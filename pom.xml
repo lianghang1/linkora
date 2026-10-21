@@ -22,6 +22,8 @@
         <module>linkora-serialize-jackson</module>
         <module>linkora-server</module>
         <module>linkora-client</module>
+        <module>linkora-spring</module>
+        <module>linkora-spring-boot-starter</module>
         <module>linkora-testkit</module>
         <module>examples</module>
     </modules>
@@ -39,6 +41,9 @@
         <servlet-api.version>3.1.0</servlet-api.version>
         <jetty.version>9.4.56.v20240826</jetty.version>
         <jackson.version>2.17.2</jackson.version>
+        <!-- Spring 5.3.x / Boot 2.7.x 是支持 JDK 8 的最后一代 -->
+        <spring-framework.version>5.3.31</spring-framework.version>
+        <spring-boot.version>2.7.18</spring-boot.version>
     </properties>
 
     <dependencyManagement>
@@ -47,6 +52,33 @@
                 <groupId>com.linkora</groupId>
                 <artifactId>linkora-core</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.linkora</groupId>
+                <artifactId>linkora-spring</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.linkora</groupId>
+                <artifactId>linkora-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-context</artifactId>
+                <version>${spring-framework.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-tx</artifactId>
+                <version>${spring-framework.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
@@ -73,6 +105,17 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <!-- Boot BOM 会将 jackson-core/annotations 压到 2.13.x，与 databind 2.17.x 混用会 NoClassDefFoundError，必须显式锁定 -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-annotations</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
             <dependency>

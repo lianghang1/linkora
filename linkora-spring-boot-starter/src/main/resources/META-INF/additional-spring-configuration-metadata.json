@@ -1,0 +1,108 @@
+{
+  "properties": [
+    {
+      "name": "linkora.server.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "是否启用 Linkora 服务端自动装配。"
+    },
+    {
+      "name": "linkora.server.auto-migrate",
+      "type": "java.lang.Boolean",
+      "defaultValue": true,
+      "description": "启动时是否对宿主 DataSource 执行 lk_* schema 迁移（幂等）。"
+    },
+    {
+      "name": "linkora.server.events-path",
+      "type": "java.lang.String",
+      "defaultValue": "/events",
+      "description": "SSE 下行端点路径。"
+    },
+    {
+      "name": "linkora.server.messages-path",
+      "type": "java.lang.String",
+      "defaultValue": "/messages",
+      "description": "消息上报端点路径。"
+    },
+    {
+      "name": "linkora.server.acks-path",
+      "type": "java.lang.String",
+      "defaultValue": "/acks",
+      "description": "ACK 上报端点路径。"
+    },
+    {
+      "name": "linkora.server.heartbeat-interval-ms",
+      "type": "java.lang.Long",
+      "defaultValue": 15000,
+      "description": "SSE 心跳间隔（毫秒），0 表示禁用。"
+    },
+    {
+      "name": "linkora.server.reconnect-hint-ms",
+      "type": "java.lang.Long",
+      "defaultValue": 3000,
+      "description": "SSE retry 重连建议间隔（毫秒）。"
+    },
+    {
+      "name": "linkora.server.register-clients",
+      "type": "java.util.Map<java.lang.String,java.lang.Boolean>",
+      "description": "启动时自动注册的客户端（clientId → 是否启用），幂等。"
+    },
+    {
+      "name": "linkora.server.sweep-interval-ms",
+      "type": "java.lang.Long",
+      "description": "补发/重推扫描周期（毫秒），未设置使用 SDK 默认。"
+    },
+    {
+      "name": "linkora.server.push-batch-size",
+      "type": "java.lang.Integer",
+      "description": "单次补发扫描每客户端最大处理条数，未设置使用 SDK 默认。"
+    },
+    {
+      "name": "linkora.server.max-delivery-retries",
+      "type": "java.lang.Integer",
+      "description": "FAILED ACK 累计多少次进入死信，未设置使用 SDK 默认。"
+    },
+    {
+      "name": "linkora.server.message-size-limit-bytes",
+      "type": "java.lang.Long",
+      "description": "上行消息体大小上限（字节），未设置使用 SDK 默认。"
+    },
+    {
+      "name": "linkora.client.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "是否启用 Linkora 客户端自动装配（默认关闭）。"
+    },
+    {
+      "name": "linkora.client.server-url",
+      "type": "java.lang.String",
+      "description": "服务端接入根地址（启用客户端时必填）。"
+    },
+    {
+      "name": "linkora.client.client-id",
+      "type": "java.lang.String",
+      "description": "本端客户端标识（启用客户端时必填）。"
+    },
+    {
+      "name": "linkora.client.db-path",
+      "type": "java.lang.String",
+      "description": "SQLite 本地队列文件路径；未设置时要求宿主提供自定义 ClientStore bean。"
+    },
+    {
+      "name": "linkora.client.sender-interval-ms",
+      "type": "java.lang.Long",
+      "description": "outbox 补传触发周期（毫秒），未设置使用 SDK 默认。"
+    },
+    {
+      "name": "linkora.client.recovery-interval-ms",
+      "type": "java.lang.Long",
+      "description": "恢复扫描周期（毫秒），未设置使用 SDK 默认。"
+    },
+    {
+      "name": "linkora.client.idle-timeout-ms",
+      "type": "java.lang.Long",
+      "description": "SSE 空闲死链检测超时（毫秒），0 禁用；未设置使用 SDK 默认。"
+    }
+  ],
+  "hints": []
+}

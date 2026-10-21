@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.linkora</groupId>
+        <artifactId>linkora-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>linkora-spring-boot-starter</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Linkora Spring Boot Starter</name>
+    <description>Spring Boot 2.7 自动装配：宿主提供 DataSource 即获得 LinkoraServer 与三端点 Servlet；可配置客户端自动接入。存储实现与客户端存储均允许宿主 bean 覆盖。</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-server</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 可选集成：JDBC 存储（宿主可换自实现接管事务） -->
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-server-storage-jdbc</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <!-- 可选集成：客户端编排与 SQLite 存储（宿主可换自实现 ClientStore） -->
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-client</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-client-storage-sqlite</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <!-- ServletRegistrationBean 泛型签名需要 servlet-api 类型；容器由宿主提供 -->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <!-- 测试 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-testkit</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+        </dependency>
+    </dependencies>
+</project>
