@@ -1,0 +1,26 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: linkora-boot-server
+  datasource:
+    # 演示用 H2 内存库；生产替换为业务库（MySQL/PostgreSQL 等 JDBC 兼容数据源）
+    url: jdbc:h2:mem:linkora-boot;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+linkora:
+  server:
+    enabled: true
+    # 启动时对宿主 DataSource 执行 lk_* schema 迁移（幂等）
+    auto-migrate: true
+    # 启动时自动注册的演示客户端（幂等）
+    register-clients:
+      demo-client: true
+    events-path: /events
+    messages-path: /messages
+    acks-path: /acks
+    # sweep-interval-ms: 5000        # 其余 ServerConfig 参数未设置时使用 SDK 默认值
+    # push-batch-size: 100

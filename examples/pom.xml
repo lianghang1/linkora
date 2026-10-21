@@ -19,5 +19,9 @@
     <modules>
         <module>plain-java-server</module>
         <module>plain-java-client</module>
+        <module>spring-mvc-server</module>
+        <module>spring-boot-server</module>
+        <module>spring-tx-server</module>
+        <module>tx-client</module>
     </modules>
 </project>
