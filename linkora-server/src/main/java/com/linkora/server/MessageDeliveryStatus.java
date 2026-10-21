@@ -6,7 +6,10 @@ import com.linkora.core.storage.server.DeliveryRecord;
 import java.util.Collections;
 import java.util.List;
 
-/** 消息状态查询结果：消息正文元信息 + 各目标客户端的投递状态。 */
+/** 消息状态查询结果：消息正文元信息 + 各目标客户端的投递状态。
+ *
+ * @author lianghang
+ */
 public final class MessageDeliveryStatus {
 
     private final LinkoraMessage message;

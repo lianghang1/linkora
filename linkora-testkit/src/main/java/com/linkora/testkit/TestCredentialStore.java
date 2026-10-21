@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * 测试用凭据库（testkit）：内存保存 clientId → token/secret 映射，
  * 供 HMAC 认证相关测试快速搭建服务端。宿主生产环境请自行实现
  * {@link CredentialStore}（落库 + 加密），不要使用本类。
+ *
+ * @author lianghang
  */
 public final class TestCredentialStore implements CredentialStore {
 

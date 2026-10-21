@@ -22,6 +22,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * testkit 自证测试：嵌入式服务器 × 真实客户端做一次完整上行/下行/ACK 往返，
  * 证明 testkit 提供的环境与生产链路语义一致。
+ *
+ * @author lianghang
  */
 public class EmbeddedLinkoraServerTest {
 

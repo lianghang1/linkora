@@ -6,6 +6,8 @@ import com.linkora.core.message.ReceiveStatus;
 /**
  * 客户端 inbox 条目（线上→线下已接收消息），对应 SQLite 表 lk_inbox。
  * 接收状态与处理状态独立追踪：RECEIVED ACK ≠ 业务处理成功。
+ *
+ * @author lianghang
  */
 public final class InboxEntry {
 

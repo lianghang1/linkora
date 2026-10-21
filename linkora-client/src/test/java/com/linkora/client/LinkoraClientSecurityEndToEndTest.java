@@ -41,6 +41,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * 安全世界端到端验证：HMAC 客户端 × HMAC 服务端认证（真实 Jetty + SQLite + H2）。
+ *
+ * @author lianghang
  */
 public class LinkoraClientSecurityEndToEndTest {
 

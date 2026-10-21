@@ -11,6 +11,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * 按 clientId 组织的 SSE 连接注册表。线程安全。
  * 同一 clientId 允许存在多条并发连接（如客户端重连竞态窗口），
  * 推送会向该 clientId 的所有活动连接尽力写出。
+ *
+ * @author lianghang
  */
 public final class SseConnectionRegistry {
 

@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 服务端自动装配测试：默认装配、路径覆盖、客户端注册、宿主 bean 覆盖。
+ *
+ * @author lianghang
  */
 class LinkoraServerAutoConfigurationTest {
 

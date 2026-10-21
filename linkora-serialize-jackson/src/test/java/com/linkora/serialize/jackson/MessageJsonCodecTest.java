@@ -15,6 +15,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+/**
+ * 覆盖线路 JSON 编解码的全字段往返、二进制 payload、非法输入拒绝与错误应答体编码。
+ *
+ * @author lianghang
+ */
 public class MessageJsonCodecTest {
 
     private final MessageJsonCodec codec = new MessageJsonCodec();

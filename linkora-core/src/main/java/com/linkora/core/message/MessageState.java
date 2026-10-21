@@ -15,6 +15,8 @@ import java.util.Set;
  * <p>本枚举的转移校验是纯函数；并发安全性由存储层保证：
  * 实现方必须以 CAS 方式（期望旧状态 + 目标状态）提交状态更新，
  * 竞争失败的调用方以最新状态重放决策。</p>
+ *
+ * @author lianghang
  */
 public enum MessageState {
 

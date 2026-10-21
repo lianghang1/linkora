@@ -34,6 +34,8 @@ import javax.servlet.http.HttpServletResponse;
  *       并按 {@code heartbeatIntervalMs} 周期发送 {@code :hb} 注释保活（0 表示禁用）；</li>
  *   <li>写出失败或容器异步超时会触发断开回调并清理注册表。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public final class SsePushServlet extends HttpServlet {
 

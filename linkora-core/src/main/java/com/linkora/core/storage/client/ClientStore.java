@@ -18,6 +18,8 @@ import java.util.Optional;
  *   <li>SQLite 事务未提交前不得触发 ACK（由上层协调器保证，接口注释为契约声明）。</li>
  *   <li>清理方法只删除已完成（终态/已确认）记录，未确认消息不得无条件删除。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public interface ClientStore {
 

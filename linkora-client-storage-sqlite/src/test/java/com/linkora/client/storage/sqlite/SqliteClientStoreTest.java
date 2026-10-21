@@ -32,6 +32,8 @@ import static org.junit.Assert.fail;
 
 /**
  * SQLite 客户端存储持久化测试：去重、CAS、查询语义、重启恢复、故障场景。
+ *
+ * @author lianghang
  */
 public class SqliteClientStoreTest {
 

@@ -13,6 +13,8 @@ import java.util.Map;
 
 /**
  * 业务 Controller：直接注入自动装配的 LinkoraServer bean 发布下行消息。
+ *
+ * @author lianghang
  */
 @RestController
 public class NotifyController {

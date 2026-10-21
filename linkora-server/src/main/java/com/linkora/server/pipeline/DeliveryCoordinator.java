@@ -32,8 +32,10 @@ import java.util.concurrent.Executor;
  *   <li>重连补发以客户端声明的 Last-Event-ID（seq）为起点，未声明时回退到
  *       服务端持久化游标；无论游标如何，周期扫描兜底覆盖一切未完成投递；</li>
  *   <li>过期消息停止投递并标记 EXPIRED（终态）；</li>
- *   <li>同一时刻只有一个执行线程调用本类写方法（由 LinkoraServer 的单线程执行器保证）。</li>
+ *       <li>同一时刻只有一个执行线程调用本类写方法（由 LinkoraServer 的单线程执行器保证）。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public final class DeliveryCoordinator implements SseSubscribeHandler {
 

@@ -3,6 +3,8 @@ package com.linkora.core.storage.server;
 /**
  * 已注册客户端的身份信息。凭据材料（token/密钥）由认证模块管理，
  * 不在本对象中保存明文凭据。
+ *
+ * @author lianghang
  */
 public final class ClientRegistration {
 

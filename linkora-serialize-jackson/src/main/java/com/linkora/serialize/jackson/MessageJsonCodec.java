@@ -25,6 +25,8 @@ import java.util.Base64;
  *
  * <p>字段缺失/类型不符抛出 {@link LinkoraException}（INVALID_MESSAGE），由调用方
  * 转换为对应 HTTP 状态。实例线程安全。</p>
+ *
+ * @author lianghang
  */
 public final class MessageJsonCodec {
 

@@ -52,6 +52,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *       已接受消息按保留策略清理；</li>
  *   <li>线程安全：start()/close() 幂等；close 后不再发起新请求。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public final class LinkoraClient implements AutoCloseable {
 

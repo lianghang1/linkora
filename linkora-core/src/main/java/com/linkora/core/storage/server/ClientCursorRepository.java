@@ -5,6 +5,8 @@ import java.util.OptionalLong;
 /**
  * 客户端投递游标仓储。游标是辅助恢复手段，
  * 补发的最终依据仍是持久化投递记录与 ACK 状态。
+ *
+ * @author lianghang
  */
 public interface ClientCursorRepository {
 

@@ -10,6 +10,8 @@ import com.linkora.core.serialize.PayloadSerializer;
  *
  * <p>仅使用 Jackson 2.13+ 的稳定 API，避免与宿主环境的 Jackson 版本仲裁冲突。
  * 实例线程安全（{@link ObjectMapper} 配置完成后不可变）。</p>
+ *
+ * @author lianghang
  */
 public final class JacksonPayloadSerializer implements PayloadSerializer {
 

@@ -11,6 +11,8 @@ import java.sql.Statement;
 /**
  * 宿主侧 ClientStore 表结构（H2 方言）。生产宿主可把同样的结构搬进
  * 自己的迁移体系（Flyway 等），或复用已有业务表。
+ *
+ * @author lianghang
  */
 final class TxClientSchema {
 

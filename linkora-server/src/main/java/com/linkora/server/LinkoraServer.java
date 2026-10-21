@@ -50,6 +50,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * <p>线程模型：所有投递/补发/扫描动作串行在单个内部调度线程上执行；
  * publish() 只做持久化（调用方线程），推送尝试异步化。</p>
+ *
+ * @author lianghang
  */
 public final class LinkoraServer {
 

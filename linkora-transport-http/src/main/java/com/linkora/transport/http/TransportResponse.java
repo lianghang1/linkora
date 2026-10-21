@@ -7,6 +7,8 @@ import java.util.Map;
 
 /**
  * 不可变的传输响应。body 已被完整读入内存（受大小上限保护）。
+ *
+ * @author lianghang
  */
 public final class TransportResponse {
 

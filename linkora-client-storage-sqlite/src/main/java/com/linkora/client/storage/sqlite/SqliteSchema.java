@@ -14,6 +14,8 @@ import java.sql.Statement;
  *
  * <p>每个迁移脚本在独立事务中执行并记录版本号；进程在任意脚本执行中崩溃后，
  * 重启会从上次已提交的版本继续，保证迁移幂等且不会半途处于中间状态。</p>
+ *
+ * @author lianghang
  */
 final class SqliteSchema {
 

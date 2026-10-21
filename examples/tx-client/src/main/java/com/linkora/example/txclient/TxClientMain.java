@@ -24,6 +24,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *   mvn -pl examples/tx-client exec:java ^
  *       -Dexec.mainClass=com.linkora.example.txclient.TxClientMain
  * </pre>
+ *
+ * @author lianghang
  */
 public final class TxClientMain {
 

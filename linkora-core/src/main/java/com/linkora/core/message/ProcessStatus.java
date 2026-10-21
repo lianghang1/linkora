@@ -3,6 +3,8 @@ package com.linkora.core.message;
 /**
  * 客户端 inbox 的业务处理进度。
  * 业务处理结果独立于接收确认：RECEIVED ACK ≠ 业务处理成功。
+ *
+ * @author lianghang
  */
 public enum ProcessStatus {
 

@@ -11,6 +11,11 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+/**
+ * 覆盖 outbox/inbox 条目的入参校验，以及 with 方法对不可变对象的变更语义。
+ *
+ * @author lianghang
+ */
 public class ClientEntryTest {
 
     private byte[] payload() {

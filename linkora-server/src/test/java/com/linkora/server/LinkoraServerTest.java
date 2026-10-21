@@ -35,6 +35,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * linkora-server 编排测试：真实 H2 JDBC 存储 + 记录型推送网关。
+ *
+ * @author lianghang
  */
 public class LinkoraServerTest {
 

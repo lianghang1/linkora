@@ -9,6 +9,8 @@ import java.util.logging.Logger;
 
 /**
  * 测试用故障注入 DataSource：getConnection 永远抛出 SQLException。
+ *
+ * @author lianghang
  */
 final class FailingDataSource implements DataSource {
 

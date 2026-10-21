@@ -25,6 +25,8 @@ import java.nio.file.Paths;
 /**
  * Spring MVC 宿主装配：宿主只需提供四个存储 SPI bean，
  * {@link LinkoraServerConfiguration} 负责组装 LinkoraServer 并管理生命周期。
+ *
+ * @author lianghang
  */
 @Configuration
 @EnableWebMvc

@@ -18,6 +18,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *   listener.awaitCount(1, 5000);
  *   assertEquals("hello", listener.messages().get(0).getPayloadAsUtf8String());
  * </pre>
+ *
+ * @author lianghang
  */
 public final class RecordingMessageListener implements MessageListener {
 

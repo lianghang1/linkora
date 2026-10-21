@@ -20,6 +20,8 @@ import static org.junit.Assert.fail;
 
 /**
  * OkHttpTransport 单元测试（基于 MockWebServer，无真实网络）。
+ *
+ * @author lianghang
  */
 public class OkHttpTransportTest {
 

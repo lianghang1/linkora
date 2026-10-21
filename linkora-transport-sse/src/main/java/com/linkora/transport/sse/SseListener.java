@@ -6,6 +6,8 @@ package com.linkora.transport.sse;
  *
  * <p>心跳约定：服务端心跳以 {@code event: hb} 类型事件发送（okhttp-sse 不透出
  * 注释行，事件型心跳可同时驱动客户端空闲检测）。</p>
+ *
+ * @author lianghang
  */
 public interface SseListener {
 

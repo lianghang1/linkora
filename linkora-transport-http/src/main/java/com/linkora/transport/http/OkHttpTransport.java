@@ -26,6 +26,8 @@ import okio.BufferedSource;
  *
  * <p>失败分类规则见 {@link TransportErrorType}；任何 2xx~5xx 响应都作为
  * {@link TransportResponse} 正常返回，不视为异常。</p>
+ *
+ * @author lianghang
  */
 public final class OkHttpTransport implements HttpTransport {
 

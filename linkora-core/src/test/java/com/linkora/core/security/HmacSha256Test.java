@@ -9,6 +9,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
+/**
+ * 用标准测试向量与字段差异比较，验证签名算法输出的正确性与确定性。
+ *
+ * @author lianghang
+ */
 public class HmacSha256Test {
 
     @Test

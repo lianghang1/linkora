@@ -10,6 +10,8 @@ import java.util.Arrays;
  * 服务端必须依据认证上下文校验 clientId，不能只信任请求体中的值。</p>
  *
  * <p>时间字段统一使用 epoch 毫秒，避免时区与时钟类型歧义。</p>
+ *
+ * @author lianghang
  */
 public final class LinkoraMessage {
 

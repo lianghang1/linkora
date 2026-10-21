@@ -13,6 +13,8 @@ import java.util.function.LongSupplier;
  * <p>为每个出站请求附加：访问令牌、毫秒时间戳、一次性随机数、
  * HMAC-SHA256 请求签名（算法见 {@link HmacSha256#canonical}）。
  * 线程安全；时间源可注入（测试用）。</p>
+ *
+ * @author lianghang
  */
 public final class HmacCredentialProvider implements CredentialProvider {
 

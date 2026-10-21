@@ -20,6 +20,8 @@ import java.util.Optional;
  *   <li>Nonce 未出现过（防重放）；</li>
  *   <li>HMAC 签名恒定时间匹配。</li>
  * </ol>
+ *
+ * @author lianghang
  */
 public final class HmacClientAuthenticator implements ClientAuthenticator {
 

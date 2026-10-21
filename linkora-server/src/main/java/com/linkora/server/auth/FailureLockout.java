@@ -6,6 +6,8 @@ package com.linkora.server.auth;
  *
  * <p>纯内存实现：重启即清零是可接受的降级（攻击者重启服务端无法获益，
  * 锁定的主要目的是拖慢爆破速度而非精确审计）。线程安全。</p>
+ *
+ * @author lianghang
  */
 public final class FailureLockout {
 

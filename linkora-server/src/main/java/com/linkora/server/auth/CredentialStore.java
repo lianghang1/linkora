@@ -5,6 +5,8 @@ import java.util.Optional;
 /**
  * 客户端凭据存储 SPI：服务端按 clientId 查找已发放的访问令牌与 HMAC 密钥。
  * 生产实现由宿主提供（通常落在认证库表），测试可使用内存实现。
+ *
+ * @author lianghang
  */
 public interface CredentialStore {
 

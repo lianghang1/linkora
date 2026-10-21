@@ -14,6 +14,8 @@ import javax.servlet.http.HttpServletResponse;
 /**
  * 服务端到单个客户端的 SSE 连接封装。所有写出方法线程安全且同步刷出；
  * 写出失败会自动关闭连接并触发断开回调。
+ *
+ * @author lianghang
  */
 public final class SseClientConnection {
 

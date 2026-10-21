@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * 已接收消息包装：在统一消息模型上提供显式 ACK 语义。
  * ackProcessed / ackFailed 只生效一次（先到先得），重复调用幂等忽略。
+ *
+ * @author lianghang
  */
 public final class LinkoraReceivedMessage {
 

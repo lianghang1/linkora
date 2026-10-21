@@ -24,6 +24,8 @@ import java.nio.charset.StandardCharsets;
  *   <li>FAILED：累计失败计数，未超阈值转 RETRYING（调度重投），超阈值进入死信；</li>
  *   <li>未知 messageId 一律返回 OK（消息可能已被保留策略清理），由服务端日志记录。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public final class AckService {
 

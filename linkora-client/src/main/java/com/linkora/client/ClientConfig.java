@@ -1,6 +1,10 @@
 package com.linkora.client;
 
-/** 客户端可调参数（全部有界校验，缺省值适合多数部署）。 */
+/**
+ * 客户端可调参数（全部有界校验，缺省值适合多数部署）。
+ *
+ * @author lianghang
+ */
 public final class ClientConfig {
 
     private final String eventsPath;

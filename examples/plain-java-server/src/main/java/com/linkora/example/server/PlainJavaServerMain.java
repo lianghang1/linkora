@@ -38,6 +38,8 @@ import java.nio.file.Paths;
  *       -Dexec.mainClass=com.linkora.example.server.PlainJavaServerMain ^
  *       -Dexec.args="8080 data/linkora-server"
  * </pre>
+ *
+ * @author lianghang
  */
 public final class PlainJavaServerMain {
 

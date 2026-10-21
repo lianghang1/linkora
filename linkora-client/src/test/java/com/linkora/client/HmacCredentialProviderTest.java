@@ -12,6 +12,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
+/**
+ * 验证 HMAC 凭据提供者生成的安全头字段完整、签名可复算，且 nonce 与签名逐请求变化。
+ *
+ * @author lianghang
+ */
 public class HmacCredentialProviderTest {
 
     @Test

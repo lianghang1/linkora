@@ -18,6 +18,8 @@ import java.util.Optional;
 /**
  * 上行消息摄入服务：认证 → 协议校验 → 大小校验 → 结构解析 → 身份匹配 → 幂等持久化。
  * 全部通过后返回"服务端已持久化接受"；重复 messageId 幂等返回 DUPLICATE。
+ *
+ * @author lianghang
  */
 public final class IngestService {
 

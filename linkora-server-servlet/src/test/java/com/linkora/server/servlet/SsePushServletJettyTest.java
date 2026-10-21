@@ -24,6 +24,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * SsePushServlet 嵌入式集成测试（Jetty 9.4 仅为测试容器，生产走宿主容器）。
+ *
+ * @author lianghang
  */
 public class SsePushServletJettyTest {
 

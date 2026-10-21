@@ -5,6 +5,8 @@ import com.linkora.core.message.OutboxStatus;
 /**
  * 客户端 outbox 条目（线下→线上待发送消息），对应 SQLite 表 lk_outbox。
  * payload 为已序列化字节，入队时即定型；重试沿用原 messageId。
+ *
+ * @author lianghang
  */
 public final class OutboxEntry {
 

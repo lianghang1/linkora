@@ -5,6 +5,8 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Nonce 防重放缓存（有界）：容量超限时按先进先出粗略驱逐，
  * 记录仅在 2 × 时钟窗口内有效，过期条目访问时惰性清理。线程安全。
+ *
+ * @author lianghang
  */
 final class NonceCache {
 

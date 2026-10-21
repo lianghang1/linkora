@@ -6,6 +6,8 @@ import java.util.Map;
 /**
  * 认证请求快照：携带客户端声明身份、HTTP 方法、请求头与请求体，
  * 供认证器实现应用层验证（如 token + HMAC 签名）。
+ *
+ * @author lianghang
  */
 public final class AuthRequest {
 

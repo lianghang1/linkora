@@ -2,7 +2,10 @@ package com.linkora.server.pipeline;
 
 import com.linkora.core.error.LinkoraErrorCode;
 
-/** ACK 处理结果：OK（含幂等重复与未知消息）或 REJECTED。 */
+/** ACK 处理结果：OK（含幂等重复与未知消息）或 REJECTED。
+ *
+ * @author lianghang
+ */
 public final class AckResult {
 
     private final boolean ok;

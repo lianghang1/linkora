@@ -11,6 +11,8 @@ import java.util.Optional;
  *   <li>写入操作在数据库事务中完成，持久化成功才返回。</li>
  *   <li>线程安全。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public interface MessageRepository {
 

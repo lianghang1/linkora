@@ -24,6 +24,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * JDBC 服务端存储测试（H2）：去重、CAS 竞争、seq 原子分配、补发查询、故障注入。
+ *
+ * @author lianghang
  */
 public class JdbcServerStorageTest {
 

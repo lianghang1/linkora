@@ -15,7 +15,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-/** 无服务端场景：入队、崩溃恢复、生命周期。 */
+/**
+ * 无服务端场景：入队、崩溃恢复、生命周期。
+ *
+ * @author lianghang
+ */
 public class LinkoraClientLocalTest {
 
     @Rule

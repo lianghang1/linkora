@@ -6,6 +6,8 @@ package com.linkora.server.auth;
  *
  * <p>生产实现见阶段 5（高熵 token + HMAC 签名 + 失败指数锁定）；
  * {@link AllowAllClientAuthenticator} 仅用于开发与测试。</p>
+ *
+ * @author lianghang
  */
 public interface ClientAuthenticator {
 

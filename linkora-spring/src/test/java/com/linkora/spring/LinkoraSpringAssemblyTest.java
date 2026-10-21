@@ -32,6 +32,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * linkora-spring 装配辅助测试：SPI bean 组装 LinkoraServer + Servlet 注册。
+ *
+ * @author lianghang
  */
 public class LinkoraSpringAssemblyTest {
 

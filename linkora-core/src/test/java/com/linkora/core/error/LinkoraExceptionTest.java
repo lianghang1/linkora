@@ -6,6 +6,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
+/**
+ * 验证统一异常对错误码与消息 ID 的携带行为，以及空错误码被拒绝的防御逻辑。
+ *
+ * @author lianghang
+ */
 public class LinkoraExceptionTest {
 
     @Test

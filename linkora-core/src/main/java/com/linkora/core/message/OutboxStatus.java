@@ -4,6 +4,8 @@ package com.linkora.core.message;
  * 客户端 outbox（线下→线上待发送队列）条目状态。
  * 只有收到服务端可验证的持久化接受结果后才推进到 SERVER_ACCEPTED；
  * 超时/响应丢失不得推进状态，重试必须沿用原 messageId。
+ *
+ * @author lianghang
  */
 public enum OutboxStatus {
 

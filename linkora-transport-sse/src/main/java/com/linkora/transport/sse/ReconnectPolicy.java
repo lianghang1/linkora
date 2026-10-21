@@ -2,6 +2,8 @@ package com.linkora.transport.sse;
 
 /**
  * 重连退避策略 SPI。实现必须线程安全且无副作用。
+ *
+ * @author lianghang
  */
 public interface ReconnectPolicy {
 

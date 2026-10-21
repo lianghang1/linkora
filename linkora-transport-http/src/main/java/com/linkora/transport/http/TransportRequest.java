@@ -7,6 +7,8 @@ import java.util.Map;
 /**
  * 不可变的传输请求。上层组装 URL、鉴权头与消息体；
  * 各超时字段为 null 时使用 {@link OkHttpTransport} 的全局默认值。
+ *
+ * @author lianghang
  */
 public final class TransportRequest {
 

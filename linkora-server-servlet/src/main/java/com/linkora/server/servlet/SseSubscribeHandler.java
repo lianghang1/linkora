@@ -5,6 +5,8 @@ import java.util.Map;
 /**
  * SSE 订阅处理 SPI。由上层（linkora-server）实现真实鉴权与注册逻辑；
  * Servlet 适配器只负责连接生命周期与帧写出。
+ *
+ * @author lianghang
  */
 public interface SseSubscribeHandler {
 

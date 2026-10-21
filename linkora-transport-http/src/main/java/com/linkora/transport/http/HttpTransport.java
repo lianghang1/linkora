@@ -6,6 +6,8 @@ package com.linkora.transport.http;
  *
  * <p>实现要求：线程安全；失败必须以 {@link TransportException} 抛出并完成错误
  * 分类，不得吞异常；传输层自身不做自动重试。</p>
+ *
+ * @author lianghang
  */
 public interface HttpTransport extends AutoCloseable {
 

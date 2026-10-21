@@ -25,6 +25,8 @@ import java.nio.file.Paths;
  * <p>HMAC 认证接入：将 {@code credentialProvider} 替换为
  * {@code new HmacCredentialProvider(clientId, accessToken, secretBytes)}
  * 并在服务端配置 {@code HmacClientAuthenticator}，见 docs/security.md。</p>
+ *
+ * @author lianghang
  */
 public final class PlainJavaClientMain {
 

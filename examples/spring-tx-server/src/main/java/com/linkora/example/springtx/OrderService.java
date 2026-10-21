@@ -16,6 +16,8 @@ import java.nio.charset.StandardCharsets;
  *   <li>抛出异常 → 业务行、消息行、投递记录一起回滚——
  *       对客户端而言消息"从未存在"，这正是事务性发件箱（transactional outbox）。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public class OrderService {
 

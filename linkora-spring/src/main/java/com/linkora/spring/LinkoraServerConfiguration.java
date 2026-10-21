@@ -34,12 +34,28 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>本类只依赖 spring-context，不依赖 Spring Boot；Boot 宿主请优先使用
  * linkora-spring-boot-starter（含配置属性与 Servlet 自动注册）。</p>
+ *
+ * @author lianghang
  */
 @Configuration
 public class LinkoraServerConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(LinkoraServerConfiguration.class);
 
+    /**
+     * 从容器内四个存储 SPI bean 组装 {@link LinkoraServer}。
+     *
+     * <p>认证器、{@link ServerConfig}、{@link PayloadSerializer} 均为可选项：
+     * 认证器缺失时回退 AllowAll 并输出警告，其余缺失时使用默认实现。</p>
+     *
+     * @param clientRegistry 在线客户端注册表（必选）
+     * @param messageRepository 消息持久化仓库（必选）
+     * @param deliveryRepository 下行投递记录仓库（必选）
+     * @param cursorRepository 客户端游标仓库（必选）
+     * @param authenticatorProvider 认证器提供者（可选）
+     * @param configProvider 服务端配置提供者（可选）
+     * @param payloadSerializerProvider 对象负载序列化器提供者（可选）
+     */
     @Bean(initMethod = "start", destroyMethod = "close")
     public LinkoraServer linkoraServer(
             ClientRegistry clientRegistry,

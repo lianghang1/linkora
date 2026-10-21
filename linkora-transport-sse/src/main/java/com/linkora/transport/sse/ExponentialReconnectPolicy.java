@@ -6,6 +6,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * 指数退避 + 抖动的默认重连策略。
  * 延迟 = min(base * multiplier^(attempt-1), max) ± jitter；
  * 服务端显式建议值优先于计算值（同样受 max 封顶）。
+ *
+ * @author lianghang
  */
 public final class ExponentialReconnectPolicy implements ReconnectPolicy {
 

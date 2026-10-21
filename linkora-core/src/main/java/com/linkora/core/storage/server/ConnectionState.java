@@ -1,6 +1,10 @@
 package com.linkora.core.storage.server;
 
-/** 客户端连接状态。 */
+/**
+ * 客户端连接状态。
+ *
+ * @author lianghang
+ */
 public enum ConnectionState {
 
     /** SSE 连接在线。 */

@@ -2,7 +2,10 @@ package com.linkora.server.pipeline;
 
 import com.linkora.core.error.LinkoraErrorCode;
 
-/** 消息摄入（上行上报）处理结果。 */
+/** 消息摄入（上行上报）处理结果。
+ *
+ * @author lianghang
+ */
 public final class IngestResult {
 
     public enum Status { ACCEPTED, DUPLICATE, REJECTED }

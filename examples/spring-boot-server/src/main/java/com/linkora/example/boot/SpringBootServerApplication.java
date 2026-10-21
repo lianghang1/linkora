@@ -12,6 +12,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * <pre>
  *   mvn -pl examples/spring-boot-server spring-boot:run
  * </pre>
+ *
+ * @author lianghang
  */
 @SpringBootApplication
 public class SpringBootServerApplication {

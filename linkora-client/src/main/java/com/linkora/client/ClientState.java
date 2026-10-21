@@ -1,6 +1,10 @@
 package com.linkora.client;
 
-/** 客户端运行状态。 */
+/**
+ * 客户端运行状态。
+ *
+ * @author lianghang
+ */
 public enum ClientState {
 
     /** 已构建，尚未启动。 */

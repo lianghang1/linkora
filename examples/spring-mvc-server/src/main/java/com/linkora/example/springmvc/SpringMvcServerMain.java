@@ -36,6 +36,8 @@ import java.nio.charset.StandardCharsets;
  * <p>生产提示：本示例用内嵌 Jetty 演示；真实 Spring MVC 部署在
  * WebApplicationInitializer / web.xml 中对 ServletContext 调用
  * {@link LinkoraServlets#register} 即可，无其他差别。</p>
+ *
+ * @author lianghang
  */
 public final class SpringMvcServerMain {
 

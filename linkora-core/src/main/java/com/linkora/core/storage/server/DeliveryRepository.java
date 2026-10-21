@@ -16,6 +16,8 @@ import java.util.Optional;
  *       这是"旧请求不得回退已完成状态"的落点。</li>
  *   <li>seq 为每个客户端独立递增的投递序号，分配必须原子。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public interface DeliveryRepository {
 

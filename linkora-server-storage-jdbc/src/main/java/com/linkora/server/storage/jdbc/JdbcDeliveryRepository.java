@@ -27,6 +27,8 @@ import java.util.Optional;
  *       {@code UPDATE last_seq = last_seq + 1}（行锁串行化）、同事务读回，
  *       并发分配严格递增且无重复、无跳号。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public final class JdbcDeliveryRepository implements DeliveryRepository {
 

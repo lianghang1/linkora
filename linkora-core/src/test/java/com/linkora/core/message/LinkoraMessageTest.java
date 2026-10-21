@@ -9,6 +9,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 
+/**
+ * 覆盖消息模型的构造校验、payload 防御性拷贝、等值语义与 toString 脱敏。
+ *
+ * @author lianghang
+ */
 public class LinkoraMessageTest {
 
     private LinkoraMessage.Builder validBuilder() {

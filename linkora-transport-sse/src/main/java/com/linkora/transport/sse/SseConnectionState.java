@@ -3,6 +3,8 @@ package com.linkora.transport.sse;
 /**
  * SSE 长连接状态。CLOSED 仅表示手动关闭后的终态；
  * 断线后的自动重连期间处于 CONNECTING。
+ *
+ * @author lianghang
  */
 public enum SseConnectionState {
 

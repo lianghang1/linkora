@@ -4,6 +4,8 @@ package com.linkora.core.serialize;
  * 负载序列化抽象。核心模块不绑定具体 JSON 实现，
  * 默认 JSON 序列化器由上层模块提供（Jackson）。
  * 实现必须线程安全。
+ *
+ * @author lianghang
  */
 public interface PayloadSerializer {
 

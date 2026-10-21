@@ -41,6 +41,8 @@ import static org.junit.Assert.assertTrue;
 /**
  * 双端端到端验证：真实 Jetty 容器 + 服务端 H2 JDBC + 客户端 SQLite，
  * 覆盖上行摄入、下行推送、ACK 状态机与重复投递幂等。
+ *
+ * @author lianghang
  */
 public class LinkoraClientEndToEndTest {
 

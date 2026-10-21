@@ -4,6 +4,8 @@ package com.linkora.core.message;
  * ACK 语义类型。语义不可混淆：
  * RECEIVED 只代表接收方已持久化，PROCESSED 才代表业务处理成功。
  * ACK 接口必须幂等，支持重复提交。
+ *
+ * @author lianghang
  */
 public enum AckType {
 

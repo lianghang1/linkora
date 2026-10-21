@@ -3,6 +3,8 @@ package com.linkora.core.message;
 /**
  * 非法状态转移异常。表明调用方基于过期状态做出了决策，
  * 应重新读取最新状态后重放处理逻辑，而不是盲目重试同一转移。
+ *
+ * @author lianghang
  */
 public class IllegalStateTransitionException extends RuntimeException {
 

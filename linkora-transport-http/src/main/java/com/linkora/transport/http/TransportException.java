@@ -3,6 +3,8 @@ package com.linkora.transport.http;
 /**
  * 传输层异常。携带错误分类、HTTP 状态码与服务端 Retry-After 提示，
  * 供上层重试调度使用。本层不做任何自动重试。
+ *
+ * @author lianghang
  */
 public class TransportException extends RuntimeException {
 

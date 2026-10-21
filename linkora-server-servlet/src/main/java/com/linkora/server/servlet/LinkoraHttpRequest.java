@@ -3,7 +3,10 @@ package com.linkora.server.servlet;
 import java.util.Collections;
 import java.util.Map;
 
-/** 端点请求快照（由 {@link LinkoraEndpointServlet} 组装）。 */
+/** 端点请求快照（由 {@link LinkoraEndpointServlet} 组装）。
+ *
+ * @author lianghang
+ */
 public final class LinkoraHttpRequest {
 
     private final String clientId;

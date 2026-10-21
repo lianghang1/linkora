@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  * <p>关键点：ClientStore 连接全部取自 {@link TransactionAwareDataSourceProxy}
  * 包装的宿主数据源，且代理目标与事务管理器持有的是同一个原始数据源，
  * 事务资源按原始数据源为键共享，outbox 写入因此能加入宿主事务。</p>
+ *
+ * @author lianghang
  */
 @Configuration
 @EnableTransactionManagement

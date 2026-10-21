@@ -3,7 +3,11 @@ package com.linkora.client;
 import java.util.Collections;
 import java.util.Map;
 
-/** 匿名凭据：不附加任何认证头（本地开发/测试用）。 */
+/**
+ * 匿名凭据：不附加任何认证头（本地开发/测试用）。
+ *
+ * @author lianghang
+ */
 public final class NoCredentialProvider implements CredentialProvider {
 
     @Override

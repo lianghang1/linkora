@@ -16,6 +16,8 @@ import javax.servlet.http.HttpServletResponse;
  *
  * <p>Servlet 只负责：请求体有界读取、请求头快照、clientId 提取、结果回写；
  * 认证、协议校验、持久化全部由上层 handler（linkora-server）完成。</p>
+ *
+ * @author lianghang
  */
 public final class LinkoraEndpointServlet extends HttpServlet {
 

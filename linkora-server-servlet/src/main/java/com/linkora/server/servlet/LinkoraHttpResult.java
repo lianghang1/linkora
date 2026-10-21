@@ -1,6 +1,9 @@
 package com.linkora.server.servlet;
 
-/** 端点处理结果（状态码 + 响应体）。 */
+/** 端点处理结果（状态码 + 响应体）。
+ *
+ * @author lianghang
+ */
 public final class LinkoraHttpResult {
 
     private final int status;

@@ -3,6 +3,8 @@ package com.linkora.server;
 /**
  * 发布结果：表示服务端已持久化接受（区分于客户端已接收/处理）。
  * duplicate=true 表示同一 messageId 已存在（幂等命中），不重复分配投递序号。
+ *
+ * @author lianghang
  */
 public final class PublishResult {
 

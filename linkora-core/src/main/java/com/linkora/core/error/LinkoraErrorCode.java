@@ -2,6 +2,8 @@ package com.linkora.core.error;
 
 /**
  * Linkora 统一错误码。对外稳定，新增只能追加不能修改语义。
+ *
+ * @author lianghang
  */
 public enum LinkoraErrorCode {
 

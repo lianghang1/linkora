@@ -30,6 +30,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
  *
  * <p>装配仍走 linkora-spring 的 {@link LinkoraServerConfiguration}：
  * 宿主提供 SPI bean 即可，无需关心 LinkoraServer 组装细节。</p>
+ *
+ * @author lianghang
  */
 @Configuration
 @EnableTransactionManagement

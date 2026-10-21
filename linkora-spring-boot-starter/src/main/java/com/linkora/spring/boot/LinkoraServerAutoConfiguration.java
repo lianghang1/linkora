@@ -43,6 +43,8 @@ import java.util.Map;
  *
  * <p>安全：未提供 ClientAuthenticator 时回退 AllowAll 并告警，生产环境必须
  * 提供真实认证器（见 docs/security.md）。</p>
+ *
+ * @author lianghang
  */
 @Configuration
 @ConditionalOnClass(name = {
@@ -81,6 +83,10 @@ public class LinkoraServerAutoConfiguration {
         return new JdbcClientCursorRepository(dataSource);
     }
 
+    /**
+     * 组装 {@link LinkoraServer}：auto-migrate 开启时先迁移 schema，认证器缺失时
+     * 回退 AllowAll 并告警；宿主已定义 LinkoraServer bean 时本方法不生效。
+     */
     @Bean(initMethod = "start", destroyMethod = "close")
     @ConditionalOnMissingBean(LinkoraServer.class)
     public LinkoraServer linkoraServer(DataSource dataSource,

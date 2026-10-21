@@ -1,6 +1,9 @@
 package com.linkora.server;
 
-/** 客户端积压查询结果。 */
+/** 客户端积压查询结果。
+ *
+ * @author lianghang
+ */
 public final class BacklogInfo {
 
     private final String clientId;

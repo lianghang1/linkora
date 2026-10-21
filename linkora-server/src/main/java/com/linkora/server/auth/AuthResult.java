@@ -2,7 +2,11 @@ package com.linkora.server.auth;
 
 import com.linkora.core.error.LinkoraErrorCode;
 
-/** 认证结果。失败必须携带稳定错误码与可诊断信息（不泄露凭据细节）。 */
+/**
+ * 认证结果。失败必须携带稳定错误码与可诊断信息（不泄露凭据细节）。
+ *
+ * @author lianghang
+ */
 public final class AuthResult {
 
     private final boolean authenticated;

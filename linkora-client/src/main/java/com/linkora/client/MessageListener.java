@@ -7,6 +7,8 @@ package com.linkora.client;
  * 调用 {@code message.ackProcessed()} → 立即标记成功；
  * 调用 {@code message.ackFailed(code, msg)} 或抛出异常 → 标记失败并按配置重试。
  * 单个监听器异常不会影响客户端其他消息的处理。</p>
+ *
+ * @author lianghang
  */
 public interface MessageListener {
 

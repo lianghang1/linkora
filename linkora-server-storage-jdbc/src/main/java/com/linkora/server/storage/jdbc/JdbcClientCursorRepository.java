@@ -15,6 +15,8 @@ import java.util.OptionalLong;
 /**
  * {@link ClientCursorRepository} 的 JDBC 实现。
  * 通过条件 UPDATE（{@code WHERE last_seq < ?}）保证游标单调前进，不允许回退。
+ *
+ * @author lianghang
  */
 public final class JdbcClientCursorRepository implements ClientCursorRepository {
 

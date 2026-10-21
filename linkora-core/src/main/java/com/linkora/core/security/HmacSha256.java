@@ -20,6 +20,8 @@ import javax.crypto.spec.SecretKeySpec;
  *
  * <p>设计说明：签名不包含 URL 路径，避免 Servlet 容器对 contextPath/servletPath
  * 的映射差异导致校验失败；跨端点重放由 timestamp + nonce 缓存拦截。</p>
+ *
+ * @author lianghang
  */
 public final class HmacSha256 {
 

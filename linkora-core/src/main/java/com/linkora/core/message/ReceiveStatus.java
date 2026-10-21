@@ -3,6 +3,8 @@ package com.linkora.core.message;
 /**
  * 客户端 inbox 的接收确认进度。
  * 只有 SQLite 事务提交成功后才允许从 PERSISTED 推进到 RECEIVED_ACK_SENT。
+ *
+ * @author lianghang
  */
 public enum ReceiveStatus {
 

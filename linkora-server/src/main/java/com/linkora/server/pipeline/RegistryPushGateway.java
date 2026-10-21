@@ -8,7 +8,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
-/** 基于 {@link SseConnectionRegistry} 的默认推送网关。 */
+/** 基于 {@link SseConnectionRegistry} 的默认推送网关。
+ *
+ * @author lianghang
+ */
 public final class RegistryPushGateway implements SsePushGateway {
 
     private final SseConnectionRegistry registry;

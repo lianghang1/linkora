@@ -1,6 +1,9 @@
 package com.linkora.server;
 
-/** 服务端可调参数（全部有界校验，缺省值适合多数部署）。 */
+/** 服务端可调参数（全部有界校验，缺省值适合多数部署）。
+ *
+ * @author lianghang
+ */
 public final class ServerConfig {
 
     private final int pushBatchSize;

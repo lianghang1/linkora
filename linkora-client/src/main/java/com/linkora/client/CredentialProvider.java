@@ -7,6 +7,8 @@ import java.util.Map;
  * 阶段 5 的 HMAC 签名实现基于 method + body 计算签名。
  *
  * <p>实现必须线程安全（会被 IO 与 SSE 线程并发调用）。</p>
+ *
+ * @author lianghang
  */
 public interface CredentialProvider {
 

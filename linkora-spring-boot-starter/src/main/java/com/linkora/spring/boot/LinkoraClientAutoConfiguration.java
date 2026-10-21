@@ -21,6 +21,8 @@ import java.nio.file.Paths;
  * <p>未配置 {@code linkora.client.db-path} 时默认使用 SQLite 本地队列；
  * 宿主定义自己的 {@link ClientStore} bean（如接 H2/MySQL 业务库接管事务，
  * 见 docs/storage-spi.md）即可整体覆盖。</p>
+ *
+ * @author lianghang
  */
 @Configuration
 @ConditionalOnClass(name = {
@@ -33,6 +35,11 @@ public class LinkoraClientAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(LinkoraClientAutoConfiguration.class);
 
+    /**
+     * 缺省提供基于 SQLite 的本地队列存储；宿主已定义 {@link ClientStore} bean 时本方法不生效。
+     *
+     * @param properties 客户端配置属性
+     */
     @Bean(destroyMethod = "close")
     @ConditionalOnMissingBean(ClientStore.class)
     public ClientStore linkoraClientStore(LinkoraClientProperties properties) {
@@ -45,6 +52,13 @@ public class LinkoraClientAutoConfiguration {
         return new SqliteClientStore(Paths.get(properties.getDbPath().trim()));
     }
 
+    /**
+     * 组装 {@link LinkoraClient}；server-url 与 client-id 必填，缺失时启动即失败，
+     * 数值型调优项未设置时沿用 SDK 默认值。
+     *
+     * @param clientStore 消息本地存储
+     * @param properties 客户端配置属性
+     */
     @Bean(initMethod = "start", destroyMethod = "close")
     @ConditionalOnMissingBean
     public LinkoraClient linkoraClient(ClientStore clientStore,

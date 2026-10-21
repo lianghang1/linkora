@@ -3,6 +3,8 @@ package com.linkora.server.pipeline;
 /**
  * SSE 推送网关 SPI：向指定客户端写出一条事件帧。
  * 抽象掉 SseConnectionRegistry，便于单元测试注入记录型网关。
+ *
+ * @author lianghang
  */
 public interface SsePushGateway {
 

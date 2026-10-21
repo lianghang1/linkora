@@ -36,6 +36,8 @@ import okhttp3.sse.EventSources;
  *
  * <p>注意：{@code Last-Event-ID} 只是传输层续传游标，不等于业务处理游标；
  * 业务 ACK 状态由上层存储与调度负责。</p>
+ *
+ * @author lianghang
  */
 public final class SseStreamClient {
 

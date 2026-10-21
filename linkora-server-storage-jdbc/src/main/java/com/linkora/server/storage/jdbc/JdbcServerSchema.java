@@ -17,6 +17,8 @@ import java.sql.Statement;
  *
  * <p>SQL 保持方言中立（ANSI），已验证 H2；MySQL 8 / PostgreSQL 在后续三库矩阵阶段验证。
  * 每个迁移脚本在独立事务中执行并记录版本号，任意时刻崩溃重启后从上次版本继续。</p>
+ *
+ * @author lianghang
  */
 public final class JdbcServerSchema {
 

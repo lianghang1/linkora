@@ -4,6 +4,8 @@ import com.linkora.core.message.MessageState;
 
 /**
  * 服务端投递记录（消息正文与投递状态分离存储，本对象只承载状态维度）。
+ *
+ * @author lianghang
  */
 public final class DeliveryRecord {
 

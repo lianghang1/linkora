@@ -51,6 +51,8 @@ import java.util.List;
  *       server.close();
  *   }
  * </pre>
+ *
+ * @author lianghang
  */
 public final class EmbeddedLinkoraServer implements AutoCloseable {
 

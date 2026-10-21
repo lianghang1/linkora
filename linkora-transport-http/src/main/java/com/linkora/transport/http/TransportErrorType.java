@@ -3,6 +3,8 @@ package com.linkora.transport.http;
 /**
  * 传输层错误分类。传输层本身不执行重试，只负责把失败归类，
  * 由上层（客户端发送调度）依据 {@link #isRetryableDefault()} 决定是否重试。
+ *
+ * @author lianghang
  */
 public enum TransportErrorType {
 

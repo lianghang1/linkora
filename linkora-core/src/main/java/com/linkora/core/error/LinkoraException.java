@@ -2,6 +2,8 @@ package com.linkora.core.error;
 
 /**
  * Linkora 统一异常。携带稳定错误码，便于业务方按码处理。
+ *
+ * @author lianghang
  */
 public class LinkoraException extends RuntimeException {
 

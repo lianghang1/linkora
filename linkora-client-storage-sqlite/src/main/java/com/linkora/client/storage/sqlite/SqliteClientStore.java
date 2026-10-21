@@ -37,6 +37,8 @@ import java.util.Optional;
  *   <li>去重依赖 message_id 主键唯一约束，INSERT ... ON CONFLICT DO NOTHING
  *       返回影响行数 0 表示重复；CAS 更新通过 WHERE 中的期望状态实现。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public final class SqliteClientStore implements ClientStore, Closeable {
 

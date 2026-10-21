@@ -20,6 +20,8 @@ import java.util.Optional;
  * <p>messageId 主键唯一约束承担幂等去重：重复保存静默忽略（保留原记录），
  * 与"先持久化后推送"的服务端语义配合。SQL 方言中立，payload 以 Base64 TEXT 存储，
  * 规避 BLOB/BYTEA 在不同数据库间的类型分歧。</p>
+ *
+ * @author lianghang
  */
 public final class JdbcMessageRepository implements MessageRepository {
 

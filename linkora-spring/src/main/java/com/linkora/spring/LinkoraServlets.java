@@ -20,6 +20,8 @@ import javax.servlet.ServletRegistration;
  *   POST {prefix}/messages  消息上报（LinkoraEndpointServlet）
  *   POST {prefix}/acks      ACK 上报（LinkoraEndpointServlet）
  * </pre>
+ *
+ * @author lianghang
  */
 public final class LinkoraServlets {
 

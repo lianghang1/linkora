@@ -4,6 +4,8 @@ import java.util.Optional;
 
 /**
  * 客户端注册与连接状态仓储。实现必须线程安全，注册幂等。
+ *
+ * @author lianghang
  */
 public interface ClientRegistry {
 

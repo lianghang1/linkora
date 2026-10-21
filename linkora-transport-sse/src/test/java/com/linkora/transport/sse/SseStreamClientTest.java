@@ -19,6 +19,8 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * SseStreamClient 单元测试（基于 MockWebServer，无真实网络）。
+ *
+ * @author lianghang
  */
 public class SseStreamClientTest {
 

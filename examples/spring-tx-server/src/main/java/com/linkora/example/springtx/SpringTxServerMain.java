@@ -23,6 +23,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  *   mvn -pl examples/spring-tx-server exec:java ^
  *       -Dexec.mainClass=com.linkora.example.springtx.SpringTxServerMain
  * </pre>
+ *
+ * @author lianghang
  */
 public final class SpringTxServerMain {
 

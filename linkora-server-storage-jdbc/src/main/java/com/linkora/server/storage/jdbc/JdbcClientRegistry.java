@@ -16,6 +16,8 @@ import java.util.Optional;
 
 /**
  * {@link ClientRegistry} 的 JDBC 实现。注册幂等：重复注册保留首次记录。
+ *
+ * @author lianghang
  */
 public final class JdbcClientRegistry implements ClientRegistry {
 

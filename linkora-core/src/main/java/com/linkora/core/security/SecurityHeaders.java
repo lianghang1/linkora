@@ -2,6 +2,8 @@ package com.linkora.core.security;
 
 /**
  * 应用层安全请求头常量。全部头名与取值不区分大小写匹配（HTTP 语义）。
+ *
+ * @author lianghang
  */
 public final class SecurityHeaders {
 

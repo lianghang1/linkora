@@ -4,6 +4,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * linkora.client.* 配置属性。未设置的数值项使用 Linkora SDK 默认值（见 ClientConfig）。
+ *
+ * @author lianghang
  */
 @ConfigurationProperties(prefix = "linkora.client")
 public class LinkoraClientProperties {

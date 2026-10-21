@@ -14,6 +14,8 @@ import java.util.Map;
 /**
  * 业务 Controller：直接注入 LinkoraServer bean 发布下行消息，
  * 展示"宿主业务代码与 Linkora 共处一个 Spring 容器"的集成形态。
+ *
+ * @author lianghang
  */
 @RestController
 public class NotifyController {

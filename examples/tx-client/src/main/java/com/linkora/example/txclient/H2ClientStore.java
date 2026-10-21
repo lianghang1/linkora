@@ -32,6 +32,8 @@ import java.util.Optional;
  *
  * <p>幂等写入用"唯一约束 + 捕获重复键"实现（方言中立），CAS 更新通过
  * WHERE 期望状态实现，与 linkora-core 契约一致（docs/storage-spi.md）。</p>
+ *
+ * @author lianghang
  */
 public class H2ClientStore implements ClientStore {
 

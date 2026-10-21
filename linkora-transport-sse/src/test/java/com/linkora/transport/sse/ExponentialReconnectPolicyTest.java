@@ -5,6 +5,11 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+/**
+ * 验证指数退避策略的倍增与封顶曲线、抖动区间边界、服务端建议值优先级及非法参数拒绝。
+ *
+ * @author lianghang
+ */
 public class ExponentialReconnectPolicyTest {
 
     @Test

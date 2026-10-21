@@ -14,6 +14,8 @@ import java.nio.charset.StandardCharsets;
  *   <li>正常返回 → 业务行与 outbox 记录一起提交，发送线程随后拾取上送；</li>
  *   <li>抛出异常 → 业务行与 outbox 记录一起回滚——消息"从未存在"。</li>
  * </ul>
+ *
+ * @author lianghang
  */
 public class OrderService {
 

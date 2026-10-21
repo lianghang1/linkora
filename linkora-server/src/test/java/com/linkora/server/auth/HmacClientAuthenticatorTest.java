@@ -16,6 +16,12 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+/**
+ * 验证令牌 + HMAC 签名认证链路的放行与拦截行为，覆盖重放、篡改、
+ * 时钟偏移与失败指数锁定/计数清零等安全语义。
+ *
+ * @author lianghang
+ */
 public class HmacClientAuthenticatorTest {
 
     private static final String CLIENT = "store-001";

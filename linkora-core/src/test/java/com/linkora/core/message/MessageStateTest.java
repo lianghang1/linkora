@@ -5,6 +5,11 @@ import org.junit.Test;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+/**
+ * 覆盖状态机的关键约束：禁止回退已完成状态、禁止跳过阶段、终态无出边、幂等转移放行。
+ *
+ * @author lianghang
+ */
 public class MessageStateTest {
 
     @Test

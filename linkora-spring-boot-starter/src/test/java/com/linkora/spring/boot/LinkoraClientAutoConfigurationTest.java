@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 客户端自动装配测试：enabled 门控、SQLite 默认存储、宿主 ClientStore 覆盖。
  * 用 testkit 内嵌服务端提供真实可达的对端，避免不可达地址造成重连风暴。
+ *
+ * @author lianghang
  */
 class LinkoraClientAutoConfigurationTest {
 
