@@ -116,9 +116,36 @@ public class LinkoraServerTest {
         PublishResult second = server.publish(message);
         assertFalse(first.isDuplicate());
         assertTrue(second.isDuplicate());
-        assertEquals(-1, second.getSeq());
+        // 重复发布返回真实 seq（与首次一致），不再是占位 -1
+        assertEquals(first.getSeq(), second.getSeq());
         assertEquals(1, server.getMessageStatus("fixed-id").orElse(null)
                 .getDeliveryRecords().size());
+    }
+
+    @Test
+    public void orphanMessageRecoveredByIdempotentRepublish() throws Exception {
+        // 模拟崩溃窗口：save 后、init 前进程崩溃 → 有消息、无投递记录
+        LinkoraMessage message = LinkoraMessage.builder()
+                .messageId("orphan-id").clientId(CLIENT).messageType("T")
+                .payload("p").createdAt(System.currentTimeMillis()).build();
+        PublishResult first = server.publish(message);
+        try (java.sql.Connection conn = dataSource.getConnection();
+             java.sql.Statement st = conn.createStatement()) {
+            st.execute("DELETE FROM lk_delivery WHERE message_id = 'orphan-id'");
+        }
+        assertEquals(0, server.getMessageStatus("orphan-id").orElse(null)
+                .getDeliveryRecords().size());
+
+        // 发布方幂等重试同 messageId：应补建投递记录并触发推送
+        PublishResult retried = server.publish(message);
+        assertTrue(retried.isDuplicate());
+        assertTrue("补建后应返回真实 seq", retried.getSeq() >= 1);
+
+        MessageDeliveryStatus status = server.getMessageStatus("orphan-id").orElse(null);
+        assertEquals(1, status.getDeliveryRecords().size());
+        assertEquals(MessageState.ACCEPTED,
+                status.getDeliveryRecords().get(0).getState());
+        awaitPush("orphan-id");
     }
 
     // ---------------- ACK 状态机 ----------------

@@ -214,13 +214,25 @@ public final class LinkoraServer {
         requireRegisteredClient(message.getClientId());
         boolean duplicate = messageRepository.findByMessageId(message.getMessageId()).isPresent();
         if (duplicate) {
-            log.debug("消息重复发布（幂等命中，触发重投）: messageId={}", message.getMessageId());
+            log.debug("消息重复发布（幂等命中）: messageId={}", message.getMessageId());
             DeliveryRecord record = deliveryRepository
                     .find(message.getMessageId(), message.getClientId()).orElse(null);
-            if (record != null) {
-                coordinator.pushNow(message.getClientId(), message.getMessageId(), record.getSeq());
+            if (record == null) {
+                // 崩溃窗口兜底：首次发布在 save 与 init 之间崩溃会留下
+                // "已持久化但无投递记录"的孤儿消息；此处补建投递记录，
+                // 使发布方按幂等重试即可恢复投递（seq 此刻才分配，无重复风险）。
+                log.warn("发现孤儿消息（无投递记录），补建投递记录: messageId={}, clientId={}",
+                        message.getMessageId(), message.getClientId());
+                long now = System.currentTimeMillis();
+                long seq = deliveryRepository.nextDeliverySeq(message.getClientId());
+                record = new DeliveryRecord(message.getMessageId(), message.getClientId(),
+                        seq, com.linkora.core.message.MessageState.ACCEPTED, 0, null, null, now, now);
+                deliveryRepository.init(record);
+            } else {
+                log.debug("重复发布触发重投: messageId={}", message.getMessageId());
             }
-            return new PublishResult(message.getMessageId(), -1, true);
+            coordinator.pushNow(message.getClientId(), message.getMessageId(), record.getSeq());
+            return new PublishResult(message.getMessageId(), record.getSeq(), true);
         }
         messageRepository.save(message);
         long seq = deliveryRepository.nextDeliverySeq(message.getClientId());
