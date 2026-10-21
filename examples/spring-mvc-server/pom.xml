@@ -11,60 +11,13 @@
     </parent>
 
     <artifactId>linkora-example-spring-mvc-server</artifactId>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
-    <name>Linkora Example: Spring MVC Server</name>
-    <description>Spring MVC 宿主示例：AnnotationConfigWebApplicationContext + linkora-spring 装配 LinkoraServer + 业务 Controller 注入发布消息。</description>
+    <name>Linkora Example: Spring MVC Server + Client</name>
+    <description>Spring MVC 多模块示例：server-app 为 linkora-spring 装配的 Spring MVC 服务端宿主（内嵌 Jetty），client-app 为零 Spring 依赖的纯 Java 客户端（下行监听/处理/ACK + 上行发送 + 触发服务端下发）。</description>
 
-    <dependencies>
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-server</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-server-storage-jdbc</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-spring</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-context</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-webmvc</artifactId>
-        </dependency>
-        <!-- 示例独立运行需要 servlet-api 与 Jetty 在运行时类路径（生产中由宿主容器提供） -->
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-server</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.jetty</groupId>
-            <artifactId>jetty-servlet</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>${slf4j.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-    </dependencies>
+    <modules>
+        <module>server-app</module>
+        <module>client-app</module>
+    </modules>
 </project>

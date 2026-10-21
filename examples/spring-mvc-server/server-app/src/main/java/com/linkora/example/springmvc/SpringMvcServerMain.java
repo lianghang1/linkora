@@ -28,7 +28,7 @@ import java.nio.charset.StandardCharsets;
  *
  * <p>运行方式（仓库根目录，首次需先 {@code mvn install -DskipTests}）：</p>
  * <pre>
- *   mvn -pl examples/spring-mvc-server exec:java ^
+ *   mvn -pl examples/spring-mvc-server/server-app exec:java ^
  *       -Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain ^
  *       -Dexec.args="8081"
  * </pre>

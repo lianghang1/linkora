@@ -45,22 +45,30 @@ mvn -pl examples/plain-java-server exec:java "-Dexec.mainClass=com.linkora.examp
 mvn -pl examples/plain-java-client exec:java "-Dexec.mainClass=com.linkora.example.client.PlainJavaClientMain" "-Dexec.args=http://127.0.0.1:8080 demo-client"
 ```
 
-Spring 宿主示例：
+Spring 宿主示例（每个示例内含 server-app 服务端 + client-app 客户端，
+完整演示下行监听/处理/ACK、上行发送、服务端下发）：
 
 ```bash
-# Spring Boot 宿主（starter 自动装配，端口 8082）
-mvn -pl examples/spring-boot-server spring-boot:run
+# Spring Boot 宿主（starter 自动装配）
+mvn -pl examples/spring-boot-server/server-app spring-boot:run
+# Spring Boot 客户端（starter 自动装配，连接 8082 server-app）
+mvn -pl examples/spring-boot-server/client-app spring-boot:run
+
 # Spring MVC 宿主（注解容器 + 内嵌 Jetty，端口 8081）
-mvn -pl examples/spring-mvc-server compile exec:java "-Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain" "-Dexec.args=8081"
+mvn -pl examples/spring-mvc-server/server-app compile exec:java "-Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain" "-Dexec.args=8081"
+# 纯 Java 客户端（零 Spring 依赖，连接 8081 server-app）
+mvn -pl examples/spring-mvc-server/client-app compile exec:java "-Dexec.mainClass=com.linkora.example.mvcclient.ClientDemoMain"
+
 # 服务端事务接管：publish 持久化与业务写入同事务（事务性发件箱）
 mvn -pl examples/spring-tx-server compile exec:java "-Dexec.mainClass=com.linkora.example.springtx.SpringTxServerMain"
 # 客户端事务接管：自实现 ClientStore 接宿主业务库，outbox 与业务同事务
 mvn -pl examples/tx-client compile exec:java "-Dexec.mainClass=com.linkora.example.txclient.TxClientMain"
 ```
 
-服务端冒烟接口：Spring Boot 宿主 `http://127.0.0.1:8082/api/status`、
-Spring MVC 宿主 `http://127.0.0.1:8081/api/status`（notify 用
-`POST /api/notify?clientId=demo-client&text=hello`）。
+服务端业务接口：Spring Boot 宿主 `http://127.0.0.1:8082/api/status`、
+Spring MVC 宿主 `http://127.0.0.1:8081/api/status`；下发消息用
+`POST /api/notify?clientId=demo-client&text=hello`（client-app 亦会
+自动触发一次下发形成收发闭环）。
 
 ## 文档
 

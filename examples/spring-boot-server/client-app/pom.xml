@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.linkora</groupId>
+        <artifactId>linkora-example-spring-boot-server</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>linkora-example-spring-boot-client-app</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Linkora Example: Spring Boot Client App</name>
+    <description>Spring Boot 客户端示例：starter 自动装配 LinkoraClient，演示下行监听/处理/ACK、上行发送并等待服务端接受、触发服务端下发消息的完整闭环。</description>
+
+    <dependencies>
+        <!-- 非 web 应用：仅引入基础 starter（web-application-type=none） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-spring-boot-starter</artifactId>
+        </dependency>
+        <!-- starter 缺省 ClientStore 为 SQLite（条件装配要求该类在 classpath） -->
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-client-storage-sqlite</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-client</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

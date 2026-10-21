@@ -10,7 +10,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *
  * <p>运行方式（仓库根目录，首次需先 {@code mvn install -DskipTests}）：</p>
  * <pre>
- *   mvn -pl examples/spring-boot-server spring-boot:run
+ *   mvn -pl examples/spring-boot-server/server-app spring-boot:run
  * </pre>
  *
  * @author lianghang
