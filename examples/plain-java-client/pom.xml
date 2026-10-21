@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.linkora</groupId>
+        <artifactId>linkora-examples</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>linkora-example-plain-java-client</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Linkora Example: Plain Java Client</name>
+    <description>普通 Java 客户端示例：无 Spring 依赖，SQLite 本地队列 + SSE 下行 + POST 上行 + ACK。</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-client</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-client-storage-sqlite</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- 示例需要自带日志实现，宿主环境通常已有 -->
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>${slf4j.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+</project>

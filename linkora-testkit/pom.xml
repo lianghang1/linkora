@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.linkora</groupId>
+        <artifactId>linkora-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>linkora-testkit</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Linkora Testkit</name>
+    <description>测试支撑：嵌入式 Linkora 服务器（H2 + Jetty 全链路）、录制监听器与测试凭据库。仅供测试与示例使用，不进入生产部署。</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-server</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-server-storage-jdbc</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-server-servlet</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- dependencyManagement 中 Jetty/H2 为 test scope，本模块自身就是测试工具，显式提升为 compile -->
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- 自测与监听器 API 依赖：RecordingMessageListener 面向 linkora-client 公共接口 -->
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-client</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-client-storage-sqlite</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+        </dependency>
+    </dependencies>
+</project>

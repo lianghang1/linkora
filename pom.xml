@@ -22,6 +22,8 @@
         <module>linkora-serialize-jackson</module>
         <module>linkora-server</module>
         <module>linkora-client</module>
+        <module>linkora-testkit</module>
+        <module>examples</module>
     </modules>
 
     <properties>
