@@ -23,6 +23,8 @@
 |---|---|---|
 | okhttp / okhttp-sse | 4.12.0 | 传递引入 kotlin-stdlib（约 1.7MB）；宿主如已有 OkHttp 4.x 可通过 `OkHttpTransport.builder().client(...)` 复用外部实例 |
 | jackson-databind | 2.17.2 | 代码只使用 2.13+ 稳定 API，宿主版本仲裁差异（2.13~2.17+）不影响功能 |
+| spring-context/tx/jdbc | 5.3.31 | 仅 `linkora-spring` 与事务接管示例使用；核心模块零 Spring 依赖 |
+| spring-boot (autoconfigure) | 2.7.18 | 仅 `linkora-spring-boot-starter` 使用；Boot 3.x（javax→jakarta）不在支持范围 |
 | sqlite-jdbc | 3.46.1.3 | **宿主 classpath 必须保证版本唯一**：多版本共存会导致 native 库重复加载冲突（`NoClassDefFoundError: Could not initialize class org.sqlite.NativeDB` 类报错） |
 | slf4j-api | 1.7.36 | 仅门面；日志实现完全由宿主提供（缺实现时退化为 NOP，不报错） |
 | h2 | 2.2.224 | 服务端**测试**依赖；生产用业务库，不会进入宿主 classpath |
@@ -51,10 +53,21 @@
 
 ## Spring 集成
 
-当前版本提供**普通 Java 全链路**（客户端零 Spring、服务端 Servlet 适配器
-兼容 Spring MVC 宿主）；`linkora-spring` / `linkora-spring-boot-starter`
-模块与 Spring MVC / Boot 专属示例**尚未提供**，宿主以 Spring MVC 运行时
-可直接按 deployment.md 的方式注册三个 Servlet，无需 Starter。
+已提供 Spring 集成模块（**不影响核心模块零 Spring 依赖**）：
+
+- `linkora-spring`：Spring MVC 宿主薄装配辅助（基于 Spring 5.3.31，
+  不依赖 Spring Boot）。宿主提供四个存储 SPI bean，
+  `LinkoraServerConfiguration` 组装并管理 `LinkoraServer` 生命周期，
+  `LinkoraServlets.register()` 一行注册三端点；
+- `linkora-spring-boot-starter`：Spring Boot 2.7.18 自动装配
+  （`linkora.server.*` / `linkora.client.*` 配置项，DataSource 即得服务端）；
+- 事务接管：`TransactionAwareDataSourceProxy` 包装宿主数据源后，
+  `publish()` 持久化与宿主 `@Transactional` 业务同生共死；
+  客户端可自实现 `ClientStore` 接宿主业务库。完整示例见
+  `examples/spring-mvc-server`、`examples/spring-boot-server`、
+  `examples/spring-tx-server`、`examples/tx-client`。
+
+不使用 Spring 的宿主仍可按 deployment.md 直接注册三个 Servlet。
 
 ## 协议兼容性
 
