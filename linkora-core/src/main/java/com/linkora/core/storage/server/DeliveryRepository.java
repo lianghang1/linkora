@@ -43,6 +43,12 @@ public interface DeliveryRepository {
      */
     List<DeliveryRecord> findUnfinishedAfterSeq(String clientId, long afterSeqExclusive, int limit);
 
+    /** 查询一条消息的全部投递记录（通常单目标一条），用于状态查询。 */
+    List<DeliveryRecord> findAllByMessageId(String messageId);
+
+    /** 统计指定客户端未完成（未到终态）投递数量，用于积压查询。 */
+    long countUnfinished(String clientId);
+
     /** 为客户端原子分配下一个投递序号（从 1 开始）。 */
     long nextDeliverySeq(String clientId);
 }

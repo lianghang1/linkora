@@ -104,7 +104,7 @@ public final class SsePushServlet extends HttpServlet {
 
         boolean accepted;
         try {
-            accepted = handler.onSubscribe(clientId, lastEventId, connection);
+            accepted = handler.onSubscribe(clientId, lastEventId, snapshotHeaders(request), connection);
         } catch (RuntimeException e) {
             log.warn("SSE 订阅处理异常: clientId={}", clientId, e);
             accepted = false;
@@ -135,6 +135,17 @@ public final class SsePushServlet extends HttpServlet {
             return header.trim();
         }
         return request.getParameter(CLIENT_ID_QUERY_PARAM);
+    }
+
+    /** 请求头快照（每个头取第一个值，保留原始头名大小写），供上层认证使用。 */
+    private static java.util.Map<String, String> snapshotHeaders(HttpServletRequest request) {
+        java.util.Enumeration<String> names = request.getHeaderNames();
+        java.util.Map<String, String> headers = new java.util.LinkedHashMap<String, String>();
+        while (names.hasMoreElements()) {
+            String name = names.nextElement();
+            headers.put(name, request.getHeader(name));
+        }
+        return headers;
     }
 
     private void writeInitialFrames(SseClientConnection connection) {

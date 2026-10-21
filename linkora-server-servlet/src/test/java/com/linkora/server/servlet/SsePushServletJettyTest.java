@@ -116,7 +116,8 @@ public class SsePushServletJettyTest {
         final AtomicReference<String> captured = new AtomicReference<String>();
         handler.onSubscribeHook = new SubscribeHook() {
             @Override
-            public boolean onSubscribe(String clientId, String lastEventId, SseClientConnection c) {
+            public boolean onSubscribe(String clientId, String lastEventId,
+                                       java.util.Map<String, String> headers, SseClientConnection c) {
                 captured.set(lastEventId);
                 subscribed.countDown();
                 return true;
@@ -262,7 +263,8 @@ public class SsePushServletJettyTest {
     // ---- 测试用记录型 handler ----
 
     private interface SubscribeHook {
-        boolean onSubscribe(String clientId, String lastEventId, SseClientConnection connection);
+        boolean onSubscribe(String clientId, String lastEventId,
+                            java.util.Map<String, String> headers, SseClientConnection connection);
     }
 
     private interface DisconnectHook {
@@ -278,11 +280,13 @@ public class SsePushServletJettyTest {
                 new AtomicReference<SseClientConnection>();
 
         @Override
-        public boolean onSubscribe(String clientId, String lastEventId, SseClientConnection connection) {
+        public boolean onSubscribe(String clientId, String lastEventId,
+                                   java.util.Map<String, String> headers,
+                                   SseClientConnection connection) {
             lastClientId.set(clientId);
             lastConnection.set(connection);
             if (onSubscribeHook != null) {
-                return onSubscribeHook.onSubscribe(clientId, lastEventId, connection);
+                return onSubscribeHook.onSubscribe(clientId, lastEventId, headers, connection);
             }
             return !rejectAll;
         }

@@ -145,6 +145,42 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
     }
 
     @Override
+    public List<DeliveryRecord> findAllByMessageId(String messageId) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT " + COLUMNS + " FROM lk_delivery WHERE message_id = ? ORDER BY seq ASC")) {
+            ps.setString(1, messageId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DeliveryRecord> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapRecord(rs));
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "按消息查询投递记录失败: " + messageId, e, messageId);
+        }
+    }
+
+    @Override
+    public long countUnfinished(String clientId) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT COUNT(*) FROM lk_delivery "
+                             + "WHERE client_id = ? AND state NOT IN (" + TERMINAL_STATE_LIST + ")")) {
+            ps.setString(1, clientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "统计未完成投递失败: " + clientId, e);
+        }
+    }
+
+    @Override
     public long nextDeliverySeq(String clientId) {
         try (Connection connection = dataSource.getConnection()) {
             boolean oldAutoCommit = connection.getAutoCommit();
