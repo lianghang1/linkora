@@ -6,6 +6,8 @@ import org.h2.jdbcx.JdbcDataSource;
 import org.junit.Test;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -236,6 +238,75 @@ public class JdbcServerStorageTest {
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    /**
+     * 宿主事务接管回归测试：连接已处于手动提交模式（autoCommit=false）时，
+     * seq 分配必须加入当前事务——不得中途 commit（会提前提交宿主业务写入），
+     * 宿主回滚后分配结果应随之消失。独立调用（自动提交连接）行为不变。
+     */
+    @Test
+    public void seqAllocationJoinsAmbientManualCommitTransaction() throws Exception {
+        DataSource ds = freshH2("seq-ambient");
+        JdbcDeliveryRepository standaloneRepo = new JdbcDeliveryRepository(ds);
+
+        // 模拟宿主事务：一条绑定的手动提交连接，close 被宿主抑制
+        final Connection ambient = ds.getConnection();
+        ambient.setAutoCommit(false);
+        Connection shared = (Connection) java.lang.reflect.Proxy.newProxyInstance(
+                Connection.class.getClassLoader(),
+                new Class<?>[] {Connection.class},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("close")) {
+                        return null; // 宿主持有连接，仓储不得真正关闭
+                    }
+                    try {
+                        return method.invoke(ambient, args);
+                    } catch (java.lang.reflect.InvocationTargetException e) {
+                        throw e.getCause();
+                    }
+                });
+        DataSource ambientDs = new DataSource() {
+            @Override public Connection getConnection() { return shared; }
+            @Override public Connection getConnection(String u, String p) { return shared; }
+            @Override public <T> T unwrap(Class<T> iface) { throw new UnsupportedOperationException(); }
+            @Override public boolean isWrapperFor(Class<?> iface) { return false; }
+            @Override public java.io.PrintWriter getLogWriter() { return null; }
+            @Override public void setLogWriter(java.io.PrintWriter out) { }
+            @Override public void setLoginTimeout(int seconds) { }
+            @Override public int getLoginTimeout() { return 0; }
+            @Override public java.util.logging.Logger getParentLogger()
+                    throws java.sql.SQLFeatureNotSupportedException {
+                throw new java.sql.SQLFeatureNotSupportedException();
+            }
+        };
+        JdbcDeliveryRepository ambientRepo = new JdbcDeliveryRepository(ambientDs);
+
+        assertEquals(1, ambientRepo.nextDeliverySeq("c-1"));
+
+        // 宿主事务未提交：其他连接不可见（若仓储中途 commit 会破坏这一点）
+        Connection observer = ds.getConnection();
+        try (ResultSet rs = observer.prepareStatement(
+                "SELECT last_seq FROM lk_client_seq WHERE client_id = 'c-1'").executeQuery()) {
+            assertFalse("seq 分配不应在宿主事务内提前提交", rs.next());
+        }
+        // 宿主回滚 → 分配结果消失
+        ambient.rollback();
+        try (ResultSet rs = observer.prepareStatement(
+                "SELECT last_seq FROM lk_client_seq WHERE client_id = 'c-1'").executeQuery()) {
+            assertFalse("宿主回滚后 seq 分配应随事务消失", rs.next());
+        }
+
+        // 独立调用（自动提交连接）行为不变：本地事务自行提交、立即可见
+        assertEquals(1, standaloneRepo.nextDeliverySeq("c-1"));
+        try (ResultSet rs = observer.prepareStatement(
+                "SELECT last_seq FROM lk_client_seq WHERE client_id = 'c-1'").executeQuery()) {
+            assertTrue("独立调用应立即提交", rs.next());
+            assertEquals(1, rs.getLong(1));
+        }
+
+        observer.close();
+        ambient.close();
     }
 
     // ---------------- DeliveryRepository：补发查询 ----------------

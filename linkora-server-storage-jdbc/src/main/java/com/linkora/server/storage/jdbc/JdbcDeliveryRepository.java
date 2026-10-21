@@ -183,8 +183,14 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
     @Override
     public long nextDeliverySeq(String clientId) {
         try (Connection connection = dataSource.getConnection()) {
-            boolean oldAutoCommit = connection.getAutoCommit();
-            connection.setAutoCommit(false);
+            // 仅当连接处于自动提交模式（独立调用）时自管本地事务；
+            // 连接已在手动提交模式（宿主事务接管，autoCommit=false）时
+            // 直接加入当前事务——严禁中途 commit/rollback，由宿主统一提交/回滚，
+            // 否则会在宿主事务内造成"提前提交"，破坏事务性发件箱语义。
+            boolean localTx = connection.getAutoCommit();
+            if (localTx) {
+                connection.setAutoCommit(false);
+            }
             try {
                 // 1. 确保序号行存在（已存在则忽略，幂等）
                 try (PreparedStatement init = connection.prepareStatement(
@@ -218,13 +224,19 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
                         allocated = rs.getLong(1);
                     }
                 }
-                connection.commit();
+                if (localTx) {
+                    connection.commit();
+                }
                 return allocated;
             } catch (Exception e) {
-                connection.rollback();
+                if (localTx) {
+                    connection.rollback();
+                }
                 throw e;
             } finally {
-                connection.setAutoCommit(oldAutoCommit);
+                if (localTx) {
+                    connection.setAutoCommit(true);
+                }
             }
         } catch (LinkoraException e) {
             throw e;
