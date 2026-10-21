@@ -2,6 +2,7 @@ package com.linkora.example.springmvc;
 
 import com.linkora.core.storage.server.ClientRegistration;
 import com.linkora.core.storage.server.ClientRegistry;
+import com.linkora.example.springmvc.service.NotifyService;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.PublishResult;
 import com.linkora.spring.LinkoraServlets;
@@ -12,8 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.DispatcherServlet;
-
-import java.nio.charset.StandardCharsets;
 
 /**
  * Spring MVC 宿主示例：注解驱动容器 + linkora-spring 装配 LinkoraServer + Jetty 承载。
@@ -82,8 +81,8 @@ public final class SpringMvcServerMain {
         LinkoraServlets.register(server, handler.getServletContext());
         jetty.start();
 
-        PublishResult welcome = server.publish(DEMO_CLIENT_ID, "greeting",
-                "欢迎接入 Linkora（Spring MVC 宿主）！".getBytes(StandardCharsets.UTF_8));
+        PublishResult welcome = context.getBean(NotifyService.class)
+                .sendGreeting(DEMO_CLIENT_ID, "欢迎接入 Linkora（Spring MVC 宿主）！");
         log.info("已下发欢迎消息: {}", welcome.getMessageId());
 
         System.out.println("========================================");

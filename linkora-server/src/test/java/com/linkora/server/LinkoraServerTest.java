@@ -411,6 +411,76 @@ public class LinkoraServerTest {
         }
     }
 
+    @Test
+    public void ingestListenerNotifiedAfterAcceptedUplink() {
+        final List<LinkoraMessage> received = new CopyOnWriteArrayList<LinkoraMessage>();
+        LinkoraServer listenerServer = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .ingestListener(new com.linkora.server.pipeline.IngestListener() {
+                    @Override
+                    public void onIngested(LinkoraMessage message) {
+                        received.add(message);
+                    }
+                })
+                .build();
+        listenerServer.start();
+        try {
+            LinkoraMessage message = LinkoraMessage.builder()
+                    .messageId("up-listener-1").clientId(CLIENT).messageType("STOCK_REPORT")
+                    .payload("{\"qty\":3}").createdAt(System.currentTimeMillis()).build();
+            com.linkora.serialize.jackson.MessageJsonCodec codec =
+                    new com.linkora.serialize.jackson.MessageJsonCodec();
+            LinkoraHttpResult result = listenerServer.ingestHttpHandler().handle(
+                    new LinkoraHttpRequest(CLIENT, "POST", protocolHeaders(),
+                            codec.encodeMessage(message).getBytes(StandardCharsets.UTF_8)));
+            assertEquals(200, result.getStatus());
+            assertEquals(1, received.size());
+            assertEquals("up-listener-1", received.get(0).getMessageId());
+            assertEquals("STOCK_REPORT", received.get(0).getMessageType());
+        } finally {
+            listenerServer.close();
+        }
+    }
+
+    @Test
+    public void ingestListenerFailureDoesNotBreakIngest() {
+        LinkoraServer listenerServer = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .ingestListener(new com.linkora.server.pipeline.IngestListener() {
+                    @Override
+                    public void onIngested(LinkoraMessage message) {
+                        throw new IllegalStateException("业务处理故障");
+                    }
+                })
+                .build();
+        listenerServer.start();
+        try {
+            LinkoraMessage message = LinkoraMessage.builder()
+                    .messageId("up-listener-2").clientId(CLIENT).messageType("T")
+                    .payload("p").createdAt(System.currentTimeMillis()).build();
+            com.linkora.serialize.jackson.MessageJsonCodec codec =
+                    new com.linkora.serialize.jackson.MessageJsonCodec();
+            LinkoraHttpResult result = listenerServer.ingestHttpHandler().handle(
+                    new LinkoraHttpRequest(CLIENT, "POST", protocolHeaders(),
+                            codec.encodeMessage(message).getBytes(StandardCharsets.UTF_8)));
+            assertEquals(200, result.getStatus());
+            assertTrue(new String(result.getBody(), StandardCharsets.UTF_8)
+                    .contains("ACCEPTED"));
+        } finally {
+            listenerServer.close();
+        }
+    }
+
     // ---------------- 补发 ----------------
 
     @Test

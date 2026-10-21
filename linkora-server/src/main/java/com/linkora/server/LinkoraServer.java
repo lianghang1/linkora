@@ -14,6 +14,7 @@ import com.linkora.server.auth.ClientAuthenticator;
 import com.linkora.server.pipeline.AckResult;
 import com.linkora.server.pipeline.AckService;
 import com.linkora.server.pipeline.DeliveryCoordinator;
+import com.linkora.server.pipeline.IngestListener;
 import com.linkora.server.pipeline.IngestResult;
 import com.linkora.server.pipeline.IngestService;
 import com.linkora.server.pipeline.RegistryPushGateway;
@@ -111,7 +112,8 @@ public final class LinkoraServer {
         }
         this.coordinator = new DeliveryCoordinator(authenticator, clientRegistry, messageRepository,
                 deliveryRepository, cursorRepository, codec, gateway, config, scheduler);
-        this.ingestService = new IngestService(authenticator, messageRepository, codec, config);
+        this.ingestService = new IngestService(authenticator, messageRepository, codec, config,
+                builder.ingestListener);
         this.ackService = new AckService(authenticator, deliveryRepository, coordinator, config);
     }
 
@@ -361,6 +363,7 @@ public final class LinkoraServer {
         private SsePushGateway gateway;
         private SseConnectionRegistry sseRegistry;
         private ScheduledExecutorService externalScheduler;
+        private IngestListener ingestListener;
 
         public Builder clientAuthenticator(ClientAuthenticator authenticator) {
             this.authenticator = authenticator;
@@ -423,6 +426,12 @@ public final class LinkoraServer {
         /** 可选：注入外部调度器（单线程语义由调用方保证），close() 不会关闭它。 */
         public Builder scheduler(ScheduledExecutorService scheduler) {
             this.externalScheduler = scheduler;
+            return this;
+        }
+
+        /** 可选：上行消息业务侧监听器，客户端上报持久化成功后被回调。 */
+        public Builder ingestListener(IngestListener listener) {
+            this.ingestListener = listener;
             return this;
         }
 

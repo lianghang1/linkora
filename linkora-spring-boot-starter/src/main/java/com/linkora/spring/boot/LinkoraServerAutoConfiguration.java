@@ -9,6 +9,7 @@ import com.linkora.server.LinkoraServer;
 import com.linkora.server.ServerConfig;
 import com.linkora.server.auth.AllowAllClientAuthenticator;
 import com.linkora.server.auth.ClientAuthenticator;
+import com.linkora.server.pipeline.IngestListener;
 import com.linkora.server.servlet.LinkoraEndpointServlet;
 import com.linkora.server.servlet.SsePushServlet;
 import com.linkora.server.storage.jdbc.JdbcClientCursorRepository;
@@ -95,6 +96,7 @@ public class LinkoraServerAutoConfiguration {
                                        DeliveryRepository deliveryRepository,
                                        ClientCursorRepository cursorRepository,
                                        org.springframework.beans.factory.ObjectProvider<ClientAuthenticator> authenticatorProvider,
+                                       org.springframework.beans.factory.ObjectProvider<IngestListener> ingestListenerProvider,
                                        LinkoraServerProperties properties) {
         if (properties.isAutoMigrate()) {
             // 在 server bean 装配（随后的 start）之前完成 schema 迁移
@@ -107,14 +109,19 @@ public class LinkoraServerAutoConfiguration {
                     + "（参见 docs/security.md 的 HMAC 方案）");
             authenticator = new AllowAllClientAuthenticator();
         }
-        return LinkoraServer.builder()
+        LinkoraServer.Builder builder = LinkoraServer.builder()
                 .clientAuthenticator(authenticator)
                 .clientRegistry(clientRegistry)
                 .messageRepository(messageRepository)
                 .deliveryRepository(deliveryRepository)
                 .cursorRepository(cursorRepository)
-                .config(toServerConfig(properties))
-                .build();
+                .config(toServerConfig(properties));
+        IngestListener ingestListener = ingestListenerProvider.getIfAvailable();
+        if (ingestListener != null) {
+            builder.ingestListener(ingestListener);
+            log.info("上行消息监听器已接入: {}", ingestListener.getClass().getSimpleName());
+        }
+        return builder.build();
     }
 
     private static ServerConfig toServerConfig(LinkoraServerProperties p) {

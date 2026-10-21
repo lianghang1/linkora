@@ -9,6 +9,7 @@ import com.linkora.server.LinkoraServer;
 import com.linkora.server.ServerConfig;
 import com.linkora.server.auth.AllowAllClientAuthenticator;
 import com.linkora.server.auth.ClientAuthenticator;
+import com.linkora.server.pipeline.IngestListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -55,6 +56,7 @@ public class LinkoraServerConfiguration {
      * @param authenticatorProvider 认证器提供者（可选）
      * @param configProvider 服务端配置提供者（可选）
      * @param payloadSerializerProvider 对象负载序列化器提供者（可选）
+     * @param ingestListenerProvider 上行消息业务监听器提供者（可选）
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     public LinkoraServer linkoraServer(
@@ -64,7 +66,8 @@ public class LinkoraServerConfiguration {
             ClientCursorRepository cursorRepository,
             ObjectProvider<ClientAuthenticator> authenticatorProvider,
             ObjectProvider<ServerConfig> configProvider,
-            ObjectProvider<PayloadSerializer> payloadSerializerProvider) {
+            ObjectProvider<PayloadSerializer> payloadSerializerProvider,
+            ObjectProvider<IngestListener> ingestListenerProvider) {
 
         ClientAuthenticator authenticator = authenticatorProvider.getIfAvailable();
         if (authenticator == null) {
@@ -88,6 +91,11 @@ public class LinkoraServerConfiguration {
         PayloadSerializer serializer = payloadSerializerProvider.getIfAvailable();
         if (serializer != null) {
             builder.payloadSerializer(serializer);
+        }
+        IngestListener ingestListener = ingestListenerProvider.getIfAvailable();
+        if (ingestListener != null) {
+            builder.ingestListener(ingestListener);
+            log.info("上行消息监听器已接入: {}", ingestListener.getClass().getSimpleName());
         }
 
         log.info("LinkoraServer 已由 Spring 容器装配（认证器: {}）",

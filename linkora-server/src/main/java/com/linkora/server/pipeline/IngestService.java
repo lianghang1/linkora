@@ -29,11 +29,20 @@ public final class IngestService {
     private final MessageRepository messageRepository;
     private final MessageJsonCodec codec;
     private final ServerConfig config;
+    private final IngestListener ingestListener;
 
     public IngestService(ClientAuthenticator authenticator,
                          MessageRepository messageRepository,
                          MessageJsonCodec codec,
                          ServerConfig config) {
+        this(authenticator, messageRepository, codec, config, null);
+    }
+
+    public IngestService(ClientAuthenticator authenticator,
+                         MessageRepository messageRepository,
+                         MessageJsonCodec codec,
+                         ServerConfig config,
+                         IngestListener ingestListener) {
         if (authenticator == null || messageRepository == null || codec == null || config == null) {
             throw new IllegalArgumentException("IngestService 依赖不能为 null");
         }
@@ -41,6 +50,7 @@ public final class IngestService {
         this.messageRepository = messageRepository;
         this.codec = codec;
         this.config = config;
+        this.ingestListener = ingestListener;
     }
 
     public IngestResult ingest(AuthRequest request) {
@@ -78,7 +88,21 @@ public final class IngestService {
         messageRepository.save(message);
         log.debug("消息已持久化接受: messageId={}, clientId={}, type={}",
                 message.getMessageId(), message.getClientId(), message.getMessageType());
+        notifyListener(message);
         return IngestResult.accepted(message.getMessageId());
+    }
+
+    /** 业务侧监听回调：异常只记告警，不影响上行结果。 */
+    private void notifyListener(LinkoraMessage message) {
+        if (ingestListener == null) {
+            return;
+        }
+        try {
+            ingestListener.onIngested(message);
+        } catch (RuntimeException e) {
+            log.warn("IngestListener 回调异常（不影响上行结果）: messageId={}",
+                    message.getMessageId(), e);
+        }
     }
 
     /** 协议版本头校验；返回 null 表示通过。 */

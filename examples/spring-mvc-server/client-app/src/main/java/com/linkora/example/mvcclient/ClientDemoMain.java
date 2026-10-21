@@ -5,8 +5,9 @@ import com.linkora.client.LinkoraClient;
 import com.linkora.client.LinkoraReceivedMessage;
 import com.linkora.client.MessageListener;
 import com.linkora.client.storage.sqlite.SqliteClientStore;
-import com.linkora.core.message.OutboxStatus;
 import com.linkora.core.storage.client.ClientStore;
+import com.linkora.example.mvcclient.handler.NotificationHandler;
+import com.linkora.example.mvcclient.service.ReportService;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -20,14 +21,15 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 纯 Java 客户端示例（零 Spring 依赖）：对接 server-app（Spring MVC 服务端宿主），
- * 演示 LinkoraClient 的完整业务闭环。
+ * 纯 Java 客户端示例（零 Spring 依赖）：对接 server-app（Spring MVC 服务端宿主）。
+ * 业务代码分两层——handler/NotificationHandler 负责下行消息处理，
+ * service/ReportService 负责上行发送，本类手动装配并串演示流程。
  *
  * <p>演示流程（对端默认 http://127.0.0.1:8081）：</p>
  * <ol>
- *   <li>注册下行监听器：收到服务端消息 → 打印 → 处理成功后 ackProcessed；</li>
- *   <li>上行发送：publish 写入 SQLite outbox → 后台线程 POST → 等待
- *       SERVER_ACCEPTED；</li>
+ *   <li>注册下行监听器：收到服务端消息 → NotificationHandler 打印 → ackProcessed；</li>
+ *   <li>上行发送：ReportService.publish 写入 SQLite outbox → 后台线程 POST →
+ *       等待 SERVER_ACCEPTED；</li>
  *   <li>请求服务端业务接口 /api/notify 下发一条消息 → 监听器收到（SSE）→ ACK。</li>
  * </ol>
  *
@@ -45,11 +47,10 @@ import java.util.concurrent.TimeUnit;
  */
 public final class ClientDemoMain {
 
-    /** 下行通知 topic（server-app 的 /api/notify 与启动欢迎消息）。 */
+    /** 下行通知 topic（server-app 的 NotifyService 以此类型发布）。 */
     private static final String TOPIC_NOTIFICATION = "notification";
+    /** 启动欢迎消息 topic（客户端离线发布，上线后补投）。 */
     private static final String TOPIC_GREETING = "greeting";
-    /** 上行上报 topic。 */
-    private static final String TOPIC_REPORT = "demo-report";
 
     private static final String SERVER_BASE = "http://127.0.0.1:8081";
     private static final String CLIENT_ID = "demo-client";
@@ -70,19 +71,11 @@ public final class ClientDemoMain {
                 .clientStore(store)
                 .config(ClientConfig.builder().build())
                 .build();
+        ReportService reportService = new ReportService(client, store);
 
-        // 1. 下行监听：收到消息 → 打印 → 业务成功后显式 ackProcessed
+        // 1. 下行监听：收到消息 → NotificationHandler 打印 → 业务成功后 ackProcessed
         //    （失败场景用 message.ackFailed(LinkoraErrorCode.XXX, "原因")，服务端按策略重试）
-        client.addListener(TOPIC_NOTIFICATION, new MessageListener() {
-            @Override
-            public void onMessage(LinkoraReceivedMessage message) {
-                System.out.println("[下行] topic=" + message.getMessageType()
-                        + " payload=" + message.getPayloadAsUtf8String()
-                        + " id=" + message.getMessageId());
-                message.ackProcessed();
-                notificationReceived.countDown();
-            }
-        });
+        client.addListener(TOPIC_NOTIFICATION, new NotificationHandler(notificationReceived));
         client.addListener(TOPIC_GREETING, new MessageListener() {
             @Override
             public void onMessage(LinkoraReceivedMessage message) {
@@ -101,11 +94,11 @@ public final class ClientDemoMain {
         System.out.println("  本地库: " + dbFile);
         System.out.println("========================================");
 
-        // 2. 上行发送：先落 SQLite outbox（进程崩溃不丢），后台线程自动 POST 上报
+        // 2. 上行发送：ReportService 先落 SQLite outbox（进程崩溃不丢），后台线程自动 POST
         for (int i = 1; i <= 3; i++) {
             String body = "mvc-client-report-" + i;
-            String messageId = client.publish(TOPIC_REPORT, body.getBytes(StandardCharsets.UTF_8));
-            boolean accepted = awaitServerAccepted(store, messageId, 30_000);
+            String messageId = reportService.submit(body);
+            boolean accepted = reportService.awaitServerAccepted(messageId, 30_000);
             System.out.println("[上行] " + body + " messageId=" + messageId
                     + " 服务端" + (accepted ? "已接受(SERVER_ACCEPTED)" : "接受超时(见日志)"));
         }
@@ -129,21 +122,6 @@ public final class ClientDemoMain {
 
         System.out.println("演示完成，客户端长驻运行（Ctrl+C 优雅关闭）");
         Thread.currentThread().join();
-    }
-
-    /** 轮询本地队列，等待该消息被服务端确认（outbox 状态 SERVER_ACCEPTED）。 */
-    private static boolean awaitServerAccepted(ClientStore store, String messageId, long timeoutMs)
-            throws InterruptedException {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            if (store.findOutbox(messageId)
-                    .filter(entry -> entry.getStatus() == OutboxStatus.SERVER_ACCEPTED)
-                    .isPresent()) {
-                return true;
-            }
-            Thread.sleep(200);
-        }
-        return false;
     }
 
     /** 调用 server-app 业务接口 POST /api/notify?clientId=..&text=.. 触发服务端下发。 */
