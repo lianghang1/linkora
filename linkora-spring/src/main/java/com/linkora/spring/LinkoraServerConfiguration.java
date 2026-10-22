@@ -7,11 +7,8 @@ import com.linkora.core.storage.server.DeliveryRepository;
 import com.linkora.core.storage.server.MessageRepository;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.ServerConfig;
-import com.linkora.server.auth.AllowAllClientAuthenticator;
 import com.linkora.server.auth.ClientAuthenticator;
 import com.linkora.server.pipeline.IngestListener;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,8 +41,6 @@ import java.util.List;
 @Configuration
 public class LinkoraServerConfiguration {
 
-    private static final Logger log = LoggerFactory.getLogger(LinkoraServerConfiguration.class);
-
     /**
      * 从容器内四个存储 SPI bean 组装 {@link LinkoraServer}。
      *
@@ -72,40 +67,13 @@ public class LinkoraServerConfiguration {
             ObjectProvider<PayloadSerializer> payloadSerializerProvider,
             ObjectProvider<IngestListener> ingestListenerProvider) {
 
-        ClientAuthenticator authenticator = authenticatorProvider.getIfAvailable();
-        if (authenticator == null) {
-            log.warn("容器内未提供 ClientAuthenticator，回退为 AllowAllClientAuthenticator；"
-                    + "该认证器放行全部请求，仅限本地开发与测试，生产环境必须替换"
-                    + "（参见 docs/security.md 的 HMAC 方案）");
-            authenticator = new AllowAllClientAuthenticator();
-        }
-
-        LinkoraServer.Builder builder = LinkoraServer.builder()
-                .clientAuthenticator(authenticator)
-                .clientRegistry(clientRegistry)
-                .messageRepository(messageRepository)
-                .deliveryRepository(deliveryRepository)
-                .cursorRepository(cursorRepository);
-
-        ServerConfig config = configProvider.getIfAvailable();
-        if (config != null) {
-            builder.config(config);
-        }
-        PayloadSerializer serializer = payloadSerializerProvider.getIfAvailable();
-        if (serializer != null) {
-            builder.payloadSerializer(serializer);
-        }
         List<IngestListener> ingestListeners = ingestListenerProvider.stream()
                 .collect(java.util.stream.Collectors.toList());
-        if (!ingestListeners.isEmpty()) {
-            builder.ingestListeners(ingestListeners);
-            for (IngestListener listener : ingestListeners) {
-                log.info("上行消息监听器已接入: {}", listener.getClass().getSimpleName());
-            }
-        }
-
-        log.info("LinkoraServer 已由 Spring 容器装配（认证器: {}）",
-                authenticator.getClass().getSimpleName());
-        return builder.build();
+        return LinkoraServerAssembler.build(
+                authenticatorProvider.getIfAvailable(),
+                clientRegistry, messageRepository, deliveryRepository, cursorRepository,
+                configProvider.getIfAvailable(),
+                payloadSerializerProvider.getIfAvailable(),
+                ingestListeners);
     }
 }

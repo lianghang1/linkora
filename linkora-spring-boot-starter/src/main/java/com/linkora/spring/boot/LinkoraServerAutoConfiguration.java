@@ -7,7 +7,6 @@ import com.linkora.core.storage.server.DeliveryRepository;
 import com.linkora.core.storage.server.MessageRepository;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.ServerConfig;
-import com.linkora.server.auth.AllowAllClientAuthenticator;
 import com.linkora.server.auth.ClientAuthenticator;
 import com.linkora.server.pipeline.IngestListener;
 import com.linkora.server.servlet.LinkoraEndpointServlet;
@@ -17,6 +16,7 @@ import com.linkora.server.storage.jdbc.JdbcClientRegistry;
 import com.linkora.server.storage.jdbc.JdbcDeliveryRepository;
 import com.linkora.server.storage.jdbc.JdbcMessageRepository;
 import com.linkora.server.storage.jdbc.JdbcServerSchema;
+import com.linkora.spring.LinkoraServerAssembler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationRunner;
@@ -86,8 +86,9 @@ public class LinkoraServerAutoConfiguration {
     }
 
     /**
-     * 组装 {@link LinkoraServer}：auto-migrate 开启时先迁移 schema，认证器缺失时
-     * 回退 AllowAll 并告警；宿主已定义 LinkoraServer bean 时本方法不生效。
+     * 组装 {@link LinkoraServer}：auto-migrate 开启时先迁移 schema；
+     * 认证器回退等组装核心复用 linkora-spring 的 {@link com.linkora.spring.LinkoraServerAssembler}；
+     * 宿主已定义 LinkoraServer bean 时本方法不生效。
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     @ConditionalOnMissingBean(LinkoraServer.class)
@@ -103,29 +104,12 @@ public class LinkoraServerAutoConfiguration {
             // 在 server bean 装配（随后的 start）之前完成 schema 迁移
             JdbcServerSchema.migrate(dataSource);
         }
-        ClientAuthenticator authenticator = authenticatorProvider.getIfAvailable();
-        if (authenticator == null) {
-            log.warn("未提供 ClientAuthenticator bean，回退为 AllowAllClientAuthenticator；"
-                    + "该认证器放行全部请求，仅限本地开发与测试，生产环境必须替换"
-                    + "（参见 docs/security.md 的 HMAC 方案）");
-            authenticator = new AllowAllClientAuthenticator();
-        }
-        LinkoraServer.Builder builder = LinkoraServer.builder()
-                .clientAuthenticator(authenticator)
-                .clientRegistry(clientRegistry)
-                .messageRepository(messageRepository)
-                .deliveryRepository(deliveryRepository)
-                .cursorRepository(cursorRepository)
-                .config(toServerConfig(properties));
         List<IngestListener> ingestListeners = ingestListenerProvider.stream()
                 .collect(java.util.stream.Collectors.toList());
-        if (!ingestListeners.isEmpty()) {
-            builder.ingestListeners(ingestListeners);
-            for (IngestListener listener : ingestListeners) {
-                log.info("上行消息监听器已接入: {}", listener.getClass().getSimpleName());
-            }
-        }
-        return builder.build();
+        return LinkoraServerAssembler.build(
+                authenticatorProvider.getIfAvailable(),
+                clientRegistry, messageRepository, deliveryRepository, cursorRepository,
+                toServerConfig(properties), null, ingestListeners);
     }
 
     private static ServerConfig toServerConfig(LinkoraServerProperties p) {

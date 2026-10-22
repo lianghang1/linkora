@@ -17,15 +17,10 @@
     <description>Spring Boot 2.7 自动装配：宿主提供 DataSource 即获得 LinkoraServer 与三端点 Servlet；可配置客户端自动接入。存储实现与客户端存储均允许宿主 bean 覆盖。</description>
 
     <dependencies>
+        <!-- 复用 linkora-spring 的服务端装配核心（LinkoraServerAssembler），传递 linkora-server 与 JDBC 存储 -->
         <dependency>
             <groupId>com.linkora</groupId>
-            <artifactId>linkora-server</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!-- JDBC 存储：默认存储实现（宿主可换自实现接管事务） -->
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-server-storage-jdbc</artifactId>
+            <artifactId>linkora-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 客户端编排与 SQLite 存储：引入 starter 即获得客户端完整能力（宿主可换自实现 ClientStore） -->
