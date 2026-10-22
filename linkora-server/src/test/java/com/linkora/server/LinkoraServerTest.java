@@ -183,6 +183,66 @@ public class LinkoraServerTest {
     }
 
     @Test
+    public void sweepRotatesCursorSoLaterMessagesAreNotStarved() throws Exception {
+        // 批次只有 2：三消息时前两轮必须能覆盖到第 3 条。
+        // 没有轮转游标时，每轮都取前 2 条，第 3 条永远轮不到（旧实现正是如此）。
+        LinkoraServer rotator = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .config(ServerConfig.builder()
+                        .sweepIntervalMs(3_600_000) // 关掉后台扫描，手动 sweep
+                        .pushBatchSize(2)
+                        .pushPacingBaseMs(1)
+                        .pushPacingMaxMs(1)
+                        .build())
+                .build();
+        rotator.start();
+        try {
+            List<String> messageIds = new java.util.ArrayList<String>();
+            for (int i = 1; i <= 3; i++) {
+                messageIds.add(rotator.publish(CLIENT, "T" + i,
+                        ("p" + i).getBytes(StandardCharsets.UTF_8)).getMessageId());
+            }
+            // 首推完成（客户端离线时 push 返回 0，但仍会被记录），清空后再扫
+            for (String messageId : messageIds) {
+                awaitPush(messageId);
+            }
+            gateway.pushes.clear();
+            gateway.connectedClients.set(1);
+            Thread.sleep(20L); // 让 pacing 到期
+
+            rotator.sweepOnce();
+            // 第一轮：只装得下 seq 1、2
+            assertEquals("第一轮应推满批次", 2, gateway.pushCount());
+            assertTrue(pushedEventIds().contains("1"));
+            assertTrue(pushedEventIds().contains("2"));
+            assertFalse("批次已满，第 3 条本轮不该出现", pushedEventIds().contains("3"));
+
+            gateway.pushes.clear();
+            rotator.sweepOnce();
+            // 第二轮：游标从 2 之后继续，必须轮到第 3 条（旧实现会重复推 1、2）
+            assertEquals("第二轮应继续向后扫，而不是重头再来", 1, gateway.pushCount());
+            assertTrue("轮转游标失效：第 3 条永远没机会", pushedEventIds().contains("3"));
+        } finally {
+            rotator.close();
+        }
+    }
+
+    private java.util.Set<String> pushedEventIds() {
+        java.util.Set<String> ids = new java.util.HashSet<String>();
+        for (java.util.List<RecordingGateway.Pushed> list : gateway.pushes.values()) {
+            for (RecordingGateway.Pushed pushed : list) {
+                ids.add(pushed.eventId);
+            }
+        }
+        return ids;
+    }
+
+    @Test
     public void failedAckSchedulesRetryThenDeadLetters() throws Exception {
         LinkoraServer retrier = LinkoraServer.builder()
                 .clientAuthenticator(new AllowAllClientAuthenticator())
