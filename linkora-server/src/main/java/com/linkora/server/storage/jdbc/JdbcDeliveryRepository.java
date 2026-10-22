@@ -314,7 +314,8 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
                 return rs.next();
             }
         } catch (SQLException e) {
-            // 顺序判断失败不应该阻断投递：退化为"允许投递"，由客户端幂等兜底
+            // 顺序判断失败按存储错误抛出：调用方（attemptPush）会捕获并跳过本条，
+            // 下一轮扫描重来——实际行为是"暂不投递"，不是"允许投递"，别误读成降级放行
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
                     "查询顺序键前序记录失败: " + clientId + "/" + sequenceKey, e);
         }

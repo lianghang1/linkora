@@ -303,6 +303,10 @@ public final class LinkoraServer {
     // ---------------- 宿主接入 ----------------
 
     /** SSE 订阅处理器（接到 SsePushServlet）。 */
+    public SseSubscribeHandler sseSubscribeHandler() {
+        return coordinator;
+    }
+
     /**
      * 单个上行请求体的最大字节数，即 {@link ServerConfig#getMessageSizeLimitBytes()}。
      *
@@ -311,10 +315,6 @@ public final class LinkoraServer {
      */
     public long getMaxBodyBytes() {
         return config.getMessageSizeLimitBytes();
-    }
-
-    public SseSubscribeHandler sseSubscribeHandler() {
-        return coordinator;
     }
 
     /** SSE 连接注册表（接到 SsePushServlet；使用默认网关时非 null）。 */

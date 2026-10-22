@@ -25,9 +25,9 @@ server.start();
 context.addServlet(new ServletHolder(
         new SsePushServlet(server.sseSubscribeHandler(), server.sseConnectionRegistry())), "/events");
 context.addServlet(new ServletHolder(
-        new LinkoraEndpointServlet(server.ingestHttpHandler())), "/messages");
+        new LinkoraEndpointServlet(server.ingestHttpHandler(), server.getMaxBodyBytes())), "/messages");
 context.addServlet(new ServletHolder(
-        new LinkoraEndpointServlet(server.ackHttpHandler())), "/acks");
+        new LinkoraEndpointServlet(server.ackHttpHandler(), server.getMaxBodyBytes())), "/acks");
 ```
 
 客户端 `serverUrl` = `http(s)://host[:port]/<contextPath前缀>`，默认子路径
@@ -71,6 +71,17 @@ context.addServlet(new ServletHolder(
 
 > 过期推进与保留策略不依赖客户端在线：`DEAD_LETTER` 与所有未完成记录永不自动删除，
 > 需要人工介入或宿主自行归档。
+
+### SSE 写出（LinkoraServerProperties 同名配置项）
+
+| 参数 | 默认值 | 说明 |
+|---|---|---|
+| `sseQueueCapacity` | 1024 | 每连接待写帧数上限，满即断开该连接（重连补发恢复） |
+| `sseWriteStallTimeoutMs` | 15000 | 单次 flush 阻塞超过该时长判定连接不可用并关闭（0 关闭看门狗） |
+| `sseWriterThreads` | 16 | 写线程池大小，按"可能同时卡死的连接数"估算 |
+
+> 除帧数上限外还有一道**字节闸门**（代码常量 8MB/连接）：帧数挡不住大消息，
+> 1MB payload 的帧约 1.37MB，1024 帧即 1.4GB。超过即断开，消息仍在 `lk_delivery`。
 
 ## 客户端部署
 
