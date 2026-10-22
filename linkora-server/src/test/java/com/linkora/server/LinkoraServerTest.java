@@ -491,6 +491,8 @@ public class LinkoraServerTest {
         awaitPush(second.getMessageId());
 
         // 模拟客户端声明已收到 first.seq：补发只应包含之后的未完成消息（即 second）
+        // 连接已建立（backfill 只对在线连接投递），网关标记在线
+        gateway.connectedClients.set(1);
         gateway.pushes.clear();
         com.linkora.server.pipeline.DeliveryCoordinator coordinator =
                 (com.linkora.server.pipeline.DeliveryCoordinator) server.sseSubscribeHandler();

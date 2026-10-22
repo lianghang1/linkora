@@ -131,15 +131,23 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
     }
 
     @Override
-    public List<DeliveryRecord> findUnfinishedAfterSeq(String clientId, long afterSeqExclusive, int limit) {
+    public List<DeliveryRecord> findUnfinishedAfterSeq(String clientId, long afterSeqExclusive,
+                                                       long now, int limit) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
                      "SELECT " + COLUMNS + " FROM lk_delivery "
-                             + "WHERE client_id = ? AND seq > ? AND state NOT IN (" + TERMINAL_STATE_LIST + ") "
+                             + "WHERE client_id = ? AND seq > ? "
+                             // 终态不再投递
+                             + "AND state NOT IN (" + TERMINAL_STATE_LIST + ") "
+                             // 死信已停止投递，等人工介入：绝不能占补发批次的名额
+                             + "AND state <> '" + MessageState.DEAD_LETTER.name() + "' "
+                             // 未到重试时间的记录本轮不取，否则会反复占位并空转
+                             + "AND (next_retry_at IS NULL OR next_retry_at <= ?) "
                              + "ORDER BY seq ASC LIMIT ?")) {
             ps.setString(1, clientId);
             ps.setLong(2, afterSeqExclusive);
-            ps.setInt(3, limit);
+            ps.setLong(3, now);
+            ps.setInt(4, limit);
             try (ResultSet rs = ps.executeQuery()) {
                 List<DeliveryRecord> result = new ArrayList<>();
                 while (rs.next()) {
