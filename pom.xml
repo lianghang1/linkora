@@ -44,7 +44,6 @@
         <module>linkora-client</module>
         <module>linkora-spring</module>
         <module>linkora-spring-boot-starter</module>
-        <module>linkora-testkit</module>
         <module>examples</module>
     </modules>
 
