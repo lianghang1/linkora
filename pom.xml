@@ -260,6 +260,8 @@
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>central</publishingServerId>
+                            <!-- 插件不识别 maven.deploy.skip，示例/测试模块必须显式排除（改示例模块名后需同步） -->
+                            <excludeArtifacts>linkora-examples,linkora-testkit,linkora-example-plain-java-server,linkora-example-plain-java-client,linkora-example-spring-boot-server,linkora-example-spring-boot-server-app,linkora-example-spring-boot-client-app,linkora-example-spring-mvc-server,linkora-example-spring-mvc-server-app,linkora-example-spring-mvc-client-app,linkora-example-spring-tx-server,linkora-example-tx-client</excludeArtifacts>
                             <!-- 校验通过即返回，去 Portal 页面确认后点 Publish；自动直发可改 true -->
                             <autoPublish>false</autoPublish>
                             <waitUntil>validated</waitUntil>
