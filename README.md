@@ -4,7 +4,7 @@
 
 面向线上服务与多个线下 Java 客户端的可靠双端通信 SDK。
 
-- 最低 JDK：8；宿主形态：**Spring Boot 2.x 或 Spring MVC 5.x**（也支持零框架宿主）
+- 最低 JDK：8；宿主形态：**Spring Boot 2.x 或 Spring MVC 5.x**
 - 通信方案：SSE 下行推送 + HTTPS POST 上行
 - 可靠性：服务端持久化 + 客户端本地队列 + 两级 ACK + 幂等 + 重试 + 断线补发
 - 投递语义：至少一次（at-least-once），业务侧需自行保证副作用幂等
@@ -253,7 +253,7 @@ linkora.client.db-path=data/client.db
 
 ## 可运行示例
 
-`examples/` 目录下每个场景都有开箱即跑的工程（Boot / MVC 双端、零框架、宿主事务接管），
+`examples/` 目录下每个场景都有开箱即跑的工程（Boot / MVC 双端、宿主事务接管），
 工程结构即推荐接入结构，直接参考或复制：
 
 ```bash
