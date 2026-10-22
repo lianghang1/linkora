@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 
@@ -71,6 +72,15 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
     private final ExpirySweeper expirySweeper;
     private final RetentionCleaner retentionCleaner;
     private volatile long lastMaintenanceAt = 0L;
+
+    /**
+     * 周期扫描的轮转游标（clientId → 上次扫到的 seq）。
+     *
+     * <p>没有它时每轮都从 seq=0 取前 N 条：只要前 N 条迟迟不 ACK（弱网、业务处理慢），
+     * 后面的新消息永远挤不进批次。看到不足一批就回卷到 0，兼顾公平与"从头补齐"。</p>
+     */
+    private final ConcurrentHashMap<String, Long> sweepCursor =
+            new ConcurrentHashMap<String, Long>();
 
     public DeliveryCoordinator(ClientAuthenticator authenticator,
                                ClientRegistry clientRegistry,
@@ -166,21 +176,35 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
     }
 
     /**
-     * 周期扫描：向所有在线客户端补推未完成投递（含到期重试），
-     * 并按固定间隔执行"不依赖在线状态"的维护动作（过期推进 + 保留策略清理）。
+     * 周期扫描：向所有在线客户端补推未完成投递（含到期重试），并执行维护动作。
+     *
+     * <p>每轮从上次扫到的 seq 之后继续，扫到不足一批就回卷到 0——保证"前面一直不 ACK
+     * 的历史消息"不会永久挡住后面的新消息。维护动作（离线过期推进 + 保留策略清理）
+     * 按固定间隔低频执行，不依赖客户端是否在线。</p>
      */
     public void sweep() {
-        for (String clientId : gateway.activeClientIds()) {
+        long now = System.currentTimeMillis();
+        Set<String> active = gateway.activeClientIds();
+        for (String clientId : active) {
             try {
-                List<DeliveryRecord> records =
-                        deliveryRepository.findUnfinishedAfterSeq(clientId, 0, config.getPushBatchSize());
+                Long cursor = sweepCursor.get(clientId);
+                long afterSeq = cursor == null ? 0L : cursor.longValue();
+                List<DeliveryRecord> records = deliveryRepository.findUnfinishedAfterSeq(
+                        clientId, afterSeq, now, config.getPushBatchSize());
                 for (DeliveryRecord record : records) {
                     attemptPush(record, false);
+                }
+                if (records.size() < config.getPushBatchSize()) {
+                    sweepCursor.remove(clientId); // 已扫到尾，下一轮从头开始
+                } else {
+                    sweepCursor.put(clientId, records.get(records.size() - 1).getSeq());
                 }
             } catch (RuntimeException e) {
                 log.warn("补发扫描失败: clientId={}", clientId, e);
             }
         }
+        // 已离线的客户端不再保留游标，避免长期运行后无界增长
+        sweepCursor.keySet().retainAll(active);
         runMaintenance();
     }
 
@@ -224,7 +248,8 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
     public void backfill(String clientId, long afterSeqExclusive) {
         try {
             List<DeliveryRecord> records = deliveryRepository.findUnfinishedAfterSeq(
-                    clientId, afterSeqExclusive, config.getPushBatchSize());
+                    clientId, afterSeqExclusive, System.currentTimeMillis(),
+                    config.getPushBatchSize());
             log.debug("重连补发: clientId={}, afterSeq={}, 待补发 {} 条",
                     clientId, afterSeqExclusive, records.size());
             for (DeliveryRecord record : records) {

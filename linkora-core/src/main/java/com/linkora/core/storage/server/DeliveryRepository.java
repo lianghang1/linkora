@@ -44,10 +44,33 @@ public interface DeliveryRepository {
                                int expectedRetryCount, int newRetryCount);
 
     /**
-     * 查询指定客户端 seq 大于 afterSeqExclusive 的未完成消息（未到终态），
-     * 按 seq 升序返回，用于重连补发。
+     * 查询指定客户端 seq 大于 afterSeqExclusive 且<b>当前可投递</b>的记录，
+     * 按 seq 升序返回，用于重连补发与周期扫描。
+     *
+     * <p>"当前可投递"必须排除三类记录，否则它们会占满批次名额、让后面的活消息饿死：</p>
+     * <ul>
+     *   <li>已到终态（PROCESSED / EXPIRED）；</li>
+     *   <li>死信（DEAD_LETTER）——已停止投递，等人工介入，不应占用补发配额；</li>
+     *   <li>尚未到重试时间的记录（next_retry_at 晚于 now）。</li>
+     * </ul>
+     *
+     * @param now 当前时间（epoch 毫秒），用于判断重试是否到期
      */
-    List<DeliveryRecord> findUnfinishedAfterSeq(String clientId, long afterSeqExclusive, int limit);
+    List<DeliveryRecord> findUnfinishedAfterSeq(String clientId, long afterSeqExclusive,
+                                                long now, int limit);
+
+    /**
+     * 兼容旧签名：等价于 {@code findUnfinishedAfterSeq(clientId, afterSeqExclusive, now, limit)}。
+     *
+     * @deprecated 语义上必须知道"当前时间"才能过滤未到期的重试记录，
+     *             请实现带 {@code now} 的版本；本方法保留仅为避免既有调用方立即编译失败。
+     */
+    @Deprecated
+    default List<DeliveryRecord> findUnfinishedAfterSeq(String clientId, long afterSeqExclusive,
+                                                        int limit) {
+        return findUnfinishedAfterSeq(clientId, afterSeqExclusive,
+                System.currentTimeMillis(), limit);
+    }
 
     /** 查询一条消息的全部投递记录（通常单目标一条），用于状态查询。 */
     List<DeliveryRecord> findAllByMessageId(String messageId);

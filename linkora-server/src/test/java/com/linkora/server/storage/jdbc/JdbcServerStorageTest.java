@@ -314,28 +314,49 @@ public class JdbcServerStorageTest {
     // ---------------- DeliveryRepository：补发查询 ----------------
 
     @Test
-    public void unfinishedQueryFiltersTerminalAndHonorsSeq() {
+    public void unfinishedQueryFiltersTerminalDeadLetterAndNotDue() {
         JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-unfinished"));
         repo.init(record("m-1", "c-1", 1, MessageState.PROCESSED));
         repo.init(record("m-2", "c-1", 2, MessageState.CREATED));
         repo.init(record("m-3", "c-1", 3, MessageState.RETRYING));
-        repo.init(record("m-4", "c-1", 4, MessageState.DEAD_LETTER)); // 非终态，需补发
+        // 死信：已停止投递，等人工介入，不得占用补发批次
+        repo.init(record("m-4", "c-1", 4, MessageState.DEAD_LETTER));
         repo.init(record("m-5", "c-1", 5, MessageState.EXPIRED));
         repo.init(record("m-6", "c-2", 1, MessageState.CREATED)); // 其他客户端隔离
+        // 重试未到期：本轮不取；已到期：取
+        repo.init(new DeliveryRecord("m-7", "c-1", 7, MessageState.FAILED, 1,
+                NOW + 60_000L, "wait", NOW, NOW));
+        repo.init(new DeliveryRecord("m-8", "c-1", 8, MessageState.FAILED, 1,
+                NOW - 1_000L, "retry", NOW, NOW));
 
-        List<DeliveryRecord> all = repo.findUnfinishedAfterSeq("c-1", 0, 100);
+        List<DeliveryRecord> all = repo.findUnfinishedAfterSeq("c-1", 0, NOW, 100);
         assertEquals(3, all.size());
         assertEquals("m-2", all.get(0).getMessageId());
         assertEquals("m-3", all.get(1).getMessageId());
-        assertEquals("m-4", all.get(2).getMessageId());
+        assertEquals("m-8", all.get(2).getMessageId());
 
-        List<DeliveryRecord> afterSeq2 = repo.findUnfinishedAfterSeq("c-1", 2, 100);
+        List<DeliveryRecord> afterSeq2 = repo.findUnfinishedAfterSeq("c-1", 2, NOW, 100);
         assertEquals(2, afterSeq2.size());
         assertEquals("m-3", afterSeq2.get(0).getMessageId());
-        assertEquals("m-4", afterSeq2.get(1).getMessageId());
+        assertEquals("m-8", afterSeq2.get(1).getMessageId());
 
-        List<DeliveryRecord> limited = repo.findUnfinishedAfterSeq("c-1", 0, 2);
+        List<DeliveryRecord> limited = repo.findUnfinishedAfterSeq("c-1", 0, NOW, 2);
         assertEquals(2, limited.size());
+    }
+
+    @Test
+    public void deadLettersDoNotStarveLaterMessages() {
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-no-starve"));
+        // 前 200 条全进死信，第 201 条是正常待投递消息
+        for (int seq = 1; seq <= 200; seq++) {
+            repo.init(record("dead-" + seq, "c-1", seq, MessageState.DEAD_LETTER));
+        }
+        repo.init(record("live-1", "c-1", 201, MessageState.ACCEPTED));
+
+        // 批次只有 100：修复前死信会把名额吃光，返回 0 条活消息
+        List<DeliveryRecord> batch = repo.findUnfinishedAfterSeq("c-1", 0, NOW, 100);
+        assertEquals(1, batch.size());
+        assertEquals("live-1", batch.get(0).getMessageId());
     }
 
     // ---------------- ClientRegistry ----------------
