@@ -57,6 +57,7 @@ context.addServlet(new ServletHolder(
 
 | 参数 | 默认值 | 说明 |
 |---|---|---|
+| `allowAnonymous` | false | 缺认证器时是否允许匿名放行；默认拒绝启动 |
 | `sweepIntervalMs` | 5000 | 补发/重推扫描周期（≥100） |
 | `pushBatchSize` | 100 | 单次扫描每客户端最多处理的投递记录数 |
 | `maxDeliveryRetries` | 10 | FAILED ACK 累计次数上限，超过进入死信 |

@@ -112,7 +112,8 @@ public class LinkoraServerAutoConfiguration {
         return LinkoraServerAssembler.build(
                 authenticatorProvider.getIfAvailable(),
                 clientRegistry, messageRepository, deliveryRepository, cursorRepository,
-                toServerConfig(properties), null, ingestListeners, uplinkHandlers);
+                toServerConfig(properties), null, ingestListeners, uplinkHandlers,
+                properties.isAllowAnonymous());
     }
 
     private static ServerConfig toServerConfig(LinkoraServerProperties p) {

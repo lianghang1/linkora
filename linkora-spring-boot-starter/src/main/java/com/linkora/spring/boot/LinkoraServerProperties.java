@@ -19,6 +19,13 @@ public class LinkoraServerProperties {
     /** 启动时是否对宿主 DataSource 执行 lk_* schema 迁移。 */
     private boolean autoMigrate = true;
 
+    /**
+     * 未提供 ClientAuthenticator 时是否允许回退为"放行全部请求"。
+     *
+     * <p>默认 false：缺认证器直接启动失败。仅本地开发/演示应设为 true。</p>
+     */
+    private boolean allowAnonymous = false;
+
     private String eventsPath = "/events";
     private String messagesPath = "/messages";
     private String acksPath = "/acks";
@@ -47,6 +54,14 @@ public class LinkoraServerProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isAllowAnonymous() {
+        return allowAnonymous;
+    }
+
+    public void setAllowAnonymous(boolean allowAnonymous) {
+        this.allowAnonymous = allowAnonymous;
     }
 
     public boolean isAutoMigrate() {

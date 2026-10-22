@@ -16,6 +16,8 @@ linkora:
     enabled: true
     # 启动时对宿主 DataSource 执行 lk_* schema 迁移（幂等）
     auto-migrate: true
+    # 演示用：未配置认证器时显式允许匿名（生产必须配置 HmacClientAuthenticator，见 docs/security.md）
+    allow-anonymous: true
     # 启动时自动注册的演示客户端（幂等）
     register-clients:
       demo-client: true

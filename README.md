@@ -565,8 +565,9 @@ try (Connection c = dataSource.getConnection()) {
 1. **投递语义是至少一次**：同一条消息可能被重复送达，业务处理必须幂等（用消息 ID 去重）。
 2. **下行消息必须显式 ACK**：处理完调用 `message.ackProcessed()`（失败调 `ackFailed(...)`），
    不 ACK 服务端会按策略无限重试。
-3. **生产必须配 HMAC 认证**：不提供 `ClientAuthenticator` 时服务端回退为**放行全部请求**
-   并打告警（仅限本地开发）。客户端侧把 `credentialProvider` 换成
+3. **生产必须配 HMAC 认证**：不提供 `ClientAuthenticator` 时服务端**直接启动失败**
+   （不会静默放行）。本地开发/演示需显式设置 `linkora.server.allow-anonymous=true`，
+   启动日志会留痕；该开关绝不应出现在生产配置里。客户端侧把 `credentialProvider` 换成
    `HmacCredentialProvider(clientId, accessToken, secretBytes)`、服务端配
    `HmacClientAuthenticator` 即启用（两端凭据一致），失败锁定与防重放内置。
 

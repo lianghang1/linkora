@@ -60,7 +60,8 @@ class LinkoraServerAutoConfigurationTest {
     @Test
     void serverStartedWithDefaultEndpoints() {
         ConfigurableApplicationContext context =
-                new SpringApplicationBuilder(App.class).run("--server.port=0");
+                new SpringApplicationBuilder(App.class)
+                        .run("--server.port=0", "--linkora.server.allow-anonymous=true");
         try {
             LinkoraServer server = context.getBean(LinkoraServer.class);
             assertNotNull(server);
@@ -82,7 +83,8 @@ class LinkoraServerAutoConfigurationTest {
         ConfigurableApplicationContext context =
                 new SpringApplicationBuilder(App.class).run("--server.port=0",
                         "--linkora.server.events-path=/sse/events",
-                        "--linkora.server.register-clients.demo-client=true");
+                        "--linkora.server.register-clients.demo-client=true",
+                        "--linkora.server.allow-anonymous=true");
         try {
             assertServletMapping(context, "linkoraSsePushServlet", "/sse/events");
             ClientRegistry registry = context.getBean(ClientRegistry.class);
@@ -97,7 +99,7 @@ class LinkoraServerAutoConfigurationTest {
     void hostBeanOverridesStarterDefaults() {
         ConfigurableApplicationContext context =
                 new SpringApplicationBuilder(App.class, HostOverrideConfig.class)
-                        .run("--server.port=0");
+                        .run("--server.port=0", "--linkora.server.allow-anonymous=true");
         try {
             assertEquals(1, context.getBeansOfType(MessageRepository.class).size(),
                     "容器内只应存在宿主自定义的 MessageRepository（starter 默认退位）");
