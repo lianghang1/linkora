@@ -57,7 +57,8 @@ public final class InboxEntry {
         this.retryCount = retryCount;
         this.nextRetryAt = nextRetryAt;
         this.lastError = lastError;
-        this.orderingKey = orderingKey;
+        this.orderingKey = orderingKey == null || orderingKey.trim().isEmpty()
+                ? null : orderingKey.trim();
     }
 
     public String getMessageId() {

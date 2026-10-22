@@ -358,13 +358,19 @@ public final class SqliteClientStore implements ClientStore, Closeable {
     }
 
     // ---------------- 顺序键 ----------------
+
+    /** 空键（null/空白）语义 = 不参与顺序约束。 */
+    private static boolean isBlankKey(String orderingKey) {
+        return orderingKey == null || orderingKey.trim().isEmpty();
+    }
+
     //
     // 用 SQLite 的 rowid 做"更早"的判据：rowid 是插入顺序，等于发布/到达顺序，
     // 比 created_at 更可靠（同一毫秒内连续发布不会打平）。
 
     @Override
     public boolean hasEarlierActiveInKey(String orderingKey, String messageId) {
-        if (orderingKey == null) {
+        if (isBlankKey(orderingKey)) {
             return false;
         }
         return exec("hasEarlierActiveInKey", () -> {
@@ -385,7 +391,7 @@ public final class SqliteClientStore implements ClientStore, Closeable {
 
     @Override
     public boolean hasEarlierUnsettledInbox(String orderingKey, String messageId) {
-        if (orderingKey == null) {
+        if (isBlankKey(orderingKey)) {
             return false;
         }
         return exec("hasEarlierUnsettledInbox", () -> {
@@ -406,7 +412,7 @@ public final class SqliteClientStore implements ClientStore, Closeable {
 
     @Override
     public Optional<InboxEntry> findNextInboxInKey(String orderingKey) {
-        if (orderingKey == null) {
+        if (isBlankKey(orderingKey)) {
             return Optional.empty();
         }
         return exec("findNextInboxInKey", () -> {

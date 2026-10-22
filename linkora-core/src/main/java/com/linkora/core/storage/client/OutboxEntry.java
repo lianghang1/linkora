@@ -52,7 +52,10 @@ public final class OutboxEntry {
         this.nextRetryAt = nextRetryAt;
         this.expiresAt = expiresAt;
         this.lastError = lastError;
-        this.orderingKey = orderingKey;
+        // 与 LinkoraMessage 保持一致：null 与空白都归一为 null（= 不参与顺序约束），
+        // 否则空串会变成一条"所有空串共用"的假车道，把无关消息串行起来
+        this.orderingKey = orderingKey == null || orderingKey.trim().isEmpty()
+                ? null : orderingKey.trim();
     }
 
     public String getMessageId() {

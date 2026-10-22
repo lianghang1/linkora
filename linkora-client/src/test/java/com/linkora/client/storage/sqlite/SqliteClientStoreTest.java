@@ -27,6 +27,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -474,6 +475,30 @@ public class SqliteClientStoreTest {
                     inboxInKey("a", "order-1", ProcessStatus.PROCESSED), ProcessStatus.PENDING);
             assertFalse(store.hasEarlierUnsettledInbox("order-1", "b"));
             assertEquals("b", store.findNextInboxInKey("order-1").get().getMessageId());
+        }
+    }
+
+    @Test
+    public void blankOrderingKeyBehavesLikeNoKey() throws Exception {
+        // 空串/空白必须归一成 null：否则所有"没传 key 但传了空串"的消息会共用一条假车道
+        assertNull(new OutboxEntry("x", "T", "p".getBytes(StandardCharsets.UTF_8),
+                OutboxStatus.PENDING, NOW, NOW, 0, null, null, null, "").getOrderingKey());
+        assertNull(new OutboxEntry("x", "T", "p".getBytes(StandardCharsets.UTF_8),
+                OutboxStatus.PENDING, NOW, NOW, 0, null, null, null, "   ").getOrderingKey());
+
+        try (SqliteClientStore store = new SqliteClientStore(dbPath())) {
+            store.saveOutbox(outboxInKey("a", ""));
+            store.saveOutbox(outboxInKey("b", "  "));
+            // 两条都没有有效 key：互不阻塞，也不产生额外查询
+            assertFalse(store.hasEarlierActiveInKey("", "b"));
+            assertFalse(store.hasEarlierActiveInKey(null, "b"));
+            assertFalse(store.hasEarlierActiveInKey("  ", "b"));
+            assertNull(store.findOutbox("a").get().getOrderingKey());
+
+            store.saveInbox(inboxInKey("i-1", "", ProcessStatus.PENDING));
+            store.saveInbox(inboxInKey("i-2", "", ProcessStatus.PENDING));
+            assertFalse(store.hasEarlierUnsettledInbox("", "i-2"));
+            assertFalse(store.findNextInboxInKey("").isPresent());
         }
     }
 

@@ -297,7 +297,7 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
 
     @Override
     public boolean hasEarlierUnsettled(String clientId, String orderingKey, long seq) {
-        if (orderingKey == null) {
+        if (orderingKey == null || orderingKey.trim().isEmpty()) {
             return false;
         }
         try (Connection connection = dataSource.getConnection();
