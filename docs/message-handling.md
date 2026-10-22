@@ -67,6 +67,11 @@
 - 客户端在 `MessageListener.onMessage` 里处理消息后**必须显式 ACK**：
   成功调 `message.ackProcessed()`；业务失败调 `message.ackFailed(错误码, 原因)`，
   服务端按策略重试。未 ACK 的消息会在重连/重启后补投。
+- **解码失败不静默丢弃**：payload 损坏、JSON 不完整等导致 `decodeMessage` 失败时，
+  客户端会回一条 `FAILED` ACK（错误码 `INVALID_MESSAGE`），由服务端按重试策略计数，
+  达到 `maxDeliveryRetries`（默认 10）后进死信。否则服务端会按 pacing 无限重推，
+  带 `sequenceKey` 时还会永久占住该键的车道。
+  连 `messageId` 都提取不到时无法回 ACK，此时只能靠消息的 `expiresAt` 兜底。
 - 客户端可用 `client.addListener(topic, listener)` 注册多个监听器，
   `start()` 之后仍可继续注册。
 
