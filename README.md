@@ -1,5 +1,7 @@
 # Linkora
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.lianghang1/linkora-spring-boot-starter)](https://central.sonatype.com/artifact/io.github.lianghang1/linkora-spring-boot-starter)
+
 面向线上服务与多个线下 Java 客户端的可靠双端通信 SDK。
 
 - 最低 JDK：8；宿主形态：**Spring Boot 2.x 或 Spring MVC 5.x**（也支持零框架宿主）
@@ -21,34 +23,43 @@
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring-boot-starter</artifactId> <!-- 或 linkora-spring -->
-    <version>0.2.0</version>
+    <version>x.y.z</version>
 </dependency>
 ```
+
+> 示例中的 `x.y.z` 一律替换为最新版本（上方徽章实时显示）。
 
 ---
 
 ## 模式一：Spring Boot
 
-### 服务端：给一个 DataSource 就能用
+### 服务端应用
+
+**第 1 步：引入依赖**
 
 ```xml
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring-boot-starter</artifactId>
-    <version>0.2.0</version>
+    <version>x.y.z</version>
 </dependency>
 ```
 
-`application.yml`（其余全部自动装配，含建表迁移）：
+**第 2 步：application.yml 配置**（其余全部自动装配，含首次启动自动建表）
 
 ```yaml
 linkora:
   server:
-    register-clients:            # 预注册的客户端 ID（→ 是否启用）
+    enabled: true                # 服务端开关，默认 true
+    auto-migrate: true           # 启动时对宿主 DataSource 自动建表（幂等）
+    register-clients:            # 预注册客户端 ID（客户端必须用其中之一接入）
       store-001: true
+    # events-path: /events       # SSE 下行端点，默认 /events
+    # messages-path: /messages   # 上行端点
+    # acks-path: /acks           # ACK 端点
 ```
 
-下发消息 = 注入 `LinkoraServer` 调 `publish`：
+**第 3 步：下发消息（注入 `LinkoraServer`，持久化成功才返回，客户端断线时重连后自动补发）**
 
 ```java
 @Service
@@ -58,15 +69,12 @@ public class OrderService {
     public OrderService(LinkoraServer linkora) { this.linkora = linkora; }
 
     public void notifyStore(String clientId, Object payload) {
-        // 推给指定客户端；持久化成功后才返回，断线的客户端重连后自动补发
         linkora.publish(clientId, "order-created", payload);
     }
 }
 ```
 
-接收上行消息 = 实现一个 `UplinkHandler` bean（**推荐方式**：装配层自动收集全部
-handler bean 经内置路由器按 messageType 分发，零装配代码；需要更泛化的回调
-也可以直接实现 `IngestListener` bean）：
+**第 4 步：接收上行（实现 `UplinkHandler` bean 即生效，自动按 `messageType()` 分发，零装配代码）**
 
 ```java
 @Service
@@ -81,38 +89,43 @@ public class OrderStatusHandler implements UplinkHandler {
 }
 ```
 
-常用配置项（未列出的一律有安全默认值，未设置时无需关心）：
+其余配置项均有安全默认值，无需关心。
 
-| 配置 | 默认 | 说明 |
-|---|---|---|
-| `linkora.server.enabled` | `true` | 服务端自动装配开关 |
-| `linkora.server.auto-migrate` | `true` | 启动时对宿主 DataSource 自动建表（幂等，可关） |
-| `linkora.server.register-clients` | 空 | 预注册客户端及启用状态 |
-| `linkora.server.heartbeat-interval-ms` | `15000` | SSE 心跳间隔 |
+### 客户端应用
 
-### 客户端：一个开关 + 三行配置
+**第 1 步：引入依赖**（与服务端同一个 starter 包）
+
+```xml
+<dependency>
+    <groupId>io.github.lianghang1</groupId>
+    <artifactId>linkora-spring-boot-starter</artifactId>
+    <version>x.y.z</version>
+</dependency>
+```
+
+**第 2 步：application.yml 配置**
 
 ```yaml
 linkora:
   client:
-    enabled: true                # 默认关闭，显式开启
-    server-url: http://127.0.0.1:8082
-    client-id: store-001         # 与服务端 register-clients 一致
-    # db-path: data/client.db    # 缺省 SQLite 本地队列，可省略
+    enabled: true                        # 客户端开关，默认 false，必须显式开启
+    server-url: http://127.0.0.1:8082    # 服务端地址
+    client-id: store-001                 # 必须在服务端 register-clients 中
+    # db-path: data/client.db            # SQLite 本地队列路径，可省略
 ```
+
+**第 3 步：接收下行（实现 `MessageListener` 并注册，业务处理后必须显式 ACK）**
 
 ```java
 @Service
 public class OrderHandler implements MessageListener {
     @Override
     public void onMessage(LinkoraReceivedMessage message) {
-        // 收到服务端下发的 order-created，业务处理后必须显式 ACK
+        // 收到 order-created 推送，业务处理后显式 ACK（不 ACK 服务端会无限重试）
         message.ackProcessed();
     }
 }
-```
 
-```java
 @Configuration
 public class LinkoraBinding {
     @Bean
@@ -122,29 +135,30 @@ public class LinkoraBinding {
 }
 ```
 
-上行发送 = 注入 `UplinkPublisher`（客户端装配自动注册的 bean）调 `publish`
-（写本地队列后自动发送与重试，崩溃不丢；`awaitServerAccepted` 可等"服务端已接受"确认）：
+**第 4 步：发送上行（注入 `UplinkPublisher`，写本地队列后自动发送与重试，崩溃不丢）**
 
 ```java
 String messageId = uplinkPublisher.publish("order-status-updated", payload); // 对象自动 JSON 序列化
-boolean accepted = uplinkPublisher.awaitServerAccepted(messageId, 30_000);
+boolean accepted = uplinkPublisher.awaitServerAccepted(messageId, 30_000);   // 可选：等服务端接受的确认
 ```
 
 ---
 
 ## 模式二：Spring MVC（不依赖 Boot）
 
-### 服务端：@Import + 四个存储 bean
+### 服务端应用
+
+**第 1 步：引入依赖**
 
 ```xml
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring</artifactId>
-    <version>0.2.0</version>
+    <version>x.y.z</version>
 </dependency>
 ```
 
-装配类（`LinkoraServerConfiguration` 负责组装与生命周期，业务代码写法与 Boot 模式完全相同）：
+**第 2 步：装配配置类（`@Import` 启用，提供 DataSource 与四个存储 bean）**
 
 ```java
 @Configuration
@@ -157,10 +171,10 @@ public class AppConfig {
 
     @Bean
     public ClientAuthenticator linkoraClientAuthenticator() {
-        return new HmacClientAuthenticator(/* 凭据库 */); // 见"注意事项"
+        return new HmacClientAuthenticator(/* 凭据库 */); // 生产必配，写法见"使用前必读"第 3 条
     }
 
-    // 四个存储 SPI bean：用官方 JDBC 实现，或自实现接宿主业务库（事务接管）
+    // 四个存储 SPI bean：官方 JDBC 实现，或自实现接宿主业务库（事务接管）
     @Bean public ClientRegistry linkoraClientRegistry(DataSource ds) { return new JdbcClientRegistry(ds); }
     @Bean public MessageRepository linkoraMessageRepository(DataSource ds) { return new JdbcMessageRepository(ds); }
     @Bean public DeliveryRepository linkoraDeliveryRepository(DataSource ds) { return new JdbcDeliveryRepository(ds); }
@@ -168,32 +182,35 @@ public class AppConfig {
 }
 ```
 
-三个 HTTP 端点（SSE 下行 `/events`、上行 `/messages`、确认 `/acks`）注册进任意 ServletContext：
+**第 3 步：注册三个 HTTP 端点（SSE 下行 `/events`、上行 `/messages`、确认 `/acks`）**
 
 ```java
 LinkoraServlets.register(linkoraServer, servletContext); // 一行
 ```
 
-服务端调优与预注册等配置通过 `ServerConfig` bean 或存储 bean 装配时提供，清单同 Boot 模式。
+之后注入 `LinkoraServer` 下发消息、实现 `UplinkHandler` 接收上行——代码与 Boot 模式完全相同。
 
-### 客户端：@Import 显式启用
+### 客户端应用
+
+**第 1 步：引入依赖**（同一个包，客户端能力随包传递）
 
 ```xml
-<!-- 同一个包，客户端能力随包传递 -->
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring</artifactId>
-    <version>0.2.0</version>
+    <version>x.y.z</version>
 </dependency>
 ```
 
+**第 2 步：装配配置类（显式 `@Import`，不 import 就不会初始化客户端）**
+
 ```java
 @Configuration
-@Import(LinkoraClientConfiguration.class)   // 显式启用，不 import 就不会初始化客户端
+@Import(LinkoraClientConfiguration.class)
 public class ClientConfig { }
 ```
 
-配置文件（任意 `@PropertySource`，配置键与 Boot 版逐字对齐）：
+**第 3 步：properties 配置（配置键与 Boot 版逐字对齐）**
 
 ```properties
 linkora.client.server-url=http://127.0.0.1:8081
@@ -201,8 +218,7 @@ linkora.client.client-id=store-001
 linkora.client.db-path=data/client.db
 ```
 
-业务代码与 Boot 模式完全相同：`MessageListener` 处理下行 + 显式 ACK，
-`client.publish` 发上行，`addListener` 绑定 topic。
+之后实现 `MessageListener` 接收下行并显式 ACK、注入 `UplinkPublisher` 发送上行——代码与 Boot 模式完全相同。
 
 ---
 
@@ -237,21 +253,20 @@ linkora.client.db-path=data/client.db
 
 ## 可运行示例
 
+`examples/` 目录下每个场景都有开箱即跑的工程（Boot / MVC 双端、零框架、宿主事务接管），
+工程结构即推荐接入结构，直接参考或复制：
+
 ```bash
 mvn install -DskipTests
 
-# Spring Boot：终端 1 服务端（8082），终端 2 客户端（自动跑四向闭环输出 [PASS]）
+# Spring Boot：终端 1 起服务端（8082），终端 2 起客户端（自动跑四向闭环输出 [PASS]）
 mvn -pl examples/spring-boot-server/server-app spring-boot:run
 mvn -pl examples/spring-boot-server/client-app spring-boot:run
 
-# Spring MVC：终端 1 服务端（8081），终端 2 客户端
+# Spring MVC：终端 1 起服务端（8081），终端 2 起客户端
 mvn -pl examples/spring-mvc-server/server-app compile exec:java "-Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain" "-Dexec.args=8081"
 mvn -pl examples/spring-mvc-server/client-app compile exec:java "-Dexec.mainClass=com.linkora.example.mvcclient.ClientDemoApplication"
 ```
-
-示例演示"线上下单/评价通知线下、线下回传订单状态/回复评价"四向闭环，
-业务代码采用 controller/service 分层，可直接当接入模板抄；
-零框架宿主示例（手动装配）见 `examples/plain-java-server` / `plain-java-client`。
 
 ## 构建
 
