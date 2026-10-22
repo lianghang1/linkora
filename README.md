@@ -8,8 +8,6 @@
 - 投递语义：至少一次（at-least-once），业务侧需自行保证副作用幂等
 - 安全：纯应用层 HMAC 签名认证（不依赖证书/mTLS），失败指数锁定 + 防重放
 
-只想用起来，看下面的两种宿主模式即可；想了解核心实现，见文末[文档导航](#文档导航)。
-
 ## 快速开始：选你的宿主模式
 
 无论服务端还是客户端，**每个角色只引 1 个 Maven 包**，存储实现随包传递，无需单独声明：
@@ -83,7 +81,7 @@ public class OrderStatusHandler implements UplinkHandler {
 }
 ```
 
-常用配置项（未设置时用 SDK 默认值，完整清单见 [docs/deployment.md](docs/deployment.md)）：
+常用配置项（未列出的一律有安全默认值，未设置时无需关心）：
 
 | 配置 | 默认 | 说明 |
 |---|---|---|
@@ -216,7 +214,9 @@ linkora.client.db-path=data/client.db
 2. **下行消息必须显式 ACK**：处理完调用 `message.ackProcessed()`（失败调 `ackFailed(...)`），
    不 ACK 服务端会按策略无限重试。
 3. **生产必须配 HMAC 认证**：不提供 `ClientAuthenticator` 时服务端回退为**放行全部请求**
-   并打告警（仅限本地开发）。接入步骤见 [docs/security.md](docs/security.md)。
+   并打告警（仅限本地开发）。客户端侧把 `credentialProvider` 换成
+   `HmacCredentialProvider(clientId, accessToken, secretBytes)`、服务端配
+   `HmacClientAuthenticator` 即启用（两端凭据一致），失败锁定与防重放内置。
 
 **版本与依赖约束**
 
@@ -230,8 +230,8 @@ linkora.client.db-path=data/client.db
 客户端缺省 SQLite（WAL + FULL，进程崩溃/断电不丢消息）。宿主可用业务库接管存储
 （事务性发件箱）——Boot 宿主定义自己的 `ClientRegistry`/`ClientStore` 等 bean 即可
 自动让位；MVC 宿主自定义 bean 需加 `@Primary`（纯 Spring 没有
-`@ConditionalOnMissingBean`）。完整示例见 `examples/spring-tx-server`（服务端）与
-`examples/tx-client`（客户端），SPI 设计见 [docs/storage-spi.md](docs/storage-spi.md)。
+`@ConditionalOnMissingBean`）。完整可运行示例见 `examples/spring-tx-server`（服务端）
+与 `examples/tx-client`（客户端）。
 
 ---
 
@@ -256,18 +256,3 @@ mvn -pl examples/spring-mvc-server/client-app compile exec:java "-Dexec.mainClas
 ## 构建
 
 JDK 8 + Maven 3.6+：`mvn clean test`（全部自动化测试，无需外部中间件）。
-
-## 文档导航
-
-| 想了解 | 看 |
-|---|---|
-| 消息怎么流转、业务代码写在哪一层 | [docs/message-handling.md](docs/message-handling.md) |
-| 线路协议与消息/ACK 报文结构 | [docs/protocol.md](docs/protocol.md) |
-| 可靠投递语义、状态机、重试与死信 | [docs/reliability.md](docs/reliability.md) |
-| HMAC 认证、防爆破、凭据管理 | [docs/security.md](docs/security.md) |
-| 部署、配置全集、升级与备份 | [docs/deployment.md](docs/deployment.md) |
-| 自定义存储 / 宿主事务接管 | [docs/storage-spi.md](docs/storage-spi.md) |
-| 架构与模块边界（核心实现） | [docs/architecture.md](docs/architecture.md) |
-| JDK/容器/数据库/依赖兼容性矩阵 | [docs/compatibility.md](docs/compatibility.md) |
-| 常见问题排查 | [docs/troubleshooting.md](docs/troubleshooting.md) |
-| 版本发布到 Maven Central 的流程 | [docs/release.md](docs/release.md) |
