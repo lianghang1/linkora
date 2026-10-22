@@ -15,8 +15,14 @@ import java.sql.Statement;
 /**
  * 服务端 schema 迁移（自研轻量实现：版本表 + 顺序脚本，不引入 Flyway）。
  *
- * <p>SQL 保持方言中立（ANSI），已验证 H2；MySQL 8 / PostgreSQL 在后续三库矩阵阶段验证。
+ * <p>SQL 保持方言中立（ANSI），已验证 H2 与 MySQL 8（见
+ * {@code JdbcServerStorageMySqlIT}）；PostgreSQL 在后续三库矩阵阶段验证。
  * 每个迁移脚本在独立事务中执行并记录版本号，任意时刻崩溃重启后从上次版本继续。</p>
+ *
+ * <p>MySQL 方言注意两点：① {@code CREATE INDEX} 不支持 {@code IF NOT EXISTS}，
+ * 索引脚本按方言裁剪；② DDL 隐式提交，崩溃续跑可能留下"已建表未记版本"的
+ * 中间态——对 MySQL 放行"对象已存在"类错误（1050 表已存在 / 1061 索引已存在）
+ * 保证重跑幂等。</p>
  *
  * @author lianghang
  */
@@ -32,7 +38,8 @@ public final class JdbcServerSchema {
                     + " version     BIGINT NOT NULL PRIMARY KEY,"
                     + " applied_at  BIGINT NOT NULL)";
 
-    private static final String V1 = ""
+    /** 表结构（两种方言通用：CREATE TABLE IF NOT EXISTS 均 supported）。 */
+    private static final String V1_TABLES = ""
             + "CREATE TABLE IF NOT EXISTS lk_client ("
             + "  client_id        VARCHAR(128) PRIMARY KEY,"
             + "  enabled          BOOLEAN      NOT NULL,"
@@ -69,12 +76,22 @@ public final class JdbcServerSchema {
             + "  created_at    BIGINT       NOT NULL,"
             + "  updated_at    BIGINT       NOT NULL,"
             + "  PRIMARY KEY (message_id, client_id)"
-            + ");"
+            + ");";
+
+    /** H2：CREATE INDEX 支持 IF NOT EXISTS。 */
+    private static final String V1_INDEXES_H2 = ""
             + "CREATE INDEX IF NOT EXISTS idx_delivery_client_state ON lk_delivery (client_id, state, seq);"
             + "CREATE UNIQUE INDEX IF NOT EXISTS uk_delivery_client_seq ON lk_delivery (client_id, seq);"
             + "CREATE INDEX IF NOT EXISTS idx_message_client_created ON lk_message (client_id, created_at);";
 
-    private static final String[] MIGRATIONS = {V1};
+    /** MySQL 8：CREATE INDEX 不支持 IF NOT EXISTS，重跑幂等由"对象已存在"容错保证。 */
+    private static final String V1_INDEXES_MYSQL = ""
+            + "CREATE INDEX idx_delivery_client_state ON lk_delivery (client_id, state, seq);"
+            + "CREATE UNIQUE INDEX uk_delivery_client_seq ON lk_delivery (client_id, seq);"
+            + "CREATE INDEX idx_message_client_created ON lk_message (client_id, created_at);";
+
+    private static final String[] MIGRATIONS = {V1_TABLES + V1_INDEXES_H2};
+    private static final String[] MIGRATIONS_MYSQL = {V1_TABLES + V1_INDEXES_MYSQL};
 
     private JdbcServerSchema() {
     }
@@ -82,15 +99,22 @@ public final class JdbcServerSchema {
     /** 依次应用未执行的迁移；重复调用幂等。 */
     public static void migrate(DataSource dataSource) {
         try (Connection connection = dataSource.getConnection()) {
+            boolean mysql = isMySql(connection);
+            String[] migrations = mysql ? MIGRATIONS_MYSQL : MIGRATIONS;
             createVersionTable(connection);
             int current = currentVersion(connection);
-            for (int version = current + 1; version <= MIGRATIONS.length; version++) {
-                applyMigration(connection, version, MIGRATIONS[version - 1]);
+            for (int version = current + 1; version <= migrations.length; version++) {
+                applyMigration(connection, version, migrations[version - 1], mysql);
             }
         } catch (SQLException e) {
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
                     "服务端 schema 迁移失败", e);
         }
+    }
+
+    private static boolean isMySql(Connection connection) throws SQLException {
+        String product = connection.getMetaData().getDatabaseProductName();
+        return product != null && product.contains("MySQL");
     }
 
     private static void createVersionTable(Connection connection) throws SQLException {
@@ -107,8 +131,8 @@ public final class JdbcServerSchema {
         }
     }
 
-    private static void applyMigration(Connection connection, int version, String script)
-            throws SQLException {
+    private static void applyMigration(Connection connection, int version, String script,
+                                       boolean mysql) throws SQLException {
         boolean oldAutoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
         try {
@@ -119,6 +143,13 @@ public final class JdbcServerSchema {
                 }
                 try (Statement st = connection.createStatement()) {
                     st.execute(sql);
+                } catch (SQLException e) {
+                    // MySQL DDL 隐式提交：崩溃续跑时对象可能已存在，视为幂等命中
+                    if (mysql && (e.getErrorCode() == 1050 || e.getErrorCode() == 1061)) {
+                        log.info("迁移对象已存在（MySQL 崩溃续跑幂等命中）: {}", sql);
+                        continue;
+                    }
+                    throw e;
                 }
             }
             try (PreparedStatement ps = connection.prepareStatement(

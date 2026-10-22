@@ -88,6 +88,9 @@ public final class LinkoraClient implements AutoCloseable {
     private final ConcurrentHashMap<String, CopyOnWriteArrayList<MessageListener>> listeners =
             new ConcurrentHashMap<String, CopyOnWriteArrayList<MessageListener>>();
 
+    private final CopyOnWriteArrayList<OutboxListener> outboxListeners =
+            new CopyOnWriteArrayList<OutboxListener>();
+
     private LinkoraClient(Builder builder) {
         this.clientId = builder.clientId;
         String base = builder.serverUrl;
@@ -241,6 +244,21 @@ public final class LinkoraClient implements AutoCloseable {
         CopyOnWriteArrayList<MessageListener> list = listeners.get(messageType);
         if (list != null) {
             list.remove(listener);
+        }
+    }
+
+    /** 注册 outbox 状态变更监听器（可注册多个，按注册顺序回调）。 */
+    public void addOutboxListener(OutboxListener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException("listener 不能为空");
+        }
+        outboxListeners.add(listener);
+    }
+
+    /** 取消 outbox 状态变更监听器。 */
+    public void removeOutboxListener(OutboxListener listener) {
+        if (listener != null) {
+            outboxListeners.remove(listener);
         }
     }
 
@@ -511,13 +529,13 @@ public final class LinkoraClient implements AutoCloseable {
 
     private void claimAndSend(OutboxEntry entry, long now) {
         if (entry.getExpiresAt() != null && entry.getExpiresAt() < now) {
-            store.updateOutboxStatus(entry.with(OutboxStatus.DEAD_LETTER, entry.getRetryCount(),
+            transitionOutbox(entry.with(OutboxStatus.DEAD_LETTER, entry.getRetryCount(),
                     null, "消息已过期", now), entry.getStatus());
             return;
         }
         OutboxEntry claimed = entry.with(OutboxStatus.SENDING, entry.getRetryCount(),
                 null, null, System.currentTimeMillis());
-        if (!store.updateOutboxStatus(claimed, entry.getStatus())) {
+        if (!transitionOutbox(claimed, entry.getStatus())) {
             return; // 竞争失败（并发发送或状态已推进）
         }
         sendOne(claimed);
@@ -536,7 +554,7 @@ public final class LinkoraClient implements AutoCloseable {
                     .schemaVersion(Protocol.PROTOCOL_VERSION)
                     .build();
         } catch (IllegalArgumentException e) {
-            store.updateOutboxStatus(entry.with(OutboxStatus.DEAD_LETTER, entry.getRetryCount(),
+            transitionOutbox(entry.with(OutboxStatus.DEAD_LETTER, entry.getRetryCount(),
                     null, "本地消息非法: " + e.getMessage(), System.currentTimeMillis()),
                     OutboxStatus.SENDING);
             return;
@@ -563,7 +581,7 @@ public final class LinkoraClient implements AutoCloseable {
                     accepted = false;
                 }
                 if (accepted) {
-                    store.updateOutboxStatus(entry.with(OutboxStatus.SERVER_ACCEPTED,
+                    transitionOutbox(entry.with(OutboxStatus.SERVER_ACCEPTED,
                             entry.getRetryCount(), null, null, System.currentTimeMillis()),
                             OutboxStatus.SENDING);
                 } else {
@@ -595,7 +613,7 @@ public final class LinkoraClient implements AutoCloseable {
             log.warn("上行发送失败，#{} 次重试将于 {} ms 后: messageId={}, 原因: {}",
                     nextRetry, delay, entry.getMessageId(), error);
         }
-        store.updateOutboxStatus(updated, OutboxStatus.SENDING);
+        transitionOutbox(updated, OutboxStatus.SENDING);
     }
 
     // ---------------- IO 任务：恢复扫描 ----------------
@@ -608,7 +626,7 @@ public final class LinkoraClient implements AutoCloseable {
             // 1. 崩溃残留：SENDING → PENDING
             for (OutboxEntry stuck : store.findOutbox(OutboxStatus.SENDING, Long.MAX_VALUE,
                     config.getOutboxBatchSize())) {
-                store.updateOutboxStatus(stuck.with(OutboxStatus.PENDING, stuck.getRetryCount(),
+                transitionOutbox(stuck.with(OutboxStatus.PENDING, stuck.getRetryCount(),
                         null, stuck.getLastError(), System.currentTimeMillis()), OutboxStatus.SENDING);
             }
             // 2. 补发未完成的 RECEIVED ACK
@@ -679,6 +697,22 @@ public final class LinkoraClient implements AutoCloseable {
     }
 
     // ---------------- 工具 ----------------
+
+    /** CAS 推进 outbox 状态；成功后按注册顺序通知监听器。 */
+    private boolean transitionOutbox(OutboxEntry updated, OutboxStatus previousStatus) {
+        if (!store.updateOutboxStatus(updated, previousStatus)) {
+            return false;
+        }
+        for (OutboxListener listener : outboxListeners) {
+            try {
+                listener.onStatusChanged(updated, previousStatus);
+            } catch (RuntimeException e) {
+                log.warn("OutboxListener 回调异常（不影响消息状态）: messageId={}",
+                        updated.getMessageId(), e);
+            }
+        }
+        return true;
+    }
 
     private LinkoraMessage toMessage(InboxEntry entry) {
         return LinkoraMessage.builder()

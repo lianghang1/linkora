@@ -36,15 +36,17 @@
 | 1. 客户端 outbox 后台线程 POST `/messages` | `linkora-client` 发送调度 | 框架 |
 | 2. 端点 Servlet 接收 → `LinkoraServer.ingestHttpHandler()` | `linkora-server-servlet` / `LinkoraServer` | 框架 |
 | 3. `IngestService.ingest()`：认证 → 校验 → 持久化 | `linkora-server` `IngestService` | 框架 |
-| 4. **持久化成功后回调 `IngestListener.onIngested`** | `IngestService.notifyListener()` | 框架调用、业务实现 |
+| 4. **持久化成功后回调 `IngestListener.onIngested`** | `IngestService.notifyListeners()` | 框架调用、业务实现 |
 | 5. 业务转发器按 messageType 路由 | 示例 `UplinkMessageDispatcher` | 业务侧 |
 | 6. `UplinkHandler.handle()` 执行业务 | 示例 `OrderStatusHandler` / `ReviewReplyHandler` | 业务侧 |
 
 要点：
 
 - 第 4 步是**观察者回调**，业务代码里不存在显式调用点，属正常设计。
+- 服务端可注册**多个** `IngestListener`（`builder().ingestListener(...)` 可链式
+  累加，Spring 容器内多个 bean 全部接入），按注册顺序逐个回调。
 - 回调在摄入线程上**同步执行**：异常会被框架捕获并记 WARN（不影响上行返回
-  200），但耗时业务应自行异步化（转线程池/MQ）。
+  200，也不影响后续监听器），但耗时业务应自行异步化（转线程池/MQ）。
 - 回调发生在持久化之后，因此即使业务处理失败，消息也不会丢——业务可自行
   重试或落库补偿。
 
@@ -82,7 +84,15 @@
 
 - 下行：实现 `MessageListener`，按 topic `addListener` 注册。
 - 上行：`client.publish(topic, payload)` 写入 SQLite outbox（进程崩溃不丢），
-  后台线程自动 POST；用 outbox 状态 `SERVER_ACCEPTED` 确认服务端已接受。
+  后台线程自动 POST；用 `client.addOutboxListener(...)` 监听 outbox 状态变更，
+  收到 `SERVER_ACCEPTED` 回调即确认服务端已接受（替代轮询本地队列）。
+
+## payload 格式约定
+
+框架不约束 payload 内容（`byte[]` 透传）。示例统一使用 JSON（UTF-8），
+如 `{"orderNo":"SO-1001","status":"SHIPPED"}`——字段演进无需改拆分逻辑，
+也便于跨语言。生产环境可用 Jackson 自定义 DTO 序列化，或实现框架
+`PayloadSerializer` 走对象负载。
 
 ## 示例索引
 
@@ -90,7 +100,7 @@
 |---|---|
 | `examples/spring-boot-server` | 线上平台 ⇄ 线下门店四向闭环，starter 全自动装配 + controller/service 分层 |
 | `examples/spring-mvc-server` | 同一业务场景：Spring MVC 宿主 + 纯 Java 客户端（零 Spring） |
-| `examples/plain-java-server` / `plain-java-client` | 零框架宿主的最小演示 |
+| `examples/plain-java-server` / `plain-java-client` | 同一业务场景：零框架宿主，`ingestListener` 手动接入演示 |
 
 服务端配置 `IngestListener` 的纯 Java 写法见 [deployment.md](deployment.md)；
 线路协议与消息结构见 [protocol.md](protocol.md)；投递状态机见 [reliability.md](reliability.md)。

@@ -32,6 +32,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -116,10 +117,13 @@ public class LinkoraServerAutoConfiguration {
                 .deliveryRepository(deliveryRepository)
                 .cursorRepository(cursorRepository)
                 .config(toServerConfig(properties));
-        IngestListener ingestListener = ingestListenerProvider.getIfAvailable();
-        if (ingestListener != null) {
-            builder.ingestListener(ingestListener);
-            log.info("上行消息监听器已接入: {}", ingestListener.getClass().getSimpleName());
+        List<IngestListener> ingestListeners = ingestListenerProvider.stream()
+                .collect(java.util.stream.Collectors.toList());
+        if (!ingestListeners.isEmpty()) {
+            builder.ingestListeners(ingestListeners);
+            for (IngestListener listener : ingestListeners) {
+                log.info("上行消息监听器已接入: {}", listener.getClass().getSimpleName());
+            }
         }
         return builder.build();
     }

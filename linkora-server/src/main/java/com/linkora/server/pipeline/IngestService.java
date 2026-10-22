@@ -13,6 +13,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -29,20 +32,33 @@ public final class IngestService {
     private final MessageRepository messageRepository;
     private final MessageJsonCodec codec;
     private final ServerConfig config;
-    private final IngestListener ingestListener;
+    private final List<IngestListener> ingestListeners;
 
     public IngestService(ClientAuthenticator authenticator,
                          MessageRepository messageRepository,
                          MessageJsonCodec codec,
                          ServerConfig config) {
-        this(authenticator, messageRepository, codec, config, null);
+        this(authenticator, messageRepository, codec, config,
+                Collections.<IngestListener>emptyList());
     }
 
+    /** 兼容旧单监听器用法；等价于只注册一个监听器的列表构造。 */
     public IngestService(ClientAuthenticator authenticator,
                          MessageRepository messageRepository,
                          MessageJsonCodec codec,
                          ServerConfig config,
                          IngestListener ingestListener) {
+        this(authenticator, messageRepository, codec, config,
+                ingestListener == null ? Collections.<IngestListener>emptyList()
+                        : Collections.singletonList(ingestListener));
+    }
+
+    /** 多监听器构造：按列表顺序逐个回调。 */
+    public IngestService(ClientAuthenticator authenticator,
+                         MessageRepository messageRepository,
+                         MessageJsonCodec codec,
+                         ServerConfig config,
+                         List<IngestListener> ingestListeners) {
         if (authenticator == null || messageRepository == null || codec == null || config == null) {
             throw new IllegalArgumentException("IngestService 依赖不能为 null");
         }
@@ -50,7 +66,9 @@ public final class IngestService {
         this.messageRepository = messageRepository;
         this.codec = codec;
         this.config = config;
-        this.ingestListener = ingestListener;
+        this.ingestListeners = ingestListeners == null || ingestListeners.isEmpty()
+                ? Collections.<IngestListener>emptyList()
+                : Collections.unmodifiableList(new ArrayList<IngestListener>(ingestListeners));
     }
 
     public IngestResult ingest(AuthRequest request) {
@@ -88,20 +106,19 @@ public final class IngestService {
         messageRepository.save(message);
         log.debug("消息已持久化接受: messageId={}, clientId={}, type={}",
                 message.getMessageId(), message.getClientId(), message.getMessageType());
-        notifyListener(message);
+        notifyListeners(message);
         return IngestResult.accepted(message.getMessageId());
     }
 
-    /** 业务侧监听回调：异常只记告警，不影响上行结果。 */
-    private void notifyListener(LinkoraMessage message) {
-        if (ingestListener == null) {
-            return;
-        }
-        try {
-            ingestListener.onIngested(message);
-        } catch (RuntimeException e) {
-            log.warn("IngestListener 回调异常（不影响上行结果）: messageId={}",
-                    message.getMessageId(), e);
+    /** 业务侧监听回调（按注册顺序逐个调用）：异常只记告警，不影响上行结果。 */
+    private void notifyListeners(LinkoraMessage message) {
+        for (IngestListener listener : ingestListeners) {
+            try {
+                listener.onIngested(message);
+            } catch (RuntimeException e) {
+                log.warn("IngestListener 回调异常（不影响上行结果）: messageId={}",
+                        message.getMessageId(), e);
+            }
         }
     }
 

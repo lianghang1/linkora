@@ -16,6 +16,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
+
 /**
  * Spring 宿主装配辅助：容器内存在四个存储 SPI bean 时自动组装 {@link LinkoraServer}。
  *
@@ -30,7 +32,8 @@ import org.springframework.context.annotation.Configuration;
  *   <li>{@link ClientAuthenticator} bean —— 缺省回退 AllowAll 并输出警告，
  *       生产环境务必提供真实认证器（见 docs/security.md）；</li>
  *   <li>{@link ServerConfig} bean —— 缺省使用默认参数；</li>
- *   <li>{@link PayloadSerializer} bean —— 需要发布对象负载时提供。</li>
+ *   <li>{@link PayloadSerializer} bean —— 需要发布对象负载时提供；</li>
+ *   <li>{@link IngestListener} bean —— 可注册多个，全部按顺序接入 LinkoraServer。</li>
  * </ul>
  *
  * <p>本类只依赖 spring-context，不依赖 Spring Boot；Boot 宿主请优先使用
@@ -56,7 +59,7 @@ public class LinkoraServerConfiguration {
      * @param authenticatorProvider 认证器提供者（可选）
      * @param configProvider 服务端配置提供者（可选）
      * @param payloadSerializerProvider 对象负载序列化器提供者（可选）
-     * @param ingestListenerProvider 上行消息业务监听器提供者（可选）
+     * @param ingestListenerProvider 上行消息业务监听器提供者（可选，可注册多个）
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     public LinkoraServer linkoraServer(
@@ -92,10 +95,13 @@ public class LinkoraServerConfiguration {
         if (serializer != null) {
             builder.payloadSerializer(serializer);
         }
-        IngestListener ingestListener = ingestListenerProvider.getIfAvailable();
-        if (ingestListener != null) {
-            builder.ingestListener(ingestListener);
-            log.info("上行消息监听器已接入: {}", ingestListener.getClass().getSimpleName());
+        List<IngestListener> ingestListeners = ingestListenerProvider.stream()
+                .collect(java.util.stream.Collectors.toList());
+        if (!ingestListeners.isEmpty()) {
+            builder.ingestListeners(ingestListeners);
+            for (IngestListener listener : ingestListeners) {
+                log.info("上行消息监听器已接入: {}", listener.getClass().getSimpleName());
+            }
         }
 
         log.info("LinkoraServer 已由 Spring 容器装配（认证器: {}）",

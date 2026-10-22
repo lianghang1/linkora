@@ -194,42 +194,26 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
                 connection.setAutoCommit(false);
             }
             try {
-                // 1. 确保序号行存在（已存在则忽略，幂等）
-                try (PreparedStatement init = connection.prepareStatement(
-                        "INSERT INTO lk_client_seq (client_id, last_seq) VALUES (?, 0)")) {
-                    init.setString(1, clientId);
+                for (int attempt = 1; ; attempt++) {
                     try {
-                        init.executeUpdate();
-                    } catch (SQLIntegrityConstraintViolationException alreadyExists) {
-                        // 行已存在，继续
-                    }
-                }
-                // 2. 行锁内自增：并发分配在此串行化
-                try (PreparedStatement increment = connection.prepareStatement(
-                        "UPDATE lk_client_seq SET last_seq = last_seq + 1 WHERE client_id = ?")) {
-                    increment.setString(1, clientId);
-                    if (increment.executeUpdate() != 1) {
-                        throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
-                                "分配投递序号失败（序号行更新异常）: " + clientId);
-                    }
-                }
-                // 3. 同事务读回分配结果
-                long allocated;
-                try (PreparedStatement select = connection.prepareStatement(
-                        "SELECT last_seq FROM lk_client_seq WHERE client_id = ?")) {
-                    select.setString(1, clientId);
-                    try (ResultSet rs = select.executeQuery()) {
-                        if (!rs.next()) {
-                            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
-                                    "分配投递序号失败（序号行读取为空）: " + clientId);
+                        long allocated = allocateSeqOnce(connection, clientId);
+                        if (localTx) {
+                            connection.commit();
                         }
-                        allocated = rs.getLong(1);
+                        return allocated;
+                    } catch (SQLException e) {
+                        // MySQL/InnoDB 并发首次分配会走"INSERT 重复键 + 间隙锁"路径，
+                        // 可能死锁（1213）或锁等待超时（1205）。死锁时 InnoDB 已自动回滚，
+                        // 本地事务下显式回滚兜底后换新事务重试（官方推荐做法）；
+                        // 宿主事务接管时不可本地重试，直接上抛交由宿主处理。
+                        boolean retryable = e.getErrorCode() == 1213 || e.getErrorCode() == 1205;
+                        if (retryable && localTx && attempt < 5) {
+                            connection.rollback();
+                            continue;
+                        }
+                        throw e;
                     }
                 }
-                if (localTx) {
-                    connection.commit();
-                }
-                return allocated;
             } catch (Exception e) {
                 if (localTx) {
                     connection.rollback();
@@ -245,6 +229,41 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
         } catch (SQLException e) {
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
                     "分配投递序号失败: " + clientId, e);
+        }
+    }
+
+    /** 单次分配（调用方在事务内）：确保序号行存在 → 行锁内自增 → 同事务读回。 */
+    private long allocateSeqOnce(Connection connection, String clientId) throws SQLException {
+        // 1. 确保序号行存在（已存在则忽略，幂等）
+        try (PreparedStatement init = connection.prepareStatement(
+                "INSERT INTO lk_client_seq (client_id, last_seq) VALUES (?, 0)")) {
+            init.setString(1, clientId);
+            try {
+                init.executeUpdate();
+            } catch (SQLIntegrityConstraintViolationException alreadyExists) {
+                // 行已存在，继续
+            }
+        }
+        // 2. 行锁内自增：并发分配在此串行化
+        try (PreparedStatement increment = connection.prepareStatement(
+                "UPDATE lk_client_seq SET last_seq = last_seq + 1 WHERE client_id = ?")) {
+            increment.setString(1, clientId);
+            if (increment.executeUpdate() != 1) {
+                throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                        "分配投递序号失败（序号行更新异常）: " + clientId);
+            }
+        }
+        // 3. 同事务读回分配结果
+        try (PreparedStatement select = connection.prepareStatement(
+                "SELECT last_seq FROM lk_client_seq WHERE client_id = ?")) {
+            select.setString(1, clientId);
+            try (ResultSet rs = select.executeQuery()) {
+                if (!rs.next()) {
+                    throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                            "分配投递序号失败（序号行读取为空）: " + clientId);
+                }
+                return rs.getLong(1);
+            }
         }
     }
 

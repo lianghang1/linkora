@@ -1,12 +1,14 @@
 package com.linkora.example.bootclient.service;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkora.client.LinkoraClient;
 import com.linkora.core.storage.client.ClientStore;
 import org.springframework.stereotype.Service;
 
 /**
  * 评价回复服务（线下门店侧）：门店回复用户评价后通知线上。
- * 消息格式：{@code 评价ID|回复内容}，线上由 ReviewReplyHandler 处理。
+ * payload 为 JSON：{@code {"reviewId":"RV-2001","reply":"感谢反馈"}}，
+ * 线上由 ReviewReplyHandler 处理。
  *
  * @author lianghang
  */
@@ -22,6 +24,9 @@ public class ReviewReplyService extends AbstractUplinkService {
 
     /** 线下回复评价并通知线上，返回消息 ID（用 awaitServerAccepted 等确认）。 */
     public String reply(String reviewId, String replyText) {
-        return publishText(TOPIC_REVIEW_REPLY, reviewId + "|" + replyText);
+        ObjectNode payload = newPayload();
+        payload.put("reviewId", reviewId);
+        payload.put("reply", replyText);
+        return publish(TOPIC_REVIEW_REPLY, payload);
     }
 }

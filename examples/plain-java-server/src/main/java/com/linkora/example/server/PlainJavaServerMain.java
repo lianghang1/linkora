@@ -1,8 +1,13 @@
 package com.linkora.example.server;
 
 import com.linkora.core.storage.server.ClientRegistration;
+import com.linkora.example.server.controller.PlatformController;
+import com.linkora.example.server.service.OrderService;
+import com.linkora.example.server.service.ReviewService;
+import com.linkora.example.server.service.uplink.OrderStatusHandler;
+import com.linkora.example.server.service.uplink.ReviewReplyHandler;
+import com.linkora.example.server.service.uplink.UplinkMessageDispatcher;
 import com.linkora.server.LinkoraServer;
-import com.linkora.server.PublishResult;
 import com.linkora.server.ServerConfig;
 import com.linkora.server.auth.AllowAllClientAuthenticator;
 import com.linkora.server.servlet.LinkoraEndpointServlet;
@@ -13,18 +18,25 @@ import com.linkora.server.storage.jdbc.JdbcDeliveryRepository;
 import com.linkora.server.storage.jdbc.JdbcMessageRepository;
 import com.linkora.server.storage.jdbc.JdbcServerSchema;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.h2.jdbcx.JdbcDataSource;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 /**
- * 普通 Java 服务端示例：LinkoraServer（持久化 + SSE 推送 + 上报/ACK 编排）
- * 嵌入 Jetty 容器对外服务，持久化走 H2 文件库。
+ * 普通 Java 服务端示例（线上平台侧）：演示"线上平台 ⇄ 线下门店"双向业务消息。
+ * 分层结构：controller 包暴露业务 HTTP 接口，service 包封装下行发布，
+ * service.uplink 包处理上行消息（经框架 {@code builder.ingestListener} 手动接入）。
+ *
+ * <p>演示闭环（对端为 plain-java-client 示例）：</p>
+ * <ol>
+ *   <li>下行：POST /api/orders、/api/reviews → 门店端两个 handler 收到并 ACK；</li>
+ *   <li>上行：门店端上报 order-status-updated、review-reply → 本端两个
+ *       UplinkHandler 处理（GET /api/uplink/* 查询）。</li>
+ * </ol>
  *
  * <p>适用场景与限制：本示例用嵌入式 Jetty 演示完整链路；生产环境请将
  * {@link SsePushServlet} / {@link LinkoraEndpointServlet} 注册进宿主已有
@@ -34,7 +46,7 @@ import java.nio.file.Paths;
  *
  * <p>运行方式（仓库根目录，首次需先 {@code mvn install -DskipTests}）：</p>
  * <pre>
- *   mvn -pl examples/plain-java-server exec:java ^
+ *   mvn -pl examples/plain-java-server compile exec:java ^
  *       -Dexec.mainClass=com.linkora.example.server.PlainJavaServerMain ^
  *       -Dexec.args="8080 data/linkora-server"
  * </pre>
@@ -44,7 +56,6 @@ import java.nio.file.Paths;
 public final class PlainJavaServerMain {
 
     private static final String DEMO_CLIENT_ID = "demo-client";
-    private static final String DEMO_TOPIC = "greeting";
 
     private PlainJavaServerMain() {
     }
@@ -66,7 +77,13 @@ public final class PlainJavaServerMain {
                     DEMO_CLIENT_ID, true, System.currentTimeMillis()));
         }
 
-        // 3. 组装 LinkoraServer（此处用放行认证器便于演示；生产用 HmacClientAuthenticator）
+        // 3. 业务分层装配：上行处理器 → 分发器（框架 IngestListener 唯一接入点）
+        OrderStatusHandler orderStatusHandler = new OrderStatusHandler();
+        ReviewReplyHandler reviewReplyHandler = new ReviewReplyHandler();
+        UplinkMessageDispatcher dispatcher = new UplinkMessageDispatcher(
+                Arrays.asList(orderStatusHandler, reviewReplyHandler));
+
+        // 4. 组装 LinkoraServer（此处用放行认证器便于演示；生产用 HmacClientAuthenticator）
         LinkoraServer server = LinkoraServer.builder()
                 .clientAuthenticator(new AllowAllClientAuthenticator())
                 .clientRegistry(registry)
@@ -74,10 +91,11 @@ public final class PlainJavaServerMain {
                 .deliveryRepository(new JdbcDeliveryRepository(dataSource))
                 .cursorRepository(new JdbcClientCursorRepository(dataSource))
                 .config(ServerConfig.builder().build())
+                .ingestListener(dispatcher)
                 .build();
         server.start();
 
-        // 4. 挂载三个端点：SSE 下行 / 消息上报 / ACK 上报
+        // 5. 挂载端点：框架三端点（SSE 下行 / 消息上报 / ACK 上报）+ 业务 controller
         Server jetty = new Server(port);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.NO_SECURITY);
         context.setContextPath("/");
@@ -88,21 +106,23 @@ public final class PlainJavaServerMain {
                 new LinkoraEndpointServlet(server.ingestHttpHandler())), "/messages");
         context.addServlet(new ServletHolder(
                 new LinkoraEndpointServlet(server.ackHttpHandler())), "/acks");
+        context.addServlet(new ServletHolder(new PlatformController(
+                new OrderService(server), new ReviewService(server),
+                orderStatusHandler, reviewReplyHandler)), "/api/*");
         jetty.start();
 
         System.out.println("========================================");
-        System.out.println("Linkora 演示服务端已启动");
-        System.out.println("  SSE 下行 : http://127.0.0.1:" + port + "/events");
-        System.out.println("  消息上报 : http://127.0.0.1:" + port + "/messages");
-        System.out.println("  ACK 上报 : http://127.0.0.1:" + port + "/acks");
-        System.out.println("  演示客户端: " + DEMO_CLIENT_ID);
-        System.out.println("  数据文件 : " + dbPath + ".mv.db");
+        System.out.println("Linkora 演示服务端已启动（线上平台侧）");
+        System.out.println("  SSE 下行   : http://127.0.0.1:" + port + "/events");
+        System.out.println("  消息上报   : http://127.0.0.1:" + port + "/messages");
+        System.out.println("  ACK 上报   : http://127.0.0.1:" + port + "/acks");
+        System.out.println("  线上下单   : POST http://127.0.0.1:" + port + "/api/orders");
+        System.out.println("  线上评价   : POST http://127.0.0.1:" + port + "/api/reviews");
+        System.out.println("  查上行状态 : GET  http://127.0.0.1:" + port + "/api/uplink/order-status-updates");
+        System.out.println("  查上行回复 : GET  http://127.0.0.1:" + port + "/api/uplink/review-replies");
+        System.out.println("  演示客户端 : " + DEMO_CLIENT_ID);
+        System.out.println("  数据文件   : " + dbPath + ".mv.db");
         System.out.println("========================================");
-
-        // 5. 下发一条欢迎消息（客户端在线即可收到；离线会在其上线后补投）
-        PublishResult welcome = server.publish(DEMO_CLIENT_ID, DEMO_TOPIC,
-                "欢迎接入 Linkora！".getBytes(StandardCharsets.UTF_8));
-        System.out.println("已下发欢迎消息: " + welcome.getMessageId());
 
         // 6. Ctrl+C 优雅关闭（先停容器再停编排，保证在途请求处理完）
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {

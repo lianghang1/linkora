@@ -1,5 +1,7 @@
 package com.linkora.example.boot.service;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.linkora.example.boot.support.JsonUtil;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.PublishResult;
 import org.springframework.stereotype.Service;
@@ -8,7 +10,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * 评价服务（线上侧）：用户评价后经 {@link LinkoraServer} 通知线下门店。
- * 消息格式（UTF-8 文本）：{@code 评价ID|评价内容}。
+ * payload 为 JSON：{@code {"reviewId":"RV-2001","content":"包装完好，五星好评"}}。
  *
  * @author lianghang
  */
@@ -26,7 +28,10 @@ public class ReviewService {
 
     /** 线上发布评价并通知线下门店。 */
     public PublishResult createReview(String clientId, String reviewId, String content) {
+        ObjectNode payload = JsonUtil.MAPPER.createObjectNode();
+        payload.put("reviewId", reviewId);
+        payload.put("content", content);
         return linkoraServer.publish(clientId, TOPIC_REVIEW_CREATED,
-                (reviewId + "|" + content).getBytes(StandardCharsets.UTF_8));
+                payload.toString().getBytes(StandardCharsets.UTF_8));
     }
 }

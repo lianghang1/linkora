@@ -1,17 +1,20 @@
 package com.linkora.example.springmvc.service.uplink;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkora.core.message.LinkoraMessage;
+import com.linkora.example.springmvc.support.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * 订单状态处理器（线上侧）：处理线下门店回传的订单状态变更。
- * 消息格式（UTF-8 文本）：{@code 订单号|新状态}，如 {@code SO-1001|SHIPPED}。
+ * payload 为 JSON：{@code {"orderNo":"SO-1001","status":"SHIPPED"}}。
  *
  * @author lianghang
  */
@@ -33,9 +36,16 @@ public class OrderStatusHandler implements UplinkHandler {
 
     @Override
     public void handle(LinkoraMessage message) {
-        String[] parts = message.getPayloadAsUtf8String().split("\\|", 2);
-        String orderNo = parts[0];
-        String status = parts.length > 1 ? parts[1] : "";
+        String orderNo;
+        String status;
+        try {
+            JsonNode payload = JsonUtil.MAPPER.readTree(message.getPayload());
+            orderNo = payload.path("orderNo").asText("");
+            status = payload.path("status").asText("");
+        } catch (IOException e) {
+            log.warn("订单状态消息 payload 解析失败，忽略: messageId={}", message.getMessageId(), e);
+            return;
+        }
         received.add(new OrderStatusUpdate(orderNo, status, message.getClientId(),
                 System.currentTimeMillis()));
         log.info("线下订单状态变更: clientId={}, orderNo={}, status={}, messageId={}",

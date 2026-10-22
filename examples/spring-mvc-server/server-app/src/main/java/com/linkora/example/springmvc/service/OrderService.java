@@ -1,14 +1,16 @@
 package com.linkora.example.springmvc.service;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.PublishResult;
+import com.linkora.example.springmvc.support.JsonUtil;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 
 /**
  * 订单服务（线上侧）：用户下单后经 {@link LinkoraServer} 通知线下门店。
- * 消息格式（UTF-8 文本）：{@code 订单号|商品描述}。
+ * payload 为 JSON：{@code {"orderNo":"SO-1001","item":"机械键盘 x1"}}。
  *
  * @author lianghang
  */
@@ -28,7 +30,10 @@ public class OrderService {
      * 线上下单并通知线下门店：先持久化（门店离线则上线补投），在线时经 SSE 实时送达。
      */
     public PublishResult placeOrder(String clientId, String orderNo, String item) {
+        ObjectNode payload = JsonUtil.MAPPER.createObjectNode();
+        payload.put("orderNo", orderNo);
+        payload.put("item", item);
         return linkoraServer.publish(clientId, TOPIC_ORDER_CREATED,
-                (orderNo + "|" + item).getBytes(StandardCharsets.UTF_8));
+                payload.toString().getBytes(StandardCharsets.UTF_8));
     }
 }

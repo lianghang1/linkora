@@ -1,14 +1,18 @@
 package com.linkora.example.bootclient.handler;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.linkora.client.LinkoraReceivedMessage;
 import com.linkora.client.MessageListener;
+import com.linkora.core.error.LinkoraErrorCode;
+import com.linkora.example.bootclient.support.JsonUtil;
 
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
 /**
- * 评价通知处理器（线下门店侧）：收到线上的 review-created 通知后
- * 解析、打印、模拟门店查看评价，最后显式 ackProcessed。
- * 消息格式：{@code 评价ID|评价内容}。
+ * 评价通知处理器（线下门店侧）：收到线上的 review-created 通知后解析 JSON、
+ * 打印、模拟门店查看评价，最后显式 ackProcessed。
+ * payload：{@code {"reviewId":"RV-3001","content":"包装完好，五星好评"}}。
  * CountDownLatch 仅用于演示主流程等待首条通知，传 null 则只处理不等待。
  *
  * @author lianghang
@@ -26,9 +30,17 @@ public class ReviewCreatedHandler implements MessageListener {
 
     @Override
     public void onMessage(LinkoraReceivedMessage message) {
-        String[] parts = message.getPayloadAsUtf8String().split("\\|", 2);
-        System.out.println("[下行-新评价] 评价ID=" + parts[0]
-                + " 内容=" + (parts.length > 1 ? parts[1] : "")
+        JsonNode payload;
+        try {
+            payload = JsonUtil.MAPPER.readTree(message.getPayload());
+        } catch (IOException e) {
+            // 业务处理失败显式 ACK FAILED，服务端按策略重试
+            message.ackFailed(LinkoraErrorCode.INVALID_MESSAGE,
+                    "payload 不是合法 JSON: " + e.getMessage());
+            return;
+        }
+        System.out.println("[下行-新评价] 评价ID=" + payload.path("reviewId").asText("")
+                + " 内容=" + payload.path("content").asText("")
                 + " id=" + message.getMessageId());
         // 业务处理成功后显式 ACK，服务端才把该条投递标记为完成
         message.ackProcessed();

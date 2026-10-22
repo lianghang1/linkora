@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -113,7 +114,7 @@ public final class LinkoraServer {
         this.coordinator = new DeliveryCoordinator(authenticator, clientRegistry, messageRepository,
                 deliveryRepository, cursorRepository, codec, gateway, config, scheduler);
         this.ingestService = new IngestService(authenticator, messageRepository, codec, config,
-                builder.ingestListener);
+                builder.ingestListeners);
         this.ackService = new AckService(authenticator, deliveryRepository, coordinator, config);
     }
 
@@ -363,7 +364,7 @@ public final class LinkoraServer {
         private SsePushGateway gateway;
         private SseConnectionRegistry sseRegistry;
         private ScheduledExecutorService externalScheduler;
-        private IngestListener ingestListener;
+        private final List<IngestListener> ingestListeners = new ArrayList<IngestListener>();
 
         public Builder clientAuthenticator(ClientAuthenticator authenticator) {
             this.authenticator = authenticator;
@@ -429,9 +430,23 @@ public final class LinkoraServer {
             return this;
         }
 
-        /** 可选：上行消息业务侧监听器，客户端上报持久化成功后被回调。 */
+        /** 可选：上行消息业务侧监听器；可多次调用累加，按注册顺序回调。 */
         public Builder ingestListener(IngestListener listener) {
-            this.ingestListener = listener;
+            if (listener != null) {
+                this.ingestListeners.add(listener);
+            }
+            return this;
+        }
+
+        /** 可选：批量注册上行消息监听器（追加，按注册顺序回调）。 */
+        public Builder ingestListeners(List<IngestListener> listeners) {
+            if (listeners != null) {
+                for (IngestListener listener : listeners) {
+                    if (listener != null) {
+                        this.ingestListeners.add(listener);
+                    }
+                }
+            }
             return this;
         }
 
