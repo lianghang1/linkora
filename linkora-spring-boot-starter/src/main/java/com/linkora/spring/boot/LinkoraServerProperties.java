@@ -40,6 +40,10 @@ public class LinkoraServerProperties {
     private Long pushPacingBaseMs;
     private Long pushPacingMaxMs;
     private Long messageSizeLimitBytes;
+    private Boolean retentionEnabled;
+    private Long retentionMs;
+    private Integer retentionBatchSize;
+    private Integer expirySweepBatchSize;
 
     public boolean isEnabled() {
         return enabled;
@@ -159,6 +163,38 @@ public class LinkoraServerProperties {
 
     public void setPushPacingMaxMs(Long pushPacingMaxMs) {
         this.pushPacingMaxMs = pushPacingMaxMs;
+    }
+
+    public Boolean getRetentionEnabled() {
+        return retentionEnabled;
+    }
+
+    public void setRetentionEnabled(Boolean retentionEnabled) {
+        this.retentionEnabled = retentionEnabled;
+    }
+
+    public Long getRetentionMs() {
+        return retentionMs;
+    }
+
+    public void setRetentionMs(Long retentionMs) {
+        this.retentionMs = retentionMs;
+    }
+
+    public Integer getRetentionBatchSize() {
+        return retentionBatchSize;
+    }
+
+    public void setRetentionBatchSize(Integer retentionBatchSize) {
+        this.retentionBatchSize = retentionBatchSize;
+    }
+
+    public Integer getExpirySweepBatchSize() {
+        return expirySweepBatchSize;
+    }
+
+    public void setExpirySweepBatchSize(Integer expirySweepBatchSize) {
+        this.expirySweepBatchSize = expirySweepBatchSize;
     }
 
     public Long getMessageSizeLimitBytes() {

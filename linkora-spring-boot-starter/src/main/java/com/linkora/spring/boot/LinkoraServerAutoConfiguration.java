@@ -141,6 +141,18 @@ public class LinkoraServerAutoConfiguration {
         if (p.getMessageSizeLimitBytes() != null) {
             builder.messageSizeLimitBytes(p.getMessageSizeLimitBytes());
         }
+        if (p.getRetentionEnabled() != null) {
+            builder.retentionEnabled(p.getRetentionEnabled());
+        }
+        if (p.getRetentionMs() != null) {
+            builder.retentionMs(p.getRetentionMs());
+        }
+        if (p.getRetentionBatchSize() != null) {
+            builder.retentionBatchSize(p.getRetentionBatchSize());
+        }
+        if (p.getExpirySweepBatchSize() != null) {
+            builder.expirySweepBatchSize(p.getExpirySweepBatchSize());
+        }
         return builder.build();
     }
 

@@ -62,7 +62,14 @@ context.addServlet(new ServletHolder(
 | `maxDeliveryRetries` | 10 | FAILED ACK 累计次数上限，超过进入死信 |
 | `retryBackoffBaseMs/MaxMs` | 2000 / 300000 | 失败重试指数退避 |
 | `pushPacingBaseMs/MaxMs` | 5000 / 60000 | 在线客户端重推节奏（防风暴） |
-| `messageSizeLimitBytes` | 1MB | 上行消息体上限（≤16MB） |
+| `messageSizeLimitBytes` | 1MB | 上行消息体上限（≤16MB）；payload 列已按 LONGTEXT 建表，可容纳该上限 |
+| `retentionEnabled` | true | 是否清理终态历史数据 |
+| `retentionMs` | 7 天 | 终态（PROCESSED/EXPIRED）记录保留时长，超期分批删除 |
+| `retentionBatchSize` | 500 | 单次清理条数上限（避免长事务） |
+| `expirySweepBatchSize` | 500 | 单次"离线过期推进"条数上限 |
+
+> 过期推进与保留策略不依赖客户端在线：`DEAD_LETTER` 与所有未完成记录永不自动删除，
+> 需要人工介入或宿主自行归档。
 
 ## 客户端部署
 

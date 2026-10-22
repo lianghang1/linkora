@@ -298,6 +298,12 @@ linkora.client.db-path=data/client.db
 | `lk_meta` | SDK 元数据（本地游标等） |
 | `lk_schema_version` | 客户端本地结构版本号 |
 
+**数据生命周期**：服务端每 60s 执行一次维护——把"已过期但客户端一直离线"的投递记录
+推进到 `EXPIRED`，并按保留期（默认 7 天，`retention-ms` 可调）分批清理终态记录与
+不再被引用的消息正文。`DEAD_LETTER` 与所有未完成记录**永不自动删除**，它们是排查与
+对账的唯一依据。payload 列按 LONGTEXT 建表，可承载 `message-size-limit-bytes` 的
+1MB 上限（v2 迁移自动完成）。
+
 **升级与维护**：后续版本的结构变更由 SDK 自动顺序迁移（按 `lk_schema_version` 记录逐版本
 执行，中途崩溃重启自动续跑），宿主**无需手动执行任何 SQL**。所有时间字段统一存 epoch
 毫秒（整数），跨时区、跨数据库一致。

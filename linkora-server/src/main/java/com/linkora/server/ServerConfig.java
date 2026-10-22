@@ -14,6 +14,10 @@ public final class ServerConfig {
     private final long pushPacingBaseMs;
     private final long pushPacingMaxMs;
     private final long messageSizeLimitBytes;
+    private final boolean retentionEnabled;
+    private final long retentionMs;
+    private final int retentionBatchSize;
+    private final int expirySweepBatchSize;
 
     private ServerConfig(Builder b) {
         this.pushBatchSize = b.pushBatchSize;
@@ -24,6 +28,10 @@ public final class ServerConfig {
         this.pushPacingBaseMs = b.pushPacingBaseMs;
         this.pushPacingMaxMs = b.pushPacingMaxMs;
         this.messageSizeLimitBytes = b.messageSizeLimitBytes;
+        this.retentionEnabled = b.retentionEnabled;
+        this.retentionMs = b.retentionMs;
+        this.retentionBatchSize = b.retentionBatchSize;
+        this.expirySweepBatchSize = b.expirySweepBatchSize;
     }
 
     public static Builder builder() {
@@ -70,6 +78,26 @@ public final class ServerConfig {
         return messageSizeLimitBytes;
     }
 
+    /** 是否启用保留策略（清理终态记录与消息正文）。默认启用。 */
+    public boolean isRetentionEnabled() {
+        return retentionEnabled;
+    }
+
+    /** 终态记录的保留时长（毫秒），超过后由周期扫描分批清理。默认 7 天。 */
+    public long getRetentionMs() {
+        return retentionMs;
+    }
+
+    /** 单次清理的投递记录条数上限。 */
+    public int getRetentionBatchSize() {
+        return retentionBatchSize;
+    }
+
+    /** 单次过期推进的投递记录条数上限（不依赖客户端是否在线）。 */
+    public int getExpirySweepBatchSize() {
+        return expirySweepBatchSize;
+    }
+
     /** 指数退避：base * 2^(attempt-1)，封顶 max。attempt 从 1 开始。 */
     public long backoffDelayMs(int attempt) {
         if (attempt <= 1) {
@@ -91,6 +119,10 @@ public final class ServerConfig {
         private long pushPacingBaseMs = 5_000L;
         private long pushPacingMaxMs = 60_000L;
         private long messageSizeLimitBytes = 1024 * 1024L;
+        private boolean retentionEnabled = true;
+        private long retentionMs = 7L * 24 * 3600 * 1000;
+        private int retentionBatchSize = 500;
+        private int expirySweepBatchSize = 500;
 
         public Builder pushBatchSize(int pushBatchSize) {
             if (pushBatchSize < 1 || pushBatchSize > 10_000) {
@@ -153,6 +185,35 @@ public final class ServerConfig {
                 throw new IllegalArgumentException("messageSizeLimitBytes 取值范围 [1, 16MB]");
             }
             this.messageSizeLimitBytes = messageSizeLimitBytes;
+            return this;
+        }
+
+        public Builder retentionEnabled(boolean retentionEnabled) {
+            this.retentionEnabled = retentionEnabled;
+            return this;
+        }
+
+        public Builder retentionMs(long retentionMs) {
+            if (retentionMs < 60_000L) {
+                throw new IllegalArgumentException("retentionMs 不得小于 60000ms（避免清理掉仍在重试的消息）");
+            }
+            this.retentionMs = retentionMs;
+            return this;
+        }
+
+        public Builder retentionBatchSize(int retentionBatchSize) {
+            if (retentionBatchSize < 1 || retentionBatchSize > 10_000) {
+                throw new IllegalArgumentException("retentionBatchSize 取值范围 [1, 10000]");
+            }
+            this.retentionBatchSize = retentionBatchSize;
+            return this;
+        }
+
+        public Builder expirySweepBatchSize(int expirySweepBatchSize) {
+            if (expirySweepBatchSize < 1 || expirySweepBatchSize > 10_000) {
+                throw new IllegalArgumentException("expirySweepBatchSize 取值范围 [1, 10000]");
+            }
+            this.expirySweepBatchSize = expirySweepBatchSize;
             return this;
         }
 

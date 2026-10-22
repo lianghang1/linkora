@@ -396,4 +396,102 @@ public class JdbcServerStorageTest {
         // 客户端隔离
         assertFalse(repo.getLastDeliveredSeq("c-2").isPresent());
     }
+
+    // ---------------- 保留策略与过期推进 ----------------
+
+    private static com.linkora.core.message.LinkoraMessage message(String id, long createdAt, Long expiresAt) {
+        return com.linkora.core.message.LinkoraMessage.builder()
+                .messageId(id)
+                .clientId("store-001")
+                .messageType("ORDER_CREATED")
+                .payload(new byte[]{1, 2, 3})
+                .createdAt(createdAt)
+                .expiresAt(expiresAt)
+                .build();
+    }
+
+    @Test
+    public void expireOverdueWorksWithoutOnlineClient() {
+        DataSource ds = freshH2("expire-offline");
+        JdbcMessageRepository messages = new JdbcMessageRepository(ds);
+        JdbcDeliveryRepository deliveries = new JdbcDeliveryRepository(ds);
+
+        // 已过期 + 未终结：应被推进
+        messages.save(message("expired-1", NOW - 10_000, NOW - 5_000));
+        deliveries.init(record("expired-1", "store-001", 1, MessageState.ACCEPTED));
+        // 未过期：不动
+        messages.save(message("alive-1", NOW - 10_000, NOW + 60_000));
+        deliveries.init(record("alive-1", "store-001", 2, MessageState.ACCEPTED));
+        // 无过期时间：不动
+        messages.save(message("no-ttl", NOW - 10_000, null));
+        deliveries.init(record("no-ttl", "store-001", 3, MessageState.ACCEPTED));
+        // 已到终态：不动
+        messages.save(message("done-1", NOW - 10_000, NOW - 5_000));
+        deliveries.init(record("done-1", "store-001", 4, MessageState.PROCESSED));
+
+        int expired = deliveries.expireOverdue(NOW, 100);
+        assertEquals(1, expired);
+        assertEquals(MessageState.EXPIRED,
+                deliveries.find("expired-1", "store-001").get().getState());
+        assertEquals(MessageState.ACCEPTED,
+                deliveries.find("alive-1", "store-001").get().getState());
+        assertEquals(MessageState.ACCEPTED,
+                deliveries.find("no-ttl", "store-001").get().getState());
+        assertEquals(MessageState.PROCESSED,
+                deliveries.find("done-1", "store-001").get().getState());
+
+        // 幂等：再跑一次没有新的可推进项
+        assertEquals(0, deliveries.expireOverdue(NOW, 100));
+    }
+
+    @Test
+    public void purgeSettledBeforeKeepsUnfinishedAndDeadLetter() {
+        DataSource ds = freshH2("retention-purge");
+        JdbcMessageRepository messages = new JdbcMessageRepository(ds);
+        JdbcDeliveryRepository deliveries = new JdbcDeliveryRepository(ds);
+
+        long old = NOW - 10L * 24 * 3600 * 1000;
+        // 终态且超期：删
+        messages.save(message("settled-old", old, null));
+        deliveries.init(new DeliveryRecord("settled-old", "store-001", 1,
+                MessageState.PROCESSED, 0, null, null, old, old));
+        // 终态但未超期：留
+        messages.save(message("settled-fresh", NOW, null));
+        deliveries.init(record("settled-fresh", "store-001", 2, MessageState.PROCESSED));
+        // 未完成：留（哪怕很旧）
+        messages.save(message("unfinished-old", old, null));
+        deliveries.init(new DeliveryRecord("unfinished-old", "store-001", 3,
+                MessageState.ACCEPTED, 0, null, null, old, old));
+        // 死信：留（需要人工介入的唯一凭据）
+        messages.save(message("dead-old", old, null));
+        deliveries.init(new DeliveryRecord("dead-old", "store-001", 4,
+                MessageState.DEAD_LETTER, 0, null, null, old, old));
+
+        int purged = deliveries.purgeSettledBefore(NOW - 7L * 24 * 3600 * 1000, 100);
+        assertEquals(1, purged);
+        assertFalse(deliveries.find("settled-old", "store-001").isPresent());
+        assertTrue(deliveries.find("settled-fresh", "store-001").isPresent());
+        assertTrue(deliveries.find("unfinished-old", "store-001").isPresent());
+        assertTrue(deliveries.find("dead-old", "store-001").isPresent());
+
+        // 正文随投递记录一起回收，其余保留
+        assertFalse(messages.findByMessageId("settled-old").isPresent());
+        assertTrue(messages.findByMessageId("unfinished-old").isPresent());
+        assertTrue(messages.findByMessageId("dead-old").isPresent());
+    }
+
+    @Test
+    public void largePayloadRoundtrip() {
+        // v2 迁移后 payload 列必须能装下默认的 1MB 上限（Base64 后约 1.37MB）
+        DataSource ds = freshH2("schema-large-payload");
+        byte[] payload = new byte[1024 * 1024];
+        for (int i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i * 31);
+        }
+        JdbcMessageRepository repo = new JdbcMessageRepository(ds);
+        repo.save(com.linkora.core.message.LinkoraMessage.builder()
+                .messageId("big-1").clientId("store-001").messageType("BIG")
+                .payload(payload).createdAt(NOW).build());
+        assertEquals(payload.length, repo.findByMessageId("big-1").get().getPayload().length);
+    }
 }

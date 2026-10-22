@@ -32,7 +32,7 @@ public final class JdbcServerSchema {
     private static final Logger log = LoggerFactory.getLogger(JdbcServerSchema.class);
 
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    public static final int LATEST_VERSION = 1;
+    public static final int LATEST_VERSION = 2;
 
     private static final String CREATE_VERSION_TABLE =
             "CREATE TABLE IF NOT EXISTS lk_schema_version ("
@@ -90,11 +90,29 @@ public final class JdbcServerSchema {
     };
 
     /**
+     * v2：payload 列扩容 + 保留策略索引。
+     *
+     * <p>v1 把 payload 存成 {@code TEXT}，而 MySQL 的 TEXT 上限只有 64KB；
+     * payload 以 Base64 存储会再膨胀 4/3，导致"消息大小上限默认 1MB"在 MySQL 上
+     * 约 48KB 就写库失败。v2 把 MySQL 侧改为 LONGTEXT（H2 的 TEXT 本身就是 CLOB，
+     * 此处显式改写以保持两端语义一致），并补一条保留策略要用的索引。</p>
+     */
+    private static final String[] V2_H2 = {
+            "ALTER TABLE lk_message ALTER COLUMN payload_base64 SET DATA TYPE CLOB",
+            "CREATE INDEX IF NOT EXISTS idx_delivery_state_updated ON lk_delivery (state, updated_at)",
+    };
+
+    private static final String[] V2_MYSQL = {
+            "ALTER TABLE lk_message MODIFY COLUMN payload_base64 LONGTEXT NOT NULL",
+            "CREATE INDEX idx_delivery_state_updated ON lk_delivery (state, updated_at)",
+    };
+
+    /**
      * 每个迁移版本 = 语句数组（一条语句一个元素，语句边界显式声明，不依赖
      * 字符串切割，规避 SQL 内分号字面量/注释被误切的问题）；方言差异仅替换索引语句。
      */
-    private static final String[][] MIGRATIONS = {concat(V1_TABLES, V1_INDEXES_H2)};
-    private static final String[][] MIGRATIONS_MYSQL = {concat(V1_TABLES, V1_INDEXES_MYSQL)};
+    private static final String[][] MIGRATIONS = {concat(V1_TABLES, V1_INDEXES_H2), V2_H2};
+    private static final String[][] MIGRATIONS_MYSQL = {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL};
 
     private static String[] concat(String[] tables, String[] indexes) {
         String[] all = new String[tables.length + indexes.length];
