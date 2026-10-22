@@ -304,6 +304,80 @@ linkora.client.db-path=data/client.db
 
 ---
 
+## 换掉内置存储：自定义存储与事务接管
+
+内置存储开箱即用，但**两端都支持换成自己的实现**。两个典型真实诉求：
+
+### 客户端：不想要 SQLite 文件，收发队列进公司统一的 MySQL
+
+实现 `com.linkora.core.storage.client.ClientStore` 接口（outbox / inbox / meta 共 14 个方法，
+把内置 SQLite 的 4 张表换成你的 MySQL 表即可）。两条**必须遵守的语义**：
+
+1. `updateOutboxStatus(updated, expected)` / `updateInboxReceiveStatus(...)` /
+   `updateInboxProcessStatus(...)` 是 **CAS**：必须生成
+   `UPDATE ... SET ... WHERE status = expected` 并返回是否真的更新了行——
+   这是崩溃恢复与并发去重的根基，去掉 expected 条件会产生重复发送/重复回调；
+2. 实现必须线程安全（SDK 多线程并发调用）。
+
+装配（一行替换内置实现）：
+
+```java
+// Boot 宿主：声明即生效，starter 发现你提供了 ClientStore 会自动放弃内置 SQLite
+@Bean
+public ClientStore clientStore(DataSource dataSource) {
+    return new MySqlClientStore(dataSource); // 你自己的实现
+}
+```
+
+MVC 宿主（`@Import(LinkoraClientConfiguration.class)`）同理，但自定义 `ClientStore` bean
+需加 `@Primary`（纯 Spring 没有 `@ConditionalOnMissingBean`）。启用自定义存储后
+`linkora.client.db-path` 配置不再生效。
+
+### 服务端：业务写库与发消息同一事务（事务性发件箱）
+
+场景：下单失败时，"通知门店"的消息要和订单行**一起回滚**——对客户端而言这条消息从未存在。
+做法是四个存储 SPI 的连接取自**事务感知数据源**，内置 JDBC 实现直接复用、无需手写 SQL：
+
+```java
+@Bean
+public TransactionAwareDataSourceProxy linkoraTxDataSource(DataSource businessDataSource) {
+    // 包一层宿主业务 DataSource（同一个连接池、同一个库）
+    return new TransactionAwareDataSourceProxy(businessDataSource);
+}
+
+// 四个存储 SPI bean 都传代理数据源（Boot 宿主同样声明这四个 bean 覆盖默认装配）
+@Bean public MessageRepository linkoraMessageRepository(TransactionAwareDataSourceProxy ds) { return new JdbcMessageRepository(ds); }
+@Bean public DeliveryRepository linkoraDeliveryRepository(TransactionAwareDataSourceProxy ds) { return new JdbcDeliveryRepository(ds); }
+@Bean public ClientRegistry linkoraClientRegistry(TransactionAwareDataSourceProxy ds) { return new JdbcClientRegistry(ds); }
+@Bean public ClientCursorRepository linkoraCursorRepository(TransactionAwareDataSourceProxy ds) { return new JdbcClientCursorRepository(ds); }
+```
+
+业务代码照常写 `@Transactional`：
+
+```java
+@Transactional
+public void placeOrder(OrderRequest req) {
+    orderDao.insert(req);                                          // 业务行
+    linkora.publish(req.getStoreId(), "order-created", payload);   // 消息行加入同一事务
+    // 抛异常 → 业务行与消息一起回滚；正常返回 → 一起提交，之后按常规流程推送
+}
+```
+
+行为说明：`@Transactional` 内发生的 publish / ACK / 上行持久化自动加入当前宿主事务；
+Linkora 后台编排线程（重试扫描、SSE 推送）始终在事务外运行，不受影响。
+表结构迁移（`JdbcServerSchema.migrate`）在**原始** DataSource 上于参与事务前执行。
+
+**完全自实现服务端存储**（连内置 JDBC 实现也不要）：实现 `ClientRegistry` /
+`MessageRepository` / `DeliveryRepository` / `ClientCursorRepository` 四个接口、声明为
+bean 即可，表结构完全由你管理。此时必须遵守：仓储方法自管事务时**尊重连接的
+autoCommit 状态**——仅 `autoCommit=true` 时自行提交；为 `false`（宿主事务接管）时
+严禁中途 commit/rollback，否则会破坏发件箱语义。
+
+完整可运行参考：`examples/spring-tx-server`（服务端事务接管，含回滚演示）与
+`examples/tx-client`（客户端自定义存储）。
+
+---
+
 ## 使用前必读
 
 **三条铁律（违反会产生故障）**
