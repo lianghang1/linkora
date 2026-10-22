@@ -76,6 +76,20 @@ public class LinkoraClientMalformedMessageTest {
         }
         longId.append("\"");
         assertNull(LinkoraClient.extractMessageIdLenient("{" + longId + "}"));
+
+        // ---- 防误取：字段值里伪造的 "messageId" ----
+        // traceId 里塞结构化文本，JSON 编码后会转义成 \"messageId\"\"，正则不应命中
+        assertEquals("real-1", LinkoraClient.extractMessageIdLenient(
+                "{\"messageId\":\"real-1\",\"traceId\":\"x\\\",\\\"messageId\\\":\\\"evil\\\"\"}"));
+        // payload 若是明文 JSON（协议外用法），内层 messageId 不得覆盖外层
+        assertEquals("real-2", LinkoraClient.extractMessageIdLenient(
+                "{\"messageId\":\"real-2\",\"payloadBase64\":\"{}\"}"));
+        // 畸形 JSON 里出现重复 messageId：取第一个（编码时序在最前）
+        assertEquals("first", LinkoraClient.extractMessageIdLenient(
+                "{\"messageId\":\"first\",\"messageId\":\"second\"}"));
+        // 值为 null / 空串：不认
+        assertNull(LinkoraClient.extractMessageIdLenient("{\"messageId\":null}"));
+        assertNull(LinkoraClient.extractMessageIdLenient("{\"messageId\":\"\"}"));
     }
 
     @Test
