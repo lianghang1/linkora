@@ -148,44 +148,46 @@ boolean accepted = uplinkPublisher.awaitServerAccepted(messageId, 30_000);   // 
 
 ### 服务端应用
 
-**第 1 步：引入依赖**
+以 **Spring MVC + JPA + MySQL** 项目为例：在现有项目上**新增两个东西**即可，不改动现有代码。
 
-```xml
-<dependency>
-    <groupId>io.github.lianghang1</groupId>
-    <artifactId>linkora-spring</artifactId>
-    <version>x.y.z</version>
-</dependency>
-```
-
-**第 2 步：装配配置类（`@Import` 启用，提供 DataSource 与四个存储 bean）**
+**新增 1：linkora 配置类**（DataSource 复用 JPA 正在用的那个，linkora 表与业务表同库，首次启动自动建表）
 
 ```java
 @Configuration
-@EnableWebMvc
 @Import(LinkoraServerConfiguration.class)
-public class AppConfig {
+public class LinkoraConfig {
 
-    @Bean
-    public DataSource linkoraDataSource() { /* 业务库连接池 */ }
+    /** 你项目里已有的 DataSource（HikariCP + MySQL），不需要新建。 */
+    @Autowired
+    private DataSource dataSource;
 
+    // 四个存储 SPI bean：官方 JDBC 实现，直接复用上面的连接池；
+    // 想用业务库事务接管（发件箱语义）时换成自实现即可
+    @Bean public ClientRegistry linkoraClientRegistry() { return new JdbcClientRegistry(dataSource); }
+    @Bean public MessageRepository linkoraMessageRepository() { return new JdbcMessageRepository(dataSource); }
+    @Bean public DeliveryRepository linkoraDeliveryRepository() { return new JdbcDeliveryRepository(dataSource); }
+    @Bean public ClientCursorRepository linkoraCursorRepository() { return new JdbcClientCursorRepository(dataSource); }
+
+    /** 生产必配；本地开发可先省略（会放行全部请求并打告警）。 */
     @Bean
     public ClientAuthenticator linkoraClientAuthenticator() {
-        return new HmacClientAuthenticator(/* 凭据库 */); // 生产必配，写法见"使用前必读"第 3 条
+        return new HmacClientAuthenticator(/* 凭据库 */);
     }
-
-    // 四个存储 SPI bean：官方 JDBC 实现，或自实现接宿主业务库（事务接管）
-    @Bean public ClientRegistry linkoraClientRegistry(DataSource ds) { return new JdbcClientRegistry(ds); }
-    @Bean public MessageRepository linkoraMessageRepository(DataSource ds) { return new JdbcMessageRepository(ds); }
-    @Bean public DeliveryRepository linkoraDeliveryRepository(DataSource ds) { return new JdbcDeliveryRepository(ds); }
-    @Bean public ClientCursorRepository linkoraCursorRepository(DataSource ds) { return new JdbcClientCursorRepository(ds); }
 }
 ```
 
-**第 3 步：注册三个 HTTP 端点（SSE 下行 `/events`、上行 `/messages`、确认 `/acks`）**
+**新增 2：在已有的 `AbstractAnnotationConfigDispatcherServletInitializer` 里注册三个端点**
+（`onStartup` 末尾加三行，注册 SSE 下行 `/events`、上行 `/messages`、确认 `/acks`）
 
 ```java
-LinkoraServlets.register(linkoraServer, servletContext); // 一行
+@Override
+public void onStartup(ServletContext servletContext) {
+    super.onStartup(servletContext);   // 让 Spring 容器照常初始化
+    WebApplicationContext ctx = WebApplicationContextUtils
+            .getRequiredWebApplicationContext(servletContext);
+    LinkoraServer linkora = ctx.getBean(LinkoraServer.class);
+    LinkoraServlets.register(linkora, servletContext);  // 注册 /events /messages /acks
+}
 ```
 
 之后注入 `LinkoraServer` 下发消息、实现 `UplinkHandler` 接收上行——代码与 Boot 模式完全相同。
@@ -219,6 +221,28 @@ linkora.client.db-path=data/client.db
 ```
 
 之后实现 `MessageListener` 接收下行并显式 ACK、注入 `UplinkPublisher` 发送上行——代码与 Boot 模式完全相同。
+
+---
+
+## 服务端还提供什么（不只是收发消息）
+
+可靠投递本身是自动的：先落库再推送、断线客户端重连自动补发、失败指数退避重试、
+到期自动作废（EXPIRED）、重试耗尽进死信（DEAD_LETTER）——全部无需业务代码参与。
+在此基础上，注入 `LinkoraServer` 后还可以：
+
+| 能力 | 用法 | 说明 |
+|---|---|---|
+| 消息投递状态查询 | `linkora.getMessageStatus(messageId)` | 消息正文 + 每个目标的投递记录（状态、序号、重试次数）；`isSettled()` 一键判断是否全部到达终态，可用于对账 |
+| 客户端积压与在线查询 | `linkora.getBacklog(clientId)` | 未完成投递数 + 是否有活跃 SSE 连接，适合监控告警 |
+| 带过期与链路追踪的发布 | `linkora.publish(clientId, type, payload, expiresAt, traceId)` | 到期未送达自动作废；traceId 透传到客户端便于全链路排查 |
+| 客户端启用/禁用 | Boot：`register-clients` 配置；MVC：`ClientRegistration` bean | 禁用的客户端拒收新消息、拒绝接入 |
+| 手动触发补发扫描 | `linkora.sweepOnce()` | 运维/测试用，正常运行不需要 |
+
+上行侧同样有保障：`UplinkHandler` 按 `messageType()` 自动分发，服务端按 messageId 幂等去重
+（客户端崩溃重发不会产生重复处理）。
+
+客户端侧注入 `LinkoraClient` 后：`getSseState()` 查询连接状态；所有上行先落本地 SQLite
+再后台发送，进程崩溃/断电后自动补传。
 
 ---
 
