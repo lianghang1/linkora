@@ -303,6 +303,16 @@ public final class LinkoraServer {
     // ---------------- 宿主接入 ----------------
 
     /** SSE 订阅处理器（接到 SsePushServlet）。 */
+    /**
+     * 单个上行请求体的最大字节数，即 {@link ServerConfig#getMessageSizeLimitBytes()}。
+     *
+     * <p>这是**唯一默认值来源**：Servlet 层不再自带默认值，注册时必须显式传入本值，
+     * 避免"配置了 4MB 却被 Servlet 的 2MB 硬上限拦下"这类不一致。</p>
+     */
+    public long getMaxBodyBytes() {
+        return config.getMessageSizeLimitBytes();
+    }
+
     public SseSubscribeHandler sseSubscribeHandler() {
         return coordinator;
     }

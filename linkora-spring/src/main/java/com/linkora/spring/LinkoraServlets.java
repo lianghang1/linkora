@@ -47,10 +47,10 @@ public final class LinkoraServlets {
                 new SsePushServlet(server.sseSubscribeHandler(), server.sseConnectionRegistry()),
                 prefix + "/events");
         add(servletContext, "linkoraIngestServlet",
-                new LinkoraEndpointServlet(server.ingestHttpHandler()),
+                new LinkoraEndpointServlet(server.ingestHttpHandler(), server.getMaxBodyBytes()),
                 prefix + "/messages");
         add(servletContext, "linkoraAckServlet",
-                new LinkoraEndpointServlet(server.ackHttpHandler()),
+                new LinkoraEndpointServlet(server.ackHttpHandler(), server.getMaxBodyBytes()),
                 prefix + "/acks");
     }
 
