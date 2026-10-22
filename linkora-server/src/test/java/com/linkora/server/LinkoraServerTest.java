@@ -301,6 +301,65 @@ public class LinkoraServerTest {
     }
 
     @Test
+    public void distantSameKeyTailDeliveredOnlyAfterHeadDeadLetters() throws Exception {
+        // 用户场景：同一 sequenceKey，第一条 seq=1 报错，第二条相隔 199 条（seq=200）。
+        // 预期：第二条一直等；第一条重试耗尽进死信后才推出去。
+        LinkoraServer ordered = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .config(ServerConfig.builder()
+                        .sweepIntervalMs(3_600_000) // 关掉后台扫描，手动 sweep
+                        .pushBatchSize(100)
+                        .pushPacingBaseMs(1)
+                        .pushPacingMaxMs(1)
+                        .maxDeliveryRetries(2)
+                        .retryBackoffBaseMs(1)
+                        .retryBackoffMaxMs(2)
+                        .build())
+                .build();
+        ordered.start();
+        try {
+            gateway.connectedClients.set(1);
+            PublishResult head = ordered.publish(CLIENT, "ORDER_STATUS",
+                    "{\"status\":1}".getBytes(StandardCharsets.UTF_8), "order-Z");
+            awaitPush(head.getMessageId());
+
+            // 占掉 198 个 seq，让第二条落到 seq=200
+            com.linkora.server.storage.jdbc.JdbcDeliveryRepository repo =
+                    new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource);
+            for (int i = 0; i < 198; i++) {
+                repo.nextDeliverySeq(CLIENT);
+            }
+            PublishResult tail = ordered.publish(CLIENT, "ORDER_STATUS",
+                    "{\"status\":2}".getBytes(StandardCharsets.UTF_8), "order-Z");
+            assertEquals("第二条应落在 seq=200", 200L, tail.getSeq());
+
+            // 队头未终结：tail 不得推送（首推也会被门禁挡住）
+            Thread.sleep(300L);
+            assertNull("队头未终结时 tail 不得被推送", gateway.pushes.get(tail.getMessageId()));
+
+            // 第一条连续失败 2 次 → 死信（maxDeliveryRetries=2）
+            assertEquals(200, postAckOn(ordered, head.getMessageId(), "FAILED",
+                    "BIZ_ERROR", "业务失败").getStatus());
+            assertEquals(200, postAckOn(ordered, head.getMessageId(), "FAILED",
+                    "BIZ_ERROR", "业务失败").getStatus());
+            assertEquals("第一条应进入死信", MessageState.DEAD_LETTER,
+                    currentStateOn(ordered, head.getMessageId()));
+
+            // 死信后车道释放：下一轮扫描推出 tail
+            ordered.sweepOnce();
+            assertNotNull("队头死信后，seq=200 的同键消息必须被投递",
+                    awaitPushCount(tail.getMessageId(), 1));
+        } finally {
+            ordered.close();
+        }
+    }
+
+    @Test
     public void failedAckSchedulesRetryThenDeadLetters() throws Exception {
         LinkoraServer retrier = LinkoraServer.builder()
                 .clientAuthenticator(new AllowAllClientAuthenticator())

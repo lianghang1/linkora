@@ -400,6 +400,59 @@ public class JdbcServerStorageTest {
     }
 
     @Test
+    public void farApartSameKeyIsStillGated() {
+        // 同 key 的两条消息 seq 相差 199（中间全是别的消息），门禁必须仍然生效
+        DataSource ds = freshH2("dlv-far-key");
+        JdbcMessageRepository messages = new JdbcMessageRepository(ds);
+        JdbcDeliveryRepository deliveries = new JdbcDeliveryRepository(ds);
+
+        messages.save(message("head", NOW, null));
+        deliveries.init(new DeliveryRecord("head", "c-1", 1, MessageState.ACCEPTED, 0, null, null,
+                NOW, NOW, "order-X"));
+        for (int i = 2; i <= 199; i++) {
+            messages.save(message("other-" + i, NOW, null));
+            deliveries.init(new DeliveryRecord("other-" + i, "c-1", i, MessageState.PROCESSED, 0,
+                    null, null, NOW, NOW, null));
+        }
+        messages.save(message("tail", NOW, null));
+        deliveries.init(new DeliveryRecord("tail", "c-1", 200, MessageState.ACCEPTED, 0, null, null,
+                NOW, NOW, "order-X"));
+
+        // 队头未终结：只允许它自己进入投递窗口，tail 必须让路（哪怕隔了 199 条）
+        List<DeliveryRecord> batch = deliveries.findUnfinishedAfterSeq("c-1", 0, NOW, 1000);
+        assertEquals(1, batch.size());
+        assertEquals("head", batch.get(0).getMessageId());
+        assertTrue(deliveries.hasEarlierUnsettled("c-1", "order-X", 200));
+
+        // 队头业务失败耗尽 → 死信 → tail 立即放行
+        assertTrue(deliveries.compareAndSetState("head", "c-1", MessageState.ACCEPTED,
+                MessageState.DEAD_LETTER, "业务失败 10 次", null, 0, 10));
+        batch = deliveries.findUnfinishedAfterSeq("c-1", 0, NOW, 1000);
+        assertEquals(1, batch.size());
+        assertEquals("tail", batch.get(0).getMessageId());
+        assertFalse(deliveries.hasEarlierUnsettled("c-1", "order-X", 200));
+    }
+
+    @Test
+    public void headInFailedStateStillBlocksTail() {
+        // 中间态（FAILED/RETRYING）不是终态，tail 必须继续等——这正是顺序保证
+        DataSource ds = freshH2("dlv-failed-key");
+        JdbcMessageRepository messages = new JdbcMessageRepository(ds);
+        JdbcDeliveryRepository deliveries = new JdbcDeliveryRepository(ds);
+
+        messages.save(message("head", NOW, null));
+        deliveries.init(new DeliveryRecord("head", "c-1", 1, MessageState.FAILED, 3,
+                NOW - 1_000L, "业务异常", NOW, NOW, "order-Y"));
+        messages.save(message("tail", NOW, null));
+        deliveries.init(new DeliveryRecord("tail", "c-1", 50, MessageState.ACCEPTED, 0, null, null,
+                NOW, NOW, "order-Y"));
+
+        assertTrue("FAILED 不是终态，仍应挡住同键后续",
+                deliveries.hasEarlierUnsettled("c-1", "order-Y", 50));
+        assertEquals(1, deliveries.findUnfinishedAfterSeq("c-1", 0, NOW, 1000).size());
+    }
+
+    @Test
     public void deadLetterInSameKeyReleasesFollowingMessage() {
         JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-sequence-dead"));
         // 前一条已进死信：不再投递，但也不能把同键后续消息永久卡住
