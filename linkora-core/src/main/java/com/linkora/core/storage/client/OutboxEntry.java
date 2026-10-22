@@ -20,10 +20,20 @@ public final class OutboxEntry {
     private final Long nextRetryAt;
     private final Long expiresAt;
     private final String lastError;
+    /** 顺序键，可为 null（不参与顺序约束）。 */
+    private final String orderingKey;
 
     public OutboxEntry(String messageId, String messageType, byte[] payload,
                        OutboxStatus status, long createdAt, long updatedAt,
                        int retryCount, Long nextRetryAt, Long expiresAt, String lastError) {
+        this(messageId, messageType, payload, status, createdAt, updatedAt,
+                retryCount, nextRetryAt, expiresAt, lastError, null);
+    }
+
+    public OutboxEntry(String messageId, String messageType, byte[] payload,
+                       OutboxStatus status, long createdAt, long updatedAt,
+                       int retryCount, Long nextRetryAt, Long expiresAt, String lastError,
+                       String orderingKey) {
         requireNonBlank(messageId, "messageId");
         requireNonBlank(messageType, "messageType");
         if (payload == null) {
@@ -42,6 +52,7 @@ public final class OutboxEntry {
         this.nextRetryAt = nextRetryAt;
         this.expiresAt = expiresAt;
         this.lastError = lastError;
+        this.orderingKey = orderingKey;
     }
 
     public String getMessageId() {
@@ -84,11 +95,17 @@ public final class OutboxEntry {
         return lastError;
     }
 
+    /** 顺序键，可为 null。 */
+    public String getOrderingKey() {
+        return orderingKey;
+    }
+
     /** 返回携带更新字段的新实例（不可变对象的变更语义）。 */
     public OutboxEntry with(OutboxStatus newStatus, int newRetryCount,
                             Long newNextRetryAt, String newLastError, long now) {
         return new OutboxEntry(messageId, messageType, payload, newStatus,
-                createdAt, now, newRetryCount, newNextRetryAt, expiresAt, newLastError);
+                createdAt, now, newRetryCount, newNextRetryAt, expiresAt, newLastError,
+                orderingKey);
     }
 
     @Override

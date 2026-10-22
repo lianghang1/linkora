@@ -32,7 +32,7 @@ public final class JdbcServerSchema {
     private static final Logger log = LoggerFactory.getLogger(JdbcServerSchema.class);
 
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    public static final int LATEST_VERSION = 2;
+    public static final int LATEST_VERSION = 3;
 
     private static final String CREATE_VERSION_TABLE =
             "CREATE TABLE IF NOT EXISTS lk_schema_version ("
@@ -108,11 +108,22 @@ public final class JdbcServerSchema {
     };
 
     /**
+     * v3：顺序键。同一 (client_id, ordering_key) 下按 seq 单调投递，
+     * 前一条到终态前不推后一条；索引支撑"同 key 是否有更早未终结记录"的 EXISTS 判断。
+     */
+    private static final String[] V3_COMMON = {
+            "ALTER TABLE lk_delivery ADD COLUMN ordering_key VARCHAR(128)",
+            "CREATE INDEX idx_delivery_client_key_seq ON lk_delivery (client_id, ordering_key, seq)",
+    };
+
+    /**
      * 每个迁移版本 = 语句数组（一条语句一个元素，语句边界显式声明，不依赖
      * 字符串切割，规避 SQL 内分号字面量/注释被误切的问题）；方言差异仅替换索引语句。
      */
-    private static final String[][] MIGRATIONS = {concat(V1_TABLES, V1_INDEXES_H2), V2_H2};
-    private static final String[][] MIGRATIONS_MYSQL = {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL};
+    private static final String[][] MIGRATIONS = {
+            concat(V1_TABLES, V1_INDEXES_H2), V2_H2, V3_COMMON};
+    private static final String[][] MIGRATIONS_MYSQL = {
+            concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL, V3_COMMON};
 
     private static String[] concat(String[] tables, String[] indexes) {
         String[] all = new String[tables.length + indexes.length];

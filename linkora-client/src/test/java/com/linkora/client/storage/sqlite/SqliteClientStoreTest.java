@@ -417,4 +417,80 @@ public class SqliteClientStoreTest {
             second.close();
         }
     }
+
+    // ---------------- 顺序键 ----------------
+
+    private static OutboxEntry outboxInKey(String id, String key) {
+        return new OutboxEntry(id, "T", "p".getBytes(StandardCharsets.UTF_8),
+                OutboxStatus.PENDING, NOW, NOW, 0, null, null, null, key);
+    }
+
+    private static InboxEntry inboxInKey(String id, String key, ProcessStatus status) {
+        return new InboxEntry(id, "T", "p".getBytes(StandardCharsets.UTF_8),
+                ReceiveStatus.RECEIVED_ACK_SENT, status, NOW, null, 0, null, null, key);
+    }
+
+    @Test
+    public void outboxOrderingBlocksLaterMessageUntilEarlierSettles() throws Exception {
+        try (SqliteClientStore store = new SqliteClientStore(dbPath())) {
+            store.saveOutbox(outboxInKey("a", "order-1"));
+            store.saveOutbox(outboxInKey("b", "order-1"));
+            store.saveOutbox(outboxInKey("c", "order-2"));
+
+            assertFalse("最早一条不受阻塞", store.hasEarlierActiveInKey("order-1", "a"));
+            assertTrue("同键后一条必须等待", store.hasEarlierActiveInKey("order-1", "b"));
+            assertFalse("不同键互不影响", store.hasEarlierActiveInKey("order-2", "c"));
+            assertFalse("无顺序键不阻塞", store.hasEarlierActiveInKey(null, "c"));
+
+            // 前一条被服务端接受（终态）→ 后一条放行
+            assertTrue(store.updateOutboxStatus(
+                    outboxInKey("a", "order-1").with(OutboxStatus.SERVER_ACCEPTED, 0, null, null, NOW),
+                    OutboxStatus.PENDING));
+            assertFalse(store.hasEarlierActiveInKey("order-1", "b"));
+
+            // 前一条进死信（终态）→ 同样放行，避免永久卡死
+            store.saveOutbox(outboxInKey("d", "order-3"));
+            store.saveOutbox(outboxInKey("e", "order-3"));
+            store.updateOutboxStatus(
+                    outboxInKey("d", "order-3").with(OutboxStatus.DEAD_LETTER, 1, null, "x", NOW),
+                    OutboxStatus.PENDING);
+            assertFalse("死信不阻塞同键后续", store.hasEarlierActiveInKey("order-3", "e"));
+        }
+    }
+
+    @Test
+    public void inboxOrderingDispatchesInKeyOrder() throws Exception {
+        try (SqliteClientStore store = new SqliteClientStore(dbPath())) {
+            store.saveInbox(inboxInKey("a", "order-1", ProcessStatus.PENDING));
+            store.saveInbox(inboxInKey("b", "order-1", ProcessStatus.PENDING));
+            store.saveInbox(inboxInKey("c", "order-1", ProcessStatus.PROCESSED));
+
+            assertTrue("同键后一条必须等待前一条处理完",
+                    store.hasEarlierUnsettledInbox("order-1", "b"));
+            assertEquals("a", store.findNextInboxInKey("order-1").get().getMessageId());
+
+            // a 处理完成 → 下一条是 b（c 已处理完，不参与派发）
+            store.updateInboxProcessStatus(
+                    inboxInKey("a", "order-1", ProcessStatus.PROCESSED), ProcessStatus.PENDING);
+            assertFalse(store.hasEarlierUnsettledInbox("order-1", "b"));
+            assertEquals("b", store.findNextInboxInKey("order-1").get().getMessageId());
+        }
+    }
+
+    @Test
+    public void orderingKeySurvivesStatusTransitions() throws Exception {
+        // with() 必须透传 key，否则每次状态变更都会把顺序键丢掉
+        try (SqliteClientStore store = new SqliteClientStore(dbPath())) {
+            store.saveOutbox(outboxInKey("a", "order-9"));
+            store.updateOutboxStatus(
+                    outboxInKey("a", "order-9").with(OutboxStatus.FAILED, 1, NOW + 1000, "e", NOW),
+                    OutboxStatus.PENDING);
+            assertEquals("order-9", store.findOutbox("a").get().getOrderingKey());
+
+            store.saveInbox(inboxInKey("i-1", "order-9", ProcessStatus.PENDING));
+            store.updateInboxProcessStatus(
+                    inboxInKey("i-1", "order-9", ProcessStatus.RETRYING), ProcessStatus.PENDING);
+            assertEquals("order-9", store.findInbox("i-1").get().getOrderingKey());
+        }
+    }
 }

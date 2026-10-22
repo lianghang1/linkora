@@ -34,13 +34,23 @@ public class UplinkPublisher {
      * 返回消息 ID（此时可能尚未到达服务端）。
      */
     public String publish(String messageType, Object payload) {
+        return publish(messageType, payload, null);
+    }
+
+    /** 发布带顺序键的上行消息（同 key 严格按调用顺序发送，前一条未终结前不发后一条）。 */
+    public String publish(String messageType, Object payload, String orderingKey) {
         return client.publish(messageType,
-                LinkoraJsonUtil.toJson(payload).getBytes(StandardCharsets.UTF_8));
+                LinkoraJsonUtil.toJson(payload).getBytes(StandardCharsets.UTF_8), orderingKey);
     }
 
     /** 发布一条原始字节上行消息，返回消息 ID（此时可能尚未到达服务端）。 */
     public String publish(String messageType, byte[] payload) {
         return client.publish(messageType, payload);
+    }
+
+    /** 发布带顺序键的字节上行消息。 */
+    public String publish(String messageType, byte[] payload, String orderingKey) {
+        return client.publish(messageType, payload, orderingKey);
     }
 
     /**

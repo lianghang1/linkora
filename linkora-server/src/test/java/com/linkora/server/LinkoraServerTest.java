@@ -183,6 +183,64 @@ public class LinkoraServerTest {
     }
 
     @Test
+    public void sameOrderingKeyDeliversOneAtATime() throws Exception {
+        LinkoraServer ordered = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .config(ServerConfig.builder()
+                        .sweepIntervalMs(100)
+                        .pushBatchSize(10)
+                        .pushPacingBaseMs(50)
+                        .pushPacingMaxMs(100)
+                        .build())
+                .build();
+        ordered.start();
+        try {
+            gateway.connectedClients.set(1);
+            PublishResult v1 = ordered.publish(CLIENT, "ORDER_STATUS",
+                    "{\"status\":1}".getBytes(StandardCharsets.UTF_8), "order-77");
+            PublishResult v2 = ordered.publish(CLIENT, "ORDER_STATUS",
+                    "{\"status\":2}".getBytes(StandardCharsets.UTF_8), "order-77");
+
+            awaitPush(v1.getMessageId());
+            // 跑过若干轮扫描：v2 必须一直没被推出去（同键前一条还停在 ACCEPTED）
+            Thread.sleep(400L);
+            assertFalse("前一条未终结时，同键后一条不得推送",
+                    gateway.pushes.containsKey(v2.getMessageId()));
+
+            // RECEIVED 只代表已落盘，不是终态 → 仍然不放行
+            assertEquals(200, postAckOn(ordered, v1.getMessageId(), "RECEIVED", null, null).getStatus());
+            Thread.sleep(400L);
+            assertFalse("RECEIVED 不是终态，后一条仍应等待",
+                    gateway.pushes.containsKey(v2.getMessageId()));
+
+            // PROCESSED 是终态 → 立即放行后一条
+            assertEquals(200, postAckOn(ordered, v1.getMessageId(), "PROCESSED", null, null).getStatus());
+            assertNotNull("前一条处理完成后，同键后一条必须被投递",
+                    awaitPushCount(v2.getMessageId(), 1));
+        } finally {
+            ordered.close();
+        }
+    }
+
+    @Test
+    public void differentOrderingKeysAreNotBlockedByEachOther() throws Exception {
+        gateway.connectedClients.set(1);
+        PublishResult a = server.publish(CLIENT, "ORDER_STATUS",
+                "{\"status\":1}".getBytes(StandardCharsets.UTF_8), "order-A");
+        PublishResult b = server.publish(CLIENT, "ORDER_STATUS",
+                "{\"status\":1}".getBytes(StandardCharsets.UTF_8), "order-B");
+
+        // 两个键互不阻塞：都应在首推阶段到达，不需要等对方 ACK
+        assertNotNull(awaitPush(a.getMessageId()));
+        assertNotNull(awaitPush(b.getMessageId()));
+    }
+
+    @Test
     public void sweepRotatesCursorSoLaterMessagesAreNotStarved() throws Exception {
         // 批次只有 2：三消息时前两轮必须能覆盖到第 3 条。
         // 没有轮转游标时，每轮都取前 2 条，第 3 条永远轮不到（旧实现正是如此）。

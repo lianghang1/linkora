@@ -23,7 +23,7 @@ final class SqliteSchema {
     private static final Logger log = LoggerFactory.getLogger(SqliteSchema.class);
 
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    static final int LATEST_VERSION = 1;
+    static final int LATEST_VERSION = 2;
 
     private static final String CREATE_VERSION_TABLE =
             "CREATE TABLE IF NOT EXISTS lk_schema_version ("
@@ -64,8 +64,20 @@ final class SqliteSchema {
                     + " meta_value TEXT NOT NULL)",
     };
 
+    /**
+     * v2：顺序键。两端队列都记录 ordering_key，并各加一条 (ordering_key, rowid) 可用索引；
+     * 老库通过 ALTER TABLE 增量升级，不动既有数据（历史行 ordering_key 为 NULL，
+     * 语义就是"不参与顺序约束"，与旧行为一致）。
+     */
+    private static final String[] V2_STATEMENTS = {
+            "ALTER TABLE lk_outbox ADD COLUMN ordering_key TEXT",
+            "ALTER TABLE lk_inbox ADD COLUMN ordering_key TEXT",
+            "CREATE INDEX IF NOT EXISTS idx_outbox_ordering ON lk_outbox (ordering_key, status)",
+            "CREATE INDEX IF NOT EXISTS idx_inbox_ordering ON lk_inbox (ordering_key, process_status)",
+    };
+
     /** 每个迁移版本 = 语句数组。 */
-    private static final String[][] MIGRATIONS = {V1_STATEMENTS};
+    private static final String[][] MIGRATIONS = {V1_STATEMENTS, V2_STATEMENTS};
 
     private SqliteSchema() {
     }

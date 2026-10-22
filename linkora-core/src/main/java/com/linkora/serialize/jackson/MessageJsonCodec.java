@@ -53,6 +53,10 @@ public final class MessageJsonCodec {
         } else {
             node.putNull("traceId");
         }
+        // 顺序键为可选字段：老客户端会忽略它（DECODE 按字段名读，未知字段不报错）
+        if (message.getOrderingKey() != null) {
+            node.put("orderingKey", message.getOrderingKey());
+        }
         return node.toString();
     }
 
@@ -73,6 +77,10 @@ public final class MessageJsonCodec {
         JsonNode traceId = node.get("traceId");
         if (traceId != null && !traceId.isNull()) {
             builder.traceId(traceId.asText());
+        }
+        JsonNode orderingKey = node.get("orderingKey");
+        if (orderingKey != null && !orderingKey.isNull()) {
+            builder.orderingKey(orderingKey.asText());
         }
         try {
             return builder.build();

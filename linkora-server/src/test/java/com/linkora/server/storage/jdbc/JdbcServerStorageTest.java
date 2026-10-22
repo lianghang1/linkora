@@ -345,6 +345,48 @@ public class JdbcServerStorageTest {
     }
 
     @Test
+    public void orderingKeyGatesLaterMessageUntilEarlierSettles() {
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-ordering"));
+        // 同一顺序键：seq 越小越先投
+        repo.init(new DeliveryRecord("o-1", "c-1", 1, MessageState.ACCEPTED, 0, null, null,
+                NOW, NOW, "order-1"));
+        repo.init(new DeliveryRecord("o-2", "c-1", 2, MessageState.ACCEPTED, 0, null, null,
+                NOW, NOW, "order-1"));
+        // 不同键互不阻塞
+        repo.init(new DeliveryRecord("x-1", "c-1", 3, MessageState.ACCEPTED, 0, null, null,
+                NOW, NOW, "order-2"));
+
+        List<DeliveryRecord> batch = repo.findUnfinishedAfterSeq("c-1", 0, NOW, 100);
+        assertEquals("同键后一条必须让路，其他键不受影响", 2, batch.size());
+        assertEquals("o-1", batch.get(0).getMessageId());
+        assertEquals("x-1", batch.get(1).getMessageId());
+        assertTrue("前一条未终结时应判定为需要让路",
+                repo.hasEarlierUnsettled("c-1", "order-1", 2));
+
+        // 前一条处理完成 → 后一条进入窗口
+        repo.compareAndSetState("o-1", "c-1", MessageState.ACCEPTED, MessageState.PROCESSED,
+                null, null, 0, 0);
+        batch = repo.findUnfinishedAfterSeq("c-1", 0, NOW, 100);
+        assertEquals(2, batch.size());
+        assertEquals("o-2", batch.get(0).getMessageId());
+        assertFalse(repo.hasEarlierUnsettled("c-1", "order-1", 2));
+    }
+
+    @Test
+    public void deadLetterInSameKeyReleasesFollowingMessage() {
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-ordering-dead"));
+        // 前一条已进死信：不再投递，但也不能把同键后续消息永久卡住
+        repo.init(new DeliveryRecord("d-1", "c-1", 1, MessageState.DEAD_LETTER, 10, null,
+                "业务失败", NOW, NOW, "order-9"));
+        repo.init(new DeliveryRecord("d-2", "c-1", 2, MessageState.ACCEPTED, 0, null, null,
+                NOW, NOW, "order-9"));
+
+        List<DeliveryRecord> batch = repo.findUnfinishedAfterSeq("c-1", 0, NOW, 100);
+        assertEquals("死信不占位，后续消息必须能投", 1, batch.size());
+        assertEquals("d-2", batch.get(0).getMessageId());
+    }
+
+    @Test
     public void deadLettersDoNotStarveLaterMessages() {
         JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-no-starve"));
         // 前 200 条全进死信，第 201 条是正常待投递消息

@@ -38,7 +38,8 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
         RetentionCleaner, ExpirySweeper {
 
     private static final String COLUMNS =
-            "message_id, client_id, seq, state, retry_count, next_retry_at, last_error, created_at, updated_at";
+            "message_id, client_id, seq, state, retry_count, next_retry_at, last_error, "
+                    + "created_at, updated_at, ordering_key";
 
     /** 终态集合（与 MessageState.isTerminal() 一致，用于补发查询过滤）。 */
     private static final String TERMINAL_STATE_LIST = buildTerminalStateList();
@@ -69,7 +70,7 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
     public void init(DeliveryRecord record) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
-                     "INSERT INTO lk_delivery (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?)")) {
+                     "INSERT INTO lk_delivery (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?)")) {
             ps.setString(1, record.getMessageId());
             ps.setString(2, record.getClientId());
             ps.setLong(3, record.getSeq());
@@ -79,6 +80,7 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
             setNullableString(ps, 7, record.getLastError());
             ps.setLong(8, record.getCreatedAt());
             ps.setLong(9, record.getUpdatedAt());
+            setNullableString(ps, 10, record.getOrderingKey());
             ps.executeUpdate();
         } catch (SQLIntegrityConstraintViolationException duplicate) {
             // 幂等语义：重复初始化忽略
@@ -143,6 +145,17 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
                              + "AND state <> '" + MessageState.DEAD_LETTER.name() + "' "
                              // 未到重试时间的记录本轮不取，否则会反复占位并空转
                              + "AND (next_retry_at IS NULL OR next_retry_at <= ?) "
+                             // 顺序键门禁：同 key 更早的记录还没终结（且不是死信）时让路，
+                             // 保证同一实体（订单/账户/设备…）的状态严格按发布顺序到达
+                             + "AND NOT EXISTS ("
+                             + "  SELECT 1 FROM lk_delivery p"
+                             + "  WHERE p.client_id = lk_delivery.client_id"
+                             + "    AND p.ordering_key = lk_delivery.ordering_key"
+                             + "    AND p.ordering_key IS NOT NULL"
+                             + "    AND p.seq < lk_delivery.seq"
+                             + "    AND p.state NOT IN (" + TERMINAL_STATE_LIST + ")"
+                             + "    AND p.state <> '" + MessageState.DEAD_LETTER.name() + "'"
+                             + ") "
                              + "ORDER BY seq ASC LIMIT ?")) {
             ps.setString(1, clientId);
             ps.setLong(2, afterSeqExclusive);
@@ -279,6 +292,31 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
                 }
                 return rs.getLong(1);
             }
+        }
+    }
+
+    @Override
+    public boolean hasEarlierUnsettled(String clientId, String orderingKey, long seq) {
+        if (orderingKey == null) {
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT 1 FROM lk_delivery "
+                             + "WHERE client_id = ? AND ordering_key = ? AND seq < ? "
+                             + "AND state NOT IN (" + TERMINAL_STATE_LIST + ") "
+                             + "AND state <> '" + MessageState.DEAD_LETTER.name() + "' "
+                             + "LIMIT 1")) {
+            ps.setString(1, clientId);
+            ps.setString(2, orderingKey);
+            ps.setLong(3, seq);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            // 顺序判断失败不应该阻断投递：退化为"允许投递"，由客户端幂等兜底
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "查询顺序键前序记录失败: " + clientId + "/" + orderingKey, e);
         }
     }
 
@@ -447,7 +485,8 @@ public final class JdbcDeliveryRepository implements DeliveryRepository,
                 getNullableLong(rs, "next_retry_at"),
                 rs.getString("last_error"),
                 rs.getLong("created_at"),
-                rs.getLong("updated_at"));
+                rs.getLong("updated_at"),
+                rs.getString("ordering_key"));
     }
 
     private static Long getNullableLong(ResultSet rs, String column) throws SQLException {

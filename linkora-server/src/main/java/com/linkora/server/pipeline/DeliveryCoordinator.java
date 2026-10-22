@@ -276,6 +276,13 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
             if (record.getState() == MessageState.DEAD_LETTER) {
                 return;
             }
+            // 顺序键兜底：SQL 已过滤，但快照可能滞后（前一条刚被 ACK、本条刚被并发推送），
+            // 这里再挡一次。不影响正确性，只影响时序。
+            if (record.getOrderingKey() != null
+                    && deliveryRepository.hasEarlierUnsettled(clientId, record.getOrderingKey(),
+                    record.getSeq())) {
+                return;
+            }
             LinkoraMessage message = messageRepository.findByMessageId(messageId).orElse(null);
             if (message == null) {
                 log.warn("投递记录缺少消息正文，跳过推送: {}", record);

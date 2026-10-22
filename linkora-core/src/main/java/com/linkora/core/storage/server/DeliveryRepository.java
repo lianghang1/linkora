@@ -80,4 +80,17 @@ public interface DeliveryRepository {
 
     /** 为客户端原子分配下一个投递序号（从 1 开始）。 */
     long nextDeliverySeq(String clientId);
+
+    /**
+     * 同一 clientId、同一 orderingKey 下，是否存在 seq 更小且未到终态（且非死信）的记录。
+     *
+     * <p>用于顺序保证：返回 true 时本条必须让路，等前一条终结后再投。默认返回 false
+     * （不阻塞），自实现仓储若不覆盖该方法则退化为"不保证顺序"，不会破坏兼容。</p>
+     *
+     * @param orderingKey 顺序键，null 表示不参与顺序约束（实现应直接返回 false）
+     * @param seq         当前记录的投递序号
+     */
+    default boolean hasEarlierUnsettled(String clientId, String orderingKey, long seq) {
+        return false;
+    }
 }

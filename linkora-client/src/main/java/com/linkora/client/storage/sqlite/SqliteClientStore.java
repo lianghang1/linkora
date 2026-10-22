@@ -46,11 +46,11 @@ public final class SqliteClientStore implements ClientStore, Closeable {
 
     private static final String OUTBOX_COLUMNS =
             "message_id, message_type, payload, status, created_at, updated_at, "
-                    + "retry_count, next_retry_at, expires_at, last_error";
+                    + "retry_count, next_retry_at, expires_at, last_error, ordering_key";
 
     private static final String INBOX_COLUMNS =
             "message_id, message_type, payload, receive_status, process_status, "
-                    + "received_at, processed_at, retry_count, next_retry_at, last_error";
+                    + "received_at, processed_at, retry_count, next_retry_at, last_error, ordering_key";
 
     private final Connection connection;
     private final Object lock = new Object();
@@ -137,7 +137,7 @@ public final class SqliteClientStore implements ClientStore, Closeable {
     public boolean saveOutbox(OutboxEntry entry) {
         return exec("saveOutbox", () -> {
             try (PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO lk_outbox (" + OUTBOX_COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?) "
+                    "INSERT INTO lk_outbox (" + OUTBOX_COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?) "
                             + "ON CONFLICT(message_id) DO NOTHING")) {
                 bindOutbox(ps, entry);
                 return ps.executeUpdate() == 1;
@@ -217,7 +217,7 @@ public final class SqliteClientStore implements ClientStore, Closeable {
     public boolean saveInbox(InboxEntry entry) {
         return exec("saveInbox", () -> {
             try (PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO lk_inbox (" + INBOX_COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?) "
+                    "INSERT INTO lk_inbox (" + INBOX_COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?) "
                             + "ON CONFLICT(message_id) DO NOTHING")) {
                 bindInbox(ps, entry);
                 return ps.executeUpdate() == 1;
@@ -357,6 +357,72 @@ public final class SqliteClientStore implements ClientStore, Closeable {
         });
     }
 
+    // ---------------- 顺序键 ----------------
+    //
+    // 用 SQLite 的 rowid 做"更早"的判据：rowid 是插入顺序，等于发布/到达顺序，
+    // 比 created_at 更可靠（同一毫秒内连续发布不会打平）。
+
+    @Override
+    public boolean hasEarlierActiveInKey(String orderingKey, String messageId) {
+        if (orderingKey == null) {
+            return false;
+        }
+        return exec("hasEarlierActiveInKey", () -> {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT 1 FROM lk_outbox "
+                            + "WHERE ordering_key = ? "
+                            + "AND status NOT IN ('SERVER_ACCEPTED', 'DEAD_LETTER') "
+                            + "AND rowid < (SELECT rowid FROM lk_outbox WHERE message_id = ?) "
+                            + "LIMIT 1")) {
+                ps.setString(1, orderingKey);
+                ps.setString(2, messageId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next();
+                }
+            }
+        });
+    }
+
+    @Override
+    public boolean hasEarlierUnsettledInbox(String orderingKey, String messageId) {
+        if (orderingKey == null) {
+            return false;
+        }
+        return exec("hasEarlierUnsettledInbox", () -> {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT 1 FROM lk_inbox "
+                            + "WHERE ordering_key = ? "
+                            + "AND process_status IN ('PENDING', 'RETRYING', 'PROCESSING') "
+                            + "AND rowid < (SELECT rowid FROM lk_inbox WHERE message_id = ?) "
+                            + "LIMIT 1")) {
+                ps.setString(1, orderingKey);
+                ps.setString(2, messageId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next();
+                }
+            }
+        });
+    }
+
+    @Override
+    public Optional<InboxEntry> findNextInboxInKey(String orderingKey) {
+        if (orderingKey == null) {
+            return Optional.empty();
+        }
+        return exec("findNextInboxInKey", () -> {
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "SELECT " + INBOX_COLUMNS + " FROM lk_inbox "
+                            + "WHERE ordering_key = ? "
+                            + "AND process_status IN ('PENDING', 'RETRYING') "
+                            + "ORDER BY rowid ASC LIMIT 1")) {
+                ps.setString(1, orderingKey);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next() ? Optional.of(mapInbox(rs)) : Optional.<InboxEntry>empty();
+                }
+            }
+        });
+    }
+
     @Override
     public void close() {
         synchronized (lock) {
@@ -409,6 +475,7 @@ public final class SqliteClientStore implements ClientStore, Closeable {
         setNullableLong(ps, 8, e.getNextRetryAt());
         setNullableLong(ps, 9, e.getExpiresAt());
         setNullableString(ps, 10, e.getLastError());
+        setNullableString(ps, 11, e.getOrderingKey());
     }
 
     private static void bindInbox(PreparedStatement ps, InboxEntry e) throws SQLException {
@@ -422,6 +489,7 @@ public final class SqliteClientStore implements ClientStore, Closeable {
         ps.setInt(8, e.getRetryCount());
         setNullableLong(ps, 9, e.getNextRetryAt());
         setNullableString(ps, 10, e.getLastError());
+        setNullableString(ps, 11, e.getOrderingKey());
     }
 
     private static OutboxEntry mapOutbox(ResultSet rs) throws SQLException {
@@ -435,7 +503,8 @@ public final class SqliteClientStore implements ClientStore, Closeable {
                 rs.getInt("retry_count"),
                 getNullableLong(rs, "next_retry_at"),
                 getNullableLong(rs, "expires_at"),
-                rs.getString("last_error"));
+                rs.getString("last_error"),
+                rs.getString("ordering_key"));
     }
 
     private static InboxEntry mapInbox(ResultSet rs) throws SQLException {
@@ -449,7 +518,8 @@ public final class SqliteClientStore implements ClientStore, Closeable {
                 getNullableLong(rs, "processed_at"),
                 rs.getInt("retry_count"),
                 getNullableLong(rs, "next_retry_at"),
-                rs.getString("last_error"));
+                rs.getString("last_error"),
+                rs.getString("ordering_key"));
     }
 
     private static Long getNullableLong(ResultSet rs, String column) throws SQLException {

@@ -577,6 +577,28 @@ try (Connection c = dataSource.getConnection()) {
    `HmacCredentialProvider(clientId, accessToken, secretBytes)`、服务端配
    `HmacClientAuthenticator` 即启用（两端凭据一致），失败锁定与防重放内置。
 
+**想保证顺序？给消息带顺序键**
+
+默认投递是"尽力而为"的：重试和补发会让后发的消息先到。如果同一笔业务（订单、账户、
+设备）的多条消息必须按顺序生效，把业务主键作为 `orderingKey` 传进去：
+
+```java
+// 服务端下发：同一个订单的状态 1 → 2 严格按序
+linkora.publish("store-001", "order-status-updated", payload, "order-20261022-0001");
+
+// 客户端上行：同一个订单的回传也按序
+uplinkPublisher.publish("order-status-updated", payload, "order-20261022-0001");
+```
+
+规则：同一 `clientId` + 同一 `orderingKey` 下，前一条没到终态（PROCESSED/EXPIRED）或
+没进死信之前，后一条不会被推送/发送。不同键完全并行。键缺省时行为与之前完全一致。
+
+代价：一条卡住会把**该键**后续消息挡住（这是顺序的固有成本），所以键要选"真正需要
+顺序的最小粒度"——用订单号而不是门店号。
+
+必须配合业务版本号：顺序键解决"先 2 后 1"的传输乱序，但不防跨系统写入与人工修数，
+落库仍建议 `UPDATE ... WHERE version < ?`。
+
 **版本与依赖约束**
 
 | 约束 | 说明 |

@@ -17,6 +17,7 @@
 | expiresAt | int64 | 否 | 过期时间，epoch 毫秒 |
 | schemaVersion | int32 | 是 | 负载结构版本，默认 1 |
 | traceId | string | 否 | 链路追踪 ID |
+| orderingKey | string | 否 | 顺序键（≤128）。同 clientId 下同键消息按 seq 单调投递；缺省表示不参与顺序约束 |
 
 ## 接口清单（阶段 3 逐步实现）
 

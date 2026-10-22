@@ -64,6 +64,32 @@ public interface ClientStore {
     /** 清理已处理完成且 updated/received 时间早于 deadline 的记录，返回删除行数。 */
     int deleteInboxProcessedBefore(long deadline);
 
+    // ---------------- 顺序键（可选能力） ----------------
+    //
+    // 三个方法都有默认实现（不阻塞 / 空），自实现存储不覆盖即退化为"不保证顺序"，
+    // 不会破坏既有实现的编译。内置 SQLite 实现已按插入顺序（rowid）实现。
+
+    /**
+     * outbox 中是否还有同一顺序键、更早入队且未终结（非 SERVER_ACCEPTED/DEAD_LETTER）的消息。
+     * 返回 true 时本条应等待，避免"重试的消息"越过同键的新消息先发出去。
+     */
+    default boolean hasEarlierActiveInKey(String orderingKey, String messageId) {
+        return false;
+    }
+
+    /**
+     * inbox 中是否还有同一顺序键、更早收到且未处理完（PENDING/RETRYING/PROCESSING）的消息。
+     * 返回 true 时本条不派发，等前一条处理完再派发——这是客户端侧的顺序兜底。
+     */
+    default boolean hasEarlierUnsettledInbox(String orderingKey, String messageId) {
+        return false;
+    }
+
+    /** 取同一顺序键下最早一条待处理消息（前一条完成后用它接续派发）。 */
+    default java.util.Optional<InboxEntry> findNextInboxInKey(String orderingKey) {
+        return java.util.Optional.empty();
+    }
+
     // ---------------- meta：游标与本地元数据 ----------------
 
     void saveMeta(String key, String value);
