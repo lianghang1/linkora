@@ -176,17 +176,46 @@ public class LinkoraConfig {
 }
 ```
 
-**新增 2：在已有的 `AbstractAnnotationConfigDispatcherServletInitializer` 里注册三个端点**
-（`onStartup` 末尾加三行，注册 SSE 下行 `/events`、上行 `/messages`、确认 `/acks`）
+**新增 2：注册三个端点**（SSE 下行 `/events`、上行 `/messages`、确认 `/acks`）——按项目的启动方式二选一
+
+**方式 A：web.xml 项目**（`ContextLoaderListener` 启动，传统 Spring MVC 多为此形态）
+
+自定义一个 `ServletContextListener`：
+
+```java
+public class LinkoraBootstrapListener implements ServletContextListener {
+    @Override
+    public void contextInitialized(ServletContextEvent event) {
+        // root 容器已就绪（本 listener 在 web.xml 中声明在 ContextLoaderListener 之后）
+        WebApplicationContext ctx = WebApplicationContextUtils
+                .getWebApplicationContext(event.getServletContext());
+        LinkoraServlets.register(ctx.getBean(LinkoraServer.class), event.getServletContext());
+    }
+}
+```
+
+web.xml 中声明在 `ContextLoaderListener` **之后**（保证取 bean 时容器已初始化完成）：
+
+```xml
+<listener>
+    <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+</listener>
+<listener>
+    <listener-class>com.example.linkora.LinkoraBootstrapListener</listener-class>
+</listener>
+```
+
+**方式 B：Java Config 项目**（`AbstractAnnotationConfigDispatcherServletInitializer` 启动）
+
+在已有的 Initializer 的 `onStartup` 末尾加三行：
 
 ```java
 @Override
 public void onStartup(ServletContext servletContext) {
-    super.onStartup(servletContext);   // 让 Spring 容器照常初始化
+    super.onStartup(servletContext);
     WebApplicationContext ctx = WebApplicationContextUtils
             .getRequiredWebApplicationContext(servletContext);
-    LinkoraServer linkora = ctx.getBean(LinkoraServer.class);
-    LinkoraServlets.register(linkora, servletContext);  // 注册 /events /messages /acks
+    LinkoraServlets.register(ctx.getBean(LinkoraServer.class), servletContext);
 }
 ```
 
