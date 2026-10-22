@@ -3,6 +3,7 @@ package com.linkora.example.mvcclient.service;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkora.client.LinkoraClient;
 import com.linkora.core.storage.client.ClientStore;
+import org.springframework.stereotype.Service;
 
 /**
  * 评价回复服务（线下门店侧）：门店回复用户评价后通知线上。
@@ -11,6 +12,7 @@ import com.linkora.core.storage.client.ClientStore;
  *
  * @author lianghang
  */
+@Service
 public class ReviewReplyService extends AbstractUplinkService {
 
     /** 上行 topic：评价回复（与线上 ReviewReplyHandler 的类型一致）。 */

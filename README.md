@@ -56,8 +56,8 @@ mvn -pl examples/spring-boot-server/client-app spring-boot:run
 
 # Spring MVC 宿主（注解容器 + 内嵌 Jetty，端口 8081）
 mvn -pl examples/spring-mvc-server/server-app compile exec:java "-Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain" "-Dexec.args=8081"
-# 纯 Java 客户端（零 Spring 依赖，连接 8081 server-app）
-mvn -pl examples/spring-mvc-server/client-app compile exec:java "-Dexec.mainClass=com.linkora.example.mvcclient.ClientDemoMain"
+# Spring MVC 宿主客户端（引 linkora-spring 单包，@Import 启用客户端装配，连接 8081 server-app）
+mvn -pl examples/spring-mvc-server/client-app compile exec:java "-Dexec.mainClass=com.linkora.example.mvcclient.ClientDemoApplication"
 
 # 服务端事务接管：publish 持久化与业务写入同事务（事务性发件箱）
 mvn -pl examples/spring-tx-server compile exec:java "-Dexec.mainClass=com.linkora.example.springtx.SpringTxServerMain"

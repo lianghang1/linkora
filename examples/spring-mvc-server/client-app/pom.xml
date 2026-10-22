@@ -14,18 +14,17 @@
     <packaging>jar</packaging>
 
     <name>Linkora Example: Spring MVC Demo Client App</name>
-    <description>纯 Java 客户端示例（零 Spring 依赖）：对接 server-app，演示下行监听/处理/ACK、上行发送并等待服务端接受、触发服务端下发的完整闭环。</description>
+    <description>Spring MVC 宿主客户端示例（零 Boot 依赖）：引 linkora-spring 单包，@Import 启用客户端装配，演示下行监听/处理/ACK、上行发送并等待服务端接受、触发服务端下发的完整闭环。</description>
 
     <dependencies>
+        <!-- 客户端装配入口：传递 linkora-client / client-storage-sqlite，无需单独声明 -->
         <dependency>
             <groupId>com.linkora</groupId>
-            <artifactId>linkora-client</artifactId>
-            <version>${project.version}</version>
+            <artifactId>linkora-spring</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-client-storage-sqlite</artifactId>
-            <version>${project.version}</version>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

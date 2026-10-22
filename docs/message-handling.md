@@ -2,7 +2,7 @@
 
 本文说明 Linkora 的消息处理链路：框架负责什么、业务侧在哪里接入、回调发生在哪一行。
 配套可运行示例见 `examples/spring-boot-server`（starter 全自动装配）与
-`examples/spring-mvc-server`（Spring MVC 宿主 + 纯 Java 客户端）。
+`examples/spring-mvc-server`（Spring MVC 宿主服务端 + 客户端）。
 
 ## 端点归属
 
@@ -99,7 +99,7 @@
 | 示例 | 说明 |
 |---|---|
 | `examples/spring-boot-server` | 线上平台 ⇄ 线下门店四向闭环，starter 全自动装配 + controller/service 分层 |
-| `examples/spring-mvc-server` | 同一业务场景：Spring MVC 宿主 + 纯 Java 客户端（零 Spring） |
+| `examples/spring-mvc-server` | 同一业务场景：Spring MVC 宿主（服务端 + 客户端均引 linkora-spring 单包装配） |
 | `examples/plain-java-server` / `plain-java-client` | 同一业务场景：零框架宿主，`ingestListener` 手动接入演示 |
 
 服务端配置 `IngestListener` 的纯 Java 写法见 [deployment.md](deployment.md)；

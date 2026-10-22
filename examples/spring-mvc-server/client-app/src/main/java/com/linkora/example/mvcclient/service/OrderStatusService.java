@@ -3,6 +3,7 @@ package com.linkora.example.mvcclient.service;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkora.client.LinkoraClient;
 import com.linkora.core.storage.client.ClientStore;
+import org.springframework.stereotype.Service;
 
 /**
  * 订单状态服务（线下门店侧）：门店更改订单状态后调用线上。
@@ -11,6 +12,7 @@ import com.linkora.core.storage.client.ClientStore;
  *
  * @author lianghang
  */
+@Service
 public class OrderStatusService extends AbstractUplinkService {
 
     /** 上行 topic：订单状态变更（与线上 OrderStatusHandler 的类型一致）。 */
