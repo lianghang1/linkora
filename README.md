@@ -298,6 +298,9 @@ linkora.client.db-path=data/client.db
 | `lk_meta` | SDK 元数据（本地游标等） |
 | `lk_schema_version` | 客户端本地结构版本号 |
 
+**payload 存储与大小上限**：payload 列已按 LONGTEXT 建表（v2 迁移自动完成），
+存储不再是瓶颈；真正的上限是 `message-size-limit-bytes`（HTTP body，默认 1MB，
+对应原始 payload 约 786KB），Servlet 读取闸门与业务校验共用这一个值。
 **升级与维护**：后续版本的结构变更由 SDK 自动顺序迁移（按 `lk_schema_version` 记录逐版本
 执行，中途崩溃重启自动续跑），宿主**无需手动执行任何 SQL**。所有时间字段统一存 epoch
 毫秒（整数），跨时区、跨数据库一致。

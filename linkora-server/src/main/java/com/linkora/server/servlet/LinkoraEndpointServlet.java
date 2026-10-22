@@ -37,10 +37,6 @@ public final class LinkoraEndpointServlet extends HttpServlet {
         this.maxBodyBytes = maxBodyBytes;
     }
 
-    public LinkoraEndpointServlet(LinkoraHttpHandler handler) {
-        this(handler, 2 * 1024 * 1024L);
-    }
-
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         String clientId = request.getHeader(SsePushServlet.CLIENT_ID_HEADER);

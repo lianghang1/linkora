@@ -63,7 +63,7 @@ context.addServlet(new ServletHolder(
 | `maxDeliveryRetries` | 10 | FAILED ACK 累计次数上限，超过进入死信 |
 | `retryBackoffBaseMs/MaxMs` | 2000 / 300000 | 失败重试指数退避 |
 | `pushPacingBaseMs/MaxMs` | 5000 / 60000 | 在线客户端重推节奏（防风暴） |
-| `messageSizeLimitBytes` | 1MB | 上行消息体上限（≤16MB） |
+| `messageSizeLimitBytes` | 1MB | 上行 **HTTP body** 上限（≤16MB）。原始 payload ≈ 该值 × 0.75（Base64 膨胀 4/3 + 信封开销），默认约 786KB。Servlet 读取闸门直接取此值，不再另设默认上限；要传更大的 payload 只改这一处 |
 
 ## 客户端部署
 

@@ -184,7 +184,7 @@ public class LinkoraServerAutoConfiguration {
             LinkoraServer server, LinkoraServerProperties properties) {
         ServletRegistrationBean<LinkoraEndpointServlet> bean =
                 new ServletRegistrationBean<LinkoraEndpointServlet>(
-                        new LinkoraEndpointServlet(server.ingestHttpHandler()),
+                        new LinkoraEndpointServlet(server.ingestHttpHandler(), server.getMaxBodyBytes()),
                         properties.getMessagesPath());
         bean.setName("linkoraIngestServlet");
         return bean;
@@ -195,7 +195,7 @@ public class LinkoraServerAutoConfiguration {
             LinkoraServer server, LinkoraServerProperties properties) {
         ServletRegistrationBean<LinkoraEndpointServlet> bean =
                 new ServletRegistrationBean<LinkoraEndpointServlet>(
-                        new LinkoraEndpointServlet(server.ackHttpHandler()),
+                        new LinkoraEndpointServlet(server.ackHttpHandler(), server.getMaxBodyBytes()),
                         properties.getAcksPath());
         bean.setName("linkoraAckServlet");
         return bean;
