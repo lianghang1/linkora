@@ -22,25 +22,22 @@
             <artifactId>linkora-server</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- 可选集成：JDBC 存储（宿主可换自实现接管事务） -->
+        <!-- JDBC 存储：默认存储实现（宿主可换自实现接管事务） -->
         <dependency>
             <groupId>com.linkora</groupId>
             <artifactId>linkora-server-storage-jdbc</artifactId>
             <version>${project.version}</version>
-            <optional>true</optional>
         </dependency>
-        <!-- 可选集成：客户端编排与 SQLite 存储（宿主可换自实现 ClientStore） -->
+        <!-- 客户端编排与 SQLite 存储：引入 starter 即获得客户端完整能力（宿主可换自实现 ClientStore） -->
         <dependency>
             <groupId>com.linkora</groupId>
             <artifactId>linkora-client</artifactId>
             <version>${project.version}</version>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.linkora</groupId>
             <artifactId>linkora-client-storage-sqlite</artifactId>
             <version>${project.version}</version>
-            <optional>true</optional>
         </dependency>
 
         <dependency>

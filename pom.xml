@@ -16,9 +16,7 @@
         <module>linkora-core</module>
         <module>linkora-client-storage-sqlite</module>
         <module>linkora-server-storage-jdbc</module>
-        <module>linkora-transport-http</module>
-        <module>linkora-transport-sse</module>
-        <module>linkora-server-servlet</module>
+        <module>linkora-transport</module>
         <module>linkora-serialize-jackson</module>
         <module>linkora-server</module>
         <module>linkora-client</module>

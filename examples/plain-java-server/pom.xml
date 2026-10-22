@@ -27,11 +27,6 @@
             <artifactId>linkora-server-storage-jdbc</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-server-servlet</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <!-- 示例独立运行需要 servlet-api 在运行时类路径（生产中由宿主容器提供） -->
         <dependency>
             <groupId>javax.servlet</groupId>

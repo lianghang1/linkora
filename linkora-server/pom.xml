@@ -27,13 +27,14 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-server-servlet</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <!-- Servlet 端点适配随服务端编排一并发布；容器由宿主提供 -->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <scope>provided</scope>
         </dependency>
         <!-- 测试依赖：H2 + Jetty 用于端到端验证（生产由宿主提供数据库与容器） -->
         <dependency>

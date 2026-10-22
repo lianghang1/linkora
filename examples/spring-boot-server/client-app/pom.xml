@@ -26,17 +26,6 @@
             <groupId>com.linkora</groupId>
             <artifactId>linkora-spring-boot-starter</artifactId>
         </dependency>
-        <!-- starter 缺省 ClientStore 为 SQLite（条件装配要求该类在 classpath） -->
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-client-storage-sqlite</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-client</artifactId>
-            <version>${project.version}</version>
-        </dependency>
     </dependencies>
 
     <build>

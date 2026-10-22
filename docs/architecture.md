@@ -41,9 +41,7 @@
 | linkora-server | 消息路由、多客户端管理、投递状态协调、补发、死信管理 |
 | linkora-client-storage-sqlite | 独立 SQLite 文件（lk_outbox/lk_inbox/lk_meta），不触碰业务数据库 |
 | linkora-server-storage-jdbc | 服务端持久化（消息正文 + 投递状态分离），CI 覆盖 H2/MySQL 8/PostgreSQL |
-| linkora-transport-sse | SSE 服务端输出（Servlet async 手写）与客户端接收（okhttp-sse） |
-| linkora-transport-http | HTTPS POST、超时、错误分类（OkHttp） |
-| linkora-server-servlet | 嵌入宿主已有 Servlet 3.1+ HTTP 服务的适配器 |
+| linkora-transport | 传输实现合集：HTTPS POST、超时、错误分类（OkHttp）；SSE 客户端接收（okhttp-sse）；Servlet async 服务端输出适配 |
 | linkora-spring / starter | 可选集成，不强制 |
 | linkora-testkit | 嵌入式测试服务端（Jetty 9.4）、故障注入工具 |
 

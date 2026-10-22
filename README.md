@@ -19,8 +19,7 @@
 | linkora-server | 服务端编排：持久化优先、SSE 推送、上报/ACK 接入、重试与死信 |
 | linkora-client-storage-sqlite | 客户端 SQLite 持久化（WAL + synchronous=FULL） |
 | linkora-server-storage-jdbc | 服务端 JDBC 持久化（自研版本迁移，复用现有数据库） |
-| linkora-transport-sse / linkora-transport-http | OkHttp 4.x 传输实现 |
-| linkora-server-servlet | Servlet 3.1 异步适配器（嵌入宿主已有容器） |
+| linkora-transport | OkHttp 4.x 传输实现 + Servlet 3.1 异步适配器（嵌入宿主已有容器） |
 | linkora-serialize-jackson | Jackson JSON 编解码（仅用 2.13+ 稳定 API） |
 | linkora-testkit | 测试支撑：嵌入式服务器、录制监听器、测试凭据库（不进生产） |
 | linkora-spring | Spring MVC 宿主薄装配辅助（不依赖 Spring Boot） |

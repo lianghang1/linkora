@@ -28,12 +28,7 @@
         </dependency>
         <dependency>
             <groupId>com.linkora</groupId>
-            <artifactId>linkora-transport-http</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-transport-sse</artifactId>
+            <artifactId>linkora-transport</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

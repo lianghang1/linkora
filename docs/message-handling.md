@@ -34,7 +34,7 @@
 | 步骤 | 代码位置 | 谁写的 |
 |---|---|---|
 | 1. 客户端 outbox 后台线程 POST `/messages` | `linkora-client` 发送调度 | 框架 |
-| 2. 端点 Servlet 接收 → `LinkoraServer.ingestHttpHandler()` | `linkora-server-servlet` / `LinkoraServer` | 框架 |
+| 2. 端点 Servlet 接收 → `LinkoraServer.ingestHttpHandler()` | `linkora-server`（servlet 包）/ `LinkoraServer` | 框架 |
 | 3. `IngestService.ingest()`：认证 → 校验 → 持久化 | `linkora-server` `IngestService` | 框架 |
 | 4. **持久化成功后回调 `IngestListener.onIngested`** | `IngestService.notifyListeners()` | 框架调用、业务实现 |
 | 5. 业务转发器按 messageType 路由 | 示例 `UplinkMessageDispatcher` | 业务侧 |

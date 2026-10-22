@@ -27,11 +27,6 @@
             <artifactId>linkora-server-storage-jdbc</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-server-servlet</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <!-- dependencyManagement 中 Jetty/H2 为 test scope，本模块自身就是测试工具，显式提升为 compile -->
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
