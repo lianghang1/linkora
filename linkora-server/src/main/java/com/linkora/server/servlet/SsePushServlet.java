@@ -31,8 +31,10 @@ import javax.servlet.http.HttpServletResponse;
  *       （仅为传输层游标，不等于业务处理游标）；</li>
  *   <li>handler 返回 false 时回写 401；</li>
  *   <li>接受订阅后发送 {@code retry: reconnectHintMs} 建议客户端重连间隔，
- *       并按 {@code heartbeatIntervalMs} 周期发送 {@code :hb} 注释保活（0 表示禁用）；</li>
- *   <li>写出失败或容器异步超时会触发断开回调并清理注册表。</li>
+ *       并按 {@code heartbeatIntervalMs} 周期发送 {@code :hb} 注释保活（0 表示禁用）；
+ *       心跳与业务帧一样只入队，不阻塞调度线程；</li>
+ *   <li>每连接有界发送队列：队列满即断开该连接（靠重连补发恢复）；
+ *       单次 flush 卡住超过阈值由看门狗关闭连接；两者都会触发断开回调并清理注册表。</li>
  * </ul>
  *
  * @author lianghang
@@ -47,24 +49,54 @@ public final class SsePushServlet extends HttpServlet {
     public static final String LAST_EVENT_ID_HEADER = "Last-Event-ID";
     private static final String CLIENT_ID_QUERY_PARAM = "clientId";
 
+    /** 每连接发送队列默认容量（帧）。 */
+    public static final int DEFAULT_QUEUE_CAPACITY = 1024;
+    /** 单次 flush 卡住的判定阈值（毫秒）。 */
+    public static final long DEFAULT_WRITE_STALL_TIMEOUT_MS = 15_000L;
+    /** 写线程池默认线程数：一个卡死连接占一个线程，池满时其余连接排队但不会被阻塞。 */
+    public static final int DEFAULT_WRITER_THREADS = 16;
+
     private final SseSubscribeHandler handler;
     private final SseConnectionRegistry registry;
     private final long heartbeatIntervalMs;
     private final long reconnectHintMs;
     private final ScheduledExecutorService heartbeatScheduler;
+    private final java.util.concurrent.ExecutorService writerPool;
+    private final int queueCapacity;
+    private final long writeStallTimeoutMs;
 
     public SsePushServlet(SseSubscribeHandler handler, SseConnectionRegistry registry,
                           long heartbeatIntervalMs, long reconnectHintMs) {
+        this(handler, registry, heartbeatIntervalMs, reconnectHintMs,
+                DEFAULT_QUEUE_CAPACITY, DEFAULT_WRITE_STALL_TIMEOUT_MS, DEFAULT_WRITER_THREADS);
+    }
+
+    /**
+     * @param queueCapacity       每连接发送队列容量，满即断开该连接
+     * @param writeStallTimeoutMs 单次 flush 卡住多久后判定连接不可用并关闭（0 表示关闭看门狗）
+     * @param writerThreads       写线程池大小
+     */
+    public SsePushServlet(SseSubscribeHandler handler, SseConnectionRegistry registry,
+                          long heartbeatIntervalMs, long reconnectHintMs,
+                          int queueCapacity, long writeStallTimeoutMs, int writerThreads) {
         if (handler == null || registry == null) {
             throw new IllegalArgumentException("handler 与 registry 不能为 null");
         }
         if (heartbeatIntervalMs < 0 || reconnectHintMs < 0) {
             throw new IllegalArgumentException("心跳与重连提示间隔不得为负数");
         }
+        if (queueCapacity < 1) {
+            throw new IllegalArgumentException("queueCapacity 必须为正数");
+        }
+        if (writerThreads < 1) {
+            throw new IllegalArgumentException("writerThreads 必须为正数");
+        }
         this.handler = handler;
         this.registry = registry;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
         this.reconnectHintMs = reconnectHintMs;
+        this.queueCapacity = queueCapacity;
+        this.writeStallTimeoutMs = writeStallTimeoutMs;
         this.heartbeatScheduler = Executors.newScheduledThreadPool(1, new ThreadFactory() {
             private final AtomicInteger seq = new AtomicInteger(0);
 
@@ -75,6 +107,17 @@ public final class SsePushServlet extends HttpServlet {
                 return t;
             }
         });
+        this.writerPool = Executors.newFixedThreadPool(writerThreads, new ThreadFactory() {
+            private final AtomicInteger seq = new AtomicInteger(0);
+
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r, "linkora-sse-writer-" + seq.incrementAndGet());
+                t.setDaemon(true);
+                return t;
+            }
+        });
+        scheduleStalledConnectionGuard();
     }
 
     public SsePushServlet(SseSubscribeHandler handler, SseConnectionRegistry registry) {
@@ -102,7 +145,8 @@ public final class SsePushServlet extends HttpServlet {
         asyncContext.setTimeout(0L); // SSE 长连接不受容器异步超时约束
 
         SseClientConnection connection = new SseClientConnection(
-                clientId, asyncContext, response, new DisconnectAdapter());
+                clientId, asyncContext, response, new DisconnectAdapter(),
+                writerPool, queueCapacity);
 
         // 先注册再交给 handler（handler 会在订阅成功后提交重连补发）：
         // 保证补发首推时连接已在注册表内，否则首推落空需等一个扫描周期
@@ -130,8 +174,37 @@ public final class SsePushServlet extends HttpServlet {
     public void destroy() {
         heartbeatScheduler.shutdownNow();
         registry.closeAll();
-        log.info("SsePushServlet 已销毁，心跳调度器关闭且全部连接断开");
+        writerPool.shutdownNow();
+        log.info("SsePushServlet 已销毁，心跳调度器与写线程池关闭且全部连接断开");
         super.destroy();
+    }
+
+    /**
+     * 写超时看门狗：flush 卡在 TCP 发送窗口上时连接实际已不可用，
+     * 主动关闭让它重连补发，避免占着写线程不放。
+     */
+    private void scheduleStalledConnectionGuard() {
+        if (writeStallTimeoutMs <= 0) {
+            return;
+        }
+        long period = Math.max(1_000L, Math.min(writeStallTimeoutMs / 2, 10_000L));
+        heartbeatScheduler.scheduleWithFixedDelay(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    long now = System.currentTimeMillis();
+                    for (SseClientConnection connection : registry.allConnections()) {
+                        if (connection.isWriteStalled(now, writeStallTimeoutMs)) {
+                            log.warn("SSE 写出阻塞超过 {} ms，关闭该连接: clientId={}",
+                                    writeStallTimeoutMs, connection.getClientId());
+                            connection.close();
+                        }
+                    }
+                } catch (RuntimeException e) {
+                    log.warn("SSE 僵死连接巡检失败（下轮继续）", e);
+                }
+            }
+        }, period, period, TimeUnit.MILLISECONDS);
     }
 
     private String extractClientId(HttpServletRequest request) {
@@ -155,7 +228,8 @@ public final class SsePushServlet extends HttpServlet {
 
     private void writeInitialFrames(SseClientConnection connection) {
         if (reconnectHintMs > 0) {
-            connection.write(SseClientConnection.SseFrameBuilder.retry(reconnectHintMs));
+            // 与后续业务帧走同一条队列，保证顺序（写出由写线程池完成，不阻塞容器线程）
+            connection.sendRawFrame(SseClientConnection.SseFrameBuilder.retry(reconnectHintMs));
         }
     }
 

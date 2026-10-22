@@ -183,7 +183,14 @@ public class LinkoraServerAutoConfiguration {
                         properties.getHeartbeatIntervalMs() == null ? 15_000L
                                 : properties.getHeartbeatIntervalMs(),
                         properties.getReconnectHintMs() == null ? 3_000L
-                                : properties.getReconnectHintMs()),
+                                : properties.getReconnectHintMs(),
+                        properties.getSseQueueCapacity() == null ? SsePushServlet.DEFAULT_QUEUE_CAPACITY
+                                : properties.getSseQueueCapacity(),
+                        properties.getSseWriteStallTimeoutMs() == null
+                                ? SsePushServlet.DEFAULT_WRITE_STALL_TIMEOUT_MS
+                                : properties.getSseWriteStallTimeoutMs(),
+                        properties.getSseWriterThreads() == null ? SsePushServlet.DEFAULT_WRITER_THREADS
+                                : properties.getSseWriterThreads()),
                 properties.getEventsPath());
         bean.setName("linkoraSsePushServlet");
         bean.setAsyncSupported(true);

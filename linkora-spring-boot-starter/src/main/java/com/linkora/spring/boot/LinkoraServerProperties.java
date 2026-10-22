@@ -27,6 +27,12 @@ public class LinkoraServerProperties {
     private Long heartbeatIntervalMs = 15_000L;
     /** SSE retry 重连建议间隔（毫秒）。 */
     private Long reconnectHintMs = 3_000L;
+    /** 每连接发送队列容量（帧），满即断开该连接。 */
+    private Integer sseQueueCapacity = 1024;
+    /** 单次 flush 卡住多久判定连接不可用（毫秒），0 表示关闭看门狗。 */
+    private Long sseWriteStallTimeoutMs = 15_000L;
+    /** SSE 写线程池大小：一个卡死连接占一个线程。 */
+    private Integer sseWriterThreads = 16;
 
     /** 启动时自动注册的客户端（clientId → 是否启用）。 */
     private Map<String, Boolean> registerClients = new LinkedHashMap<String, Boolean>();
@@ -91,6 +97,30 @@ public class LinkoraServerProperties {
 
     public void setHeartbeatIntervalMs(Long heartbeatIntervalMs) {
         this.heartbeatIntervalMs = heartbeatIntervalMs;
+    }
+
+    public Integer getSseQueueCapacity() {
+        return sseQueueCapacity;
+    }
+
+    public void setSseQueueCapacity(Integer sseQueueCapacity) {
+        this.sseQueueCapacity = sseQueueCapacity;
+    }
+
+    public Long getSseWriteStallTimeoutMs() {
+        return sseWriteStallTimeoutMs;
+    }
+
+    public void setSseWriteStallTimeoutMs(Long sseWriteStallTimeoutMs) {
+        this.sseWriteStallTimeoutMs = sseWriteStallTimeoutMs;
+    }
+
+    public Integer getSseWriterThreads() {
+        return sseWriterThreads;
+    }
+
+    public void setSseWriterThreads(Integer sseWriterThreads) {
+        this.sseWriterThreads = sseWriterThreads;
     }
 
     public Long getReconnectHintMs() {
