@@ -64,6 +64,8 @@ public class LinkoraServerConfiguration {
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     public LinkoraServer linkoraServer(
+            @org.springframework.beans.factory.annotation.Value(
+                    "${linkora.server.allow-anonymous:false}") boolean allowAnonymous,
             ClientRegistry clientRegistry,
             MessageRepository messageRepository,
             DeliveryRepository deliveryRepository,
@@ -83,6 +85,6 @@ public class LinkoraServerConfiguration {
                 clientRegistry, messageRepository, deliveryRepository, cursorRepository,
                 configProvider.getIfAvailable(),
                 payloadSerializerProvider.getIfAvailable(),
-                ingestListeners, uplinkHandlers);
+                ingestListeners, uplinkHandlers, allowAnonymous);
     }
 }
