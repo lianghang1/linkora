@@ -2,83 +2,276 @@
 
 面向线上服务与多个线下 Java 客户端的可靠双端通信 SDK。
 
-- 最低 JDK：8（构建与测试在真实 JDK 8 上执行）
-- 通信方案：SSE 下行 + HTTPS POST 上行
-- 可靠性：服务端持久化 + 客户端独立 SQLite + 接收/处理两级 ACK + 幂等 + 重试 + 断线补发
+- 最低 JDK：8；宿主形态：**Spring Boot 2.x 或 Spring MVC 5.x**（也支持零框架宿主）
+- 通信方案：SSE 下行推送 + HTTPS POST 上行
+- 可靠性：服务端持久化 + 客户端本地队列 + 两级 ACK + 幂等 + 重试 + 断线补发
 - 投递语义：至少一次（at-least-once），业务侧需自行保证副作用幂等
 - 安全：纯应用层 HMAC 签名认证（不依赖证书/mTLS），失败指数锁定 + 防重放
 
-详细设计见 `Linkora_最终开发方案.md` 与 `docs/`。
+只想用起来，看下面的两种宿主模式即可；想了解核心实现，见文末[文档导航](#文档导航)。
 
-## 模块
+## 选你的宿主模式
 
-| 模块 | 职责 |
-|---|---|
-| linkora-core | 消息模型、状态机、错误码、序列化抽象、存储 SPI、安全工具 |
-| linkora-client | 客户端编排：SQLite 优先、SSE 下行、POST 上行、ACK 流程、断网补传 |
-| linkora-server | 服务端编排：持久化优先、SSE 推送、上报/ACK 接入、重试与死信 |
-| linkora-client-storage-sqlite | 客户端 SQLite 持久化（WAL + synchronous=FULL） |
-| linkora-server-storage-jdbc | 服务端 JDBC 持久化（自研版本迁移，复用现有数据库） |
-| linkora-transport | OkHttp 4.x 传输实现 + Servlet 3.1 异步适配器（嵌入宿主已有容器） |
-| linkora-serialize-jackson | Jackson JSON 编解码（仅用 2.13+ 稳定 API） |
-| linkora-testkit | 测试支撑：嵌入式服务器、录制监听器、测试凭据库（不进生产） |
-| linkora-spring | Spring MVC 宿主装配辅助（不依赖 Spring Boot，含 JDBC 存储） |
-| linkora-spring-boot-starter | Spring Boot 2.7 自动装配（DataSource 即得服务端，客户端可配） |
-| examples/* | 可运行示例：普通 Java ×2、Spring MVC、Spring Boot、服务端/客户端事务接管 ×2 |
+无论服务端还是客户端，**每个角色只引 1 个 Maven 包**，存储实现随包传递，无需单独声明：
 
-## 构建
+| 你的宿主 | 服务端引 | 客户端引 |
+|---|---|---|
+| Spring Boot 应用 | `linkora-spring-boot-starter` | `linkora-spring-boot-starter`（同一包） |
+| Spring MVC 应用（无 Boot） | `linkora-spring` | `linkora-spring`（同一包） |
 
-要求 JDK 8 + Maven 3.6+。
-
-```bash
-mvn clean test
+```xml
+<dependency>
+    <groupId>com.linkora</groupId>
+    <artifactId>linkora-spring-boot-starter</artifactId> <!-- 或 linkora-spring -->
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
 ```
 
-## 快速上手
+---
+
+## 模式一：Spring Boot
+
+### 服务端：给一个 DataSource 就能用
+
+```xml
+<dependency>
+    <groupId>com.linkora</groupId>
+    <artifactId>linkora-spring-boot-starter</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+`application.yml`（其余全部自动装配，含建表迁移）：
+
+```yaml
+linkora:
+  server:
+    register-clients:            # 预注册的客户端 ID（→ 是否启用）
+      store-001: true
+```
+
+下发消息 = 注入 `LinkoraServer` 调 `publish`：
+
+```java
+@Service
+public class OrderService {
+    private final LinkoraServer linkora;
+
+    public OrderService(LinkoraServer linkora) { this.linkora = linkora; }
+
+    public void notifyStore(String clientId, Object payload) {
+        // 推给指定客户端；持久化成功后才返回，断线的客户端重连后自动补发
+        linkora.publish(clientId, "order-created", payload);
+    }
+}
+```
+
+接收上行消息 = 实现一个 `IngestListener` bean（客户端 POST 上来、持久化完成后回调；
+回调异常不影响上行结果，上行可靠性由业务侧自行处理）：
+
+```java
+@Component
+public class UplinkListener implements IngestListener {
+    @Override
+    public void onIngested(LinkoraMessage message) {
+        // message.getMessageType() 区分类型；业务侧自行落库/分发并保证幂等
+    }
+}
+```
+
+常用配置项（未设置时用 SDK 默认值，完整清单见 [docs/deployment.md](docs/deployment.md)）：
+
+| 配置 | 默认 | 说明 |
+|---|---|---|
+| `linkora.server.enabled` | `true` | 服务端自动装配开关 |
+| `linkora.server.auto-migrate` | `true` | 启动时对宿主 DataSource 自动建表（幂等，可关） |
+| `linkora.server.register-clients` | 空 | 预注册客户端及启用状态 |
+| `linkora.server.heartbeat-interval-ms` | `15000` | SSE 心跳间隔 |
+
+### 客户端：一个开关 + 三行配置
+
+```yaml
+linkora:
+  client:
+    enabled: true                # 默认关闭，显式开启
+    server-url: http://127.0.0.1:8082
+    client-id: store-001         # 与服务端 register-clients 一致
+    # db-path: data/client.db    # 缺省 SQLite 本地队列，可省略
+```
+
+```java
+@Service
+public class OrderHandler implements MessageListener {
+    @Override
+    public void onMessage(LinkoraReceivedMessage message) {
+        // 收到服务端下发的 order-created，业务处理后必须显式 ACK
+        message.ackProcessed();
+    }
+}
+```
+
+```java
+@Configuration
+public class LinkoraBinding {
+    @Bean
+    public CommandLineRunner bind(LinkoraClient client, OrderHandler handler) {
+        return args -> client.addListener("order-created", handler);
+    }
+}
+```
+
+上行发送 = 注入 `LinkoraClient` 调 `publish`（写本地队列后自动发送与重试，
+崩溃不丢；`addOutboxListener` 可等"服务端已接受"确认）：
+
+```java
+client.publish("order-status-updated", payloadBytes);
+```
+
+---
+
+## 模式二：Spring MVC（不依赖 Boot）
+
+### 服务端：@Import + 四个存储 bean
+
+```xml
+<dependency>
+    <groupId>com.linkora</groupId>
+    <artifactId>linkora-spring</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+装配类（`LinkoraServerConfiguration` 负责组装与生命周期，业务代码写法与 Boot 模式完全相同）：
+
+```java
+@Configuration
+@EnableWebMvc
+@Import(LinkoraServerConfiguration.class)
+public class AppConfig {
+
+    @Bean
+    public DataSource linkoraDataSource() { /* 业务库连接池 */ }
+
+    @Bean
+    public ClientAuthenticator linkoraClientAuthenticator() {
+        return new HmacClientAuthenticator(/* 凭据库 */); // 见"注意事项"
+    }
+
+    // 四个存储 SPI bean：用官方 JDBC 实现，或自实现接宿主业务库（事务接管）
+    @Bean public ClientRegistry linkoraClientRegistry(DataSource ds) { return new JdbcClientRegistry(ds); }
+    @Bean public MessageRepository linkoraMessageRepository(DataSource ds) { return new JdbcMessageRepository(ds); }
+    @Bean public DeliveryRepository linkoraDeliveryRepository(DataSource ds) { return new JdbcDeliveryRepository(ds); }
+    @Bean public ClientCursorRepository linkoraCursorRepository(DataSource ds) { return new JdbcClientCursorRepository(ds); }
+}
+```
+
+三个 HTTP 端点（SSE 下行 `/events`、上行 `/messages`、确认 `/acks`）注册进任意 ServletContext：
+
+```java
+LinkoraServlets.register(linkoraServer, servletContext); // 一行
+```
+
+服务端调优与预注册等配置通过 `ServerConfig` bean 或存储 bean 装配时提供，清单同 Boot 模式。
+
+### 客户端：@Import 显式启用
+
+```xml
+<!-- 同一个包，客户端能力随包传递 -->
+<dependency>
+    <groupId>com.linkora</groupId>
+    <artifactId>linkora-spring</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+```java
+@Configuration
+@Import(LinkoraClientConfiguration.class)   // 显式启用，不 import 就不会初始化客户端
+public class ClientConfig { }
+```
+
+配置文件（任意 `@PropertySource`，配置键与 Boot 版逐字对齐）：
+
+```properties
+linkora.client.server-url=http://127.0.0.1:8081
+linkora.client.client-id=store-001
+linkora.client.db-path=data/client.db
+```
+
+业务代码与 Boot 模式完全相同：`MessageListener` 处理下行 + 显式 ACK，
+`client.publish` 发上行，`addListener` 绑定 topic。
+
+---
+
+## 注意事项（使用前必读）
+
+**投递与 ACK**
+
+1. 投递语义是**至少一次**：同一条消息可能被重复收到，业务处理必须幂等（用消息 ID 去重）。
+2. 下行消息处理完**必须显式调用** `message.ackProcessed()`（失败调 `ackFailed(...)`），
+   不 ACK 服务端会按策略无限重试。
+
+**安全（生产必改）**
+
+3. 不提供 `ClientAuthenticator` 时服务端回退为**放行全部请求**的默认认证器并打告警——
+   仅限本地开发。生产必须使用 HMAC 认证（高熵 token + 签名 + 失败锁定 + 防重放），
+   接入步骤见 [docs/security.md](docs/security.md)。
+
+**依赖与版本**
+
+4. Spring 版本范围：Spring 5.x / Boot 2.x **全系兼容**（SDK 以 5.3.31 / 2.7.18 为测试基线，
+   宿主声明自己的 spring-context / spring-boot 版本即生效）；**上限 Spring 6 / Boot 3.x
+   不支持**（javax→jakarta 不兼容）。JDK 最低 8。
+5. 客户端 SQLite 依赖 `sqlite-jdbc`：宿主 classpath 必须保证该库**版本唯一**——
+   宿主自身也用 SQLite 时，用 `dependencyManagement` 锁定为与 SDK 相同的版本（3.46.1.3），
+   多版本共存会报 native 库初始化错误。
+6. 全家桶传递依赖约 16MB（客户端能力 + SQLite + OkHttp）。纯服务端宿主在意体积时，
+   用 `<exclusions>` 排除 `linkora-client` 与 `linkora-client-storage-sqlite` 即可，
+   未使用的类不会初始化、native 库不会加载，无运行时代价。
+
+**存储**
+
+7. 服务端只要求宿主给一个 `DataSource`（复用业务库，无需新增中间件），
+   首次启动自动建表；客户端缺省 SQLite（WAL + FULL，进程崩溃/断电不丢消息）。
+8. 宿主想用业务库接管存储（事务性发件箱）：
+   - Boot 宿主：定义自己的 `ClientRegistry`/`ClientStore` 等 bean 即可自动让位；
+   - MVC 宿主：自定义 `ClientStore` bean 需加 `@Primary`
+     （纯 Spring 没有 `@ConditionalOnMissingBean`，不会自动让位）。
+   事务接管完整示例见 `examples/spring-tx-server`（服务端）与 `examples/tx-client`（客户端）。
+
+---
+
+## 可运行示例
 
 ```bash
 mvn install -DskipTests
-# 终端 1：启动服务端示例
-mvn -pl examples/plain-java-server exec:java "-Dexec.mainClass=com.linkora.example.server.PlainJavaServerMain" "-Dexec.args=8080 data/linkora-server"
-# 终端 2：启动客户端示例
-mvn -pl examples/plain-java-client exec:java "-Dexec.mainClass=com.linkora.example.client.PlainJavaClientMain" "-Dexec.args=http://127.0.0.1:8080 demo-client"
-```
 
-Spring 宿主示例（每个示例内含 server-app 服务端 + client-app 客户端，
-演示"线上下单/评价通知线下、线下回传订单状态/回复评价"的四向消息闭环，
-业务代码采用 controller/service 分层，见各示例 README 与 docs/message-handling.md）：
-
-```bash
-# Spring Boot 宿主（starter 自动装配）
+# Spring Boot：终端 1 服务端（8082），终端 2 客户端（自动跑四向闭环输出 [PASS]）
 mvn -pl examples/spring-boot-server/server-app spring-boot:run
-# Spring Boot 客户端（starter 自动装配，连接 8082 server-app）
 mvn -pl examples/spring-boot-server/client-app spring-boot:run
 
-# Spring MVC 宿主（注解容器 + 内嵌 Jetty，端口 8081）
+# Spring MVC：终端 1 服务端（8081），终端 2 客户端
 mvn -pl examples/spring-mvc-server/server-app compile exec:java "-Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain" "-Dexec.args=8081"
-# Spring MVC 宿主客户端（引 linkora-spring 单包，@Import 启用客户端装配，连接 8081 server-app）
 mvn -pl examples/spring-mvc-server/client-app compile exec:java "-Dexec.mainClass=com.linkora.example.mvcclient.ClientDemoApplication"
-
-# 服务端事务接管：publish 持久化与业务写入同事务（事务性发件箱）
-mvn -pl examples/spring-tx-server compile exec:java "-Dexec.mainClass=com.linkora.example.springtx.SpringTxServerMain"
-# 客户端事务接管：自实现 ClientStore 接宿主业务库，outbox 与业务同事务
-mvn -pl examples/tx-client compile exec:java "-Dexec.mainClass=com.linkora.example.txclient.TxClientMain"
 ```
 
-服务端业务接口（触发下行通知）：Spring Boot 宿主 `http://127.0.0.1:8082/api/orders`、
-`/api/reviews`；Spring MVC 宿主 `http://127.0.0.1:8081/api/orders`、`/api/reviews`。
-上行处理结果查询：`GET /api/uplink/order-status-updates`、`GET /api/uplink/review-replies`
-（client-app 会自动跑完四向闭环并输出 `[PASS]`）。
+示例演示"线上下单/评价通知线下、线下回传订单状态/回复评价"四向闭环，
+业务代码采用 controller/service 分层，可直接当接入模板抄；
+零框架宿主示例（手动装配）见 `examples/plain-java-server` / `plain-java-client`。
 
-## 文档
+## 构建
 
-| 文档 | 内容 |
+JDK 8 + Maven 3.6+：`mvn clean test`（全部自动化测试，无需外部中间件）。
+
+## 文档导航
+
+| 想了解 | 看 |
 |---|---|
-| [docs/architecture.md](docs/architecture.md) | 架构与模块边界 |
-| [docs/protocol.md](docs/protocol.md) | 线路协议与消息/ACK 结构 |
-| [docs/message-handling.md](docs/message-handling.md) | 消息处理链路与业务接入（上行/下行回调） |
-| [docs/reliability.md](docs/reliability.md) | 可靠投递语义与状态机 |
-| [docs/security.md](docs/security.md) | HMAC 认证、防爆破、凭据管理 |
-| [docs/deployment.md](docs/deployment.md) | 部署、配置、升级与备份 |
-| [docs/compatibility.md](docs/compatibility.md) | JDK/容器/数据库/依赖兼容性矩阵 |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | 常见问题排查 |
+| 消息怎么流转、业务代码写在哪一层 | [docs/message-handling.md](docs/message-handling.md) |
+| 线路协议与消息/ACK 报文结构 | [docs/protocol.md](docs/protocol.md) |
+| 可靠投递语义、状态机、重试与死信 | [docs/reliability.md](docs/reliability.md) |
+| HMAC 认证、防爆破、凭据管理 | [docs/security.md](docs/security.md) |
+| 部署、配置全集、升级与备份 | [docs/deployment.md](docs/deployment.md) |
+| 架构与模块边界（核心实现） | [docs/architecture.md](docs/architecture.md) |
+| JDK/容器/数据库/依赖兼容性矩阵 | [docs/compatibility.md](docs/compatibility.md) |
+| 常见问题排查 | [docs/troubleshooting.md](docs/troubleshooting.md) |
