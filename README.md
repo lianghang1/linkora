@@ -264,7 +264,7 @@ linkora.client.db-path=data/client.db
 | 消息投递状态查询 | `linkora.getMessageStatus(messageId)` | 消息正文 + 每个目标的投递记录（状态、序号、重试次数）；`isSettled()` 一键判断是否全部到达终态，可用于对账 |
 | 客户端积压与在线查询 | `linkora.getBacklog(clientId)` | 未完成投递数 + 是否有活跃 SSE 连接，适合监控告警 |
 | 带过期与链路追踪的发布 | `linkora.publish(clientId, type, payload, expiresAt, traceId)` | 到期未送达自动作废；traceId 透传到客户端便于全链路排查 |
-| 客户端启用/禁用 | Boot：`register-clients` 配置；MVC：`ClientRegistration` bean | 禁用的客户端拒收新消息、拒绝接入 |
+| 客户端启用/禁用 | Boot：`register-clients` 配置；MVC：启动时 `clientRegistry.register(new ClientRegistration(id, enabled, System.currentTimeMillis()))` 或预置 SQL | 禁用的客户端拒收新消息、拒绝接入 |
 | 手动触发补发扫描 | `linkora.sweepOnce()` | 运维/测试用，正常运行不需要 |
 
 上行侧同样有保障：`UplinkHandler` 按 `messageType()` 自动分发，服务端按 messageId 幂等去重
