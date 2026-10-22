@@ -479,12 +479,12 @@ public class SqliteClientStoreTest {
     }
 
     @Test
-    public void blankOrderingKeyBehavesLikeNoKey() throws Exception {
+    public void blankSequenceKeyBehavesLikeNoKey() throws Exception {
         // 空串/空白必须归一成 null：否则所有"没传 key 但传了空串"的消息会共用一条假车道
         assertNull(new OutboxEntry("x", "T", "p".getBytes(StandardCharsets.UTF_8),
-                OutboxStatus.PENDING, NOW, NOW, 0, null, null, null, "").getOrderingKey());
+                OutboxStatus.PENDING, NOW, NOW, 0, null, null, null, "").getSequenceKey());
         assertNull(new OutboxEntry("x", "T", "p".getBytes(StandardCharsets.UTF_8),
-                OutboxStatus.PENDING, NOW, NOW, 0, null, null, null, "   ").getOrderingKey());
+                OutboxStatus.PENDING, NOW, NOW, 0, null, null, null, "   ").getSequenceKey());
 
         try (SqliteClientStore store = new SqliteClientStore(dbPath())) {
             store.saveOutbox(outboxInKey("a", ""));
@@ -493,7 +493,7 @@ public class SqliteClientStoreTest {
             assertFalse(store.hasEarlierActiveInKey("", "b"));
             assertFalse(store.hasEarlierActiveInKey(null, "b"));
             assertFalse(store.hasEarlierActiveInKey("  ", "b"));
-            assertNull(store.findOutbox("a").get().getOrderingKey());
+            assertNull(store.findOutbox("a").get().getSequenceKey());
 
             store.saveInbox(inboxInKey("i-1", "", ProcessStatus.PENDING));
             store.saveInbox(inboxInKey("i-2", "", ProcessStatus.PENDING));
@@ -503,19 +503,19 @@ public class SqliteClientStoreTest {
     }
 
     @Test
-    public void orderingKeySurvivesStatusTransitions() throws Exception {
+    public void sequenceKeySurvivesStatusTransitions() throws Exception {
         // with() 必须透传 key，否则每次状态变更都会把顺序键丢掉
         try (SqliteClientStore store = new SqliteClientStore(dbPath())) {
             store.saveOutbox(outboxInKey("a", "order-9"));
             store.updateOutboxStatus(
                     outboxInKey("a", "order-9").with(OutboxStatus.FAILED, 1, NOW + 1000, "e", NOW),
                     OutboxStatus.PENDING);
-            assertEquals("order-9", store.findOutbox("a").get().getOrderingKey());
+            assertEquals("order-9", store.findOutbox("a").get().getSequenceKey());
 
             store.saveInbox(inboxInKey("i-1", "order-9", ProcessStatus.PENDING));
             store.updateInboxProcessStatus(
                     inboxInKey("i-1", "order-9", ProcessStatus.RETRYING), ProcessStatus.PENDING);
-            assertEquals("order-9", store.findInbox("i-1").get().getOrderingKey());
+            assertEquals("order-9", store.findInbox("i-1").get().getSequenceKey());
         }
     }
 }

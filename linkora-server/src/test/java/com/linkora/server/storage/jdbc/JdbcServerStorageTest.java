@@ -345,8 +345,8 @@ public class JdbcServerStorageTest {
     }
 
     @Test
-    public void orderingKeyGatesLaterMessageUntilEarlierSettles() {
-        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-ordering"));
+    public void sequenceKeyGatesLaterMessageUntilEarlierSettles() {
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-sequence"));
         // 同一顺序键：seq 越小越先投
         repo.init(new DeliveryRecord("o-1", "c-1", 1, MessageState.ACCEPTED, 0, null, null,
                 NOW, NOW, "order-1"));
@@ -376,7 +376,7 @@ public class JdbcServerStorageTest {
     public void expiredHeadInSameKeyReleasesFollowingMessage() {
         // 关键安全性：如果队头那条永远拿不到终态，同键后续会被永久堵住。
         // 过期是自愈路径——过期推进把队头置为 EXPIRED（终态），车道随即放行。
-        DataSource ds = freshH2("dlv-ordering-expire");
+        DataSource ds = freshH2("dlv-sequence-expire");
         JdbcMessageRepository messages = new JdbcMessageRepository(ds);
         JdbcDeliveryRepository deliveries = new JdbcDeliveryRepository(ds);
 
@@ -401,7 +401,7 @@ public class JdbcServerStorageTest {
 
     @Test
     public void deadLetterInSameKeyReleasesFollowingMessage() {
-        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-ordering-dead"));
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-sequence-dead"));
         // 前一条已进死信：不再投递，但也不能把同键后续消息永久卡住
         repo.init(new DeliveryRecord("d-1", "c-1", 1, MessageState.DEAD_LETTER, 10, null,
                 "业务失败", NOW, NOW, "order-9"));

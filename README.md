@@ -580,7 +580,7 @@ try (Connection c = dataSource.getConnection()) {
 **想保证顺序？给消息带顺序键**
 
 默认投递是"尽力而为"的：重试和补发会让后发的消息先到。如果同一笔业务（订单、账户、
-设备）的多条消息必须按顺序生效，把业务主键作为 `orderingKey` 传进去：
+设备）的多条消息必须按顺序生效，把业务主键作为 `sequenceKey` 传进去：
 
 ```java
 // 服务端下发：同一个订单的状态 1 → 2 严格按序
@@ -590,7 +590,7 @@ linkora.publish("store-001", "order-status-updated", payload, "order-20261022-00
 uplinkPublisher.publish("order-status-updated", payload, "order-20261022-0001");
 ```
 
-规则：同一 `clientId` + 同一 `orderingKey` 下，前一条没到终态（PROCESSED/EXPIRED）或
+规则：同一 `clientId` + 同一 `sequenceKey` 下，前一条没到终态（PROCESSED/EXPIRED）或
 没进死信之前，后一条不会被推送/发送。不同键完全并行。
 
 键缺省、传 `null`、传空白串，三者等价：都归一为"无顺序键"，行为与未引入该特性时完全一致

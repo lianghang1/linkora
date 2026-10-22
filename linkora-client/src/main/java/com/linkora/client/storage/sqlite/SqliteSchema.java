@@ -65,15 +65,15 @@ final class SqliteSchema {
     };
 
     /**
-     * v2：顺序键。两端队列都记录 ordering_key，并各加一条 (ordering_key, rowid) 可用索引；
-     * 老库通过 ALTER TABLE 增量升级，不动既有数据（历史行 ordering_key 为 NULL，
+     * v2：顺序键。两端队列都记录 sequence_key，并各加一条 (sequence_key, rowid) 可用索引；
+     * 老库通过 ALTER TABLE 增量升级，不动既有数据（历史行 sequence_key 为 NULL，
      * 语义就是"不参与顺序约束"，与旧行为一致）。
      */
     private static final String[] V2_STATEMENTS = {
-            "ALTER TABLE lk_outbox ADD COLUMN ordering_key TEXT",
-            "ALTER TABLE lk_inbox ADD COLUMN ordering_key TEXT",
-            "CREATE INDEX IF NOT EXISTS idx_outbox_ordering ON lk_outbox (ordering_key, status)",
-            "CREATE INDEX IF NOT EXISTS idx_inbox_ordering ON lk_inbox (ordering_key, process_status)",
+            "ALTER TABLE lk_outbox ADD COLUMN sequence_key TEXT",
+            "ALTER TABLE lk_inbox ADD COLUMN sequence_key TEXT",
+            "CREATE INDEX IF NOT EXISTS idx_outbox_sequence ON lk_outbox (sequence_key, status)",
+            "CREATE INDEX IF NOT EXISTS idx_inbox_sequence ON lk_inbox (sequence_key, process_status)",
     };
 
     /** 每个迁移版本 = 语句数组。 */

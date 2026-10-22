@@ -22,7 +22,7 @@ public final class InboxEntry {
     private final Long nextRetryAt;
     private final String lastError;
     /** 顺序键，可为 null（不参与顺序约束）。 */
-    private final String orderingKey;
+    private final String sequenceKey;
 
     public InboxEntry(String messageId, String messageType, byte[] payload,
                       ReceiveStatus receiveStatus, ProcessStatus processStatus,
@@ -35,7 +35,7 @@ public final class InboxEntry {
     public InboxEntry(String messageId, String messageType, byte[] payload,
                       ReceiveStatus receiveStatus, ProcessStatus processStatus,
                       long receivedAt, Long processedAt, int retryCount,
-                      Long nextRetryAt, String lastError, String orderingKey) {
+                      Long nextRetryAt, String lastError, String sequenceKey) {
         requireNonBlank(messageId, "messageId");
         requireNonBlank(messageType, "messageType");
         if (payload == null) {
@@ -57,8 +57,8 @@ public final class InboxEntry {
         this.retryCount = retryCount;
         this.nextRetryAt = nextRetryAt;
         this.lastError = lastError;
-        this.orderingKey = orderingKey == null || orderingKey.trim().isEmpty()
-                ? null : orderingKey.trim();
+        this.sequenceKey = sequenceKey == null || sequenceKey.trim().isEmpty()
+                ? null : sequenceKey.trim();
     }
 
     public String getMessageId() {
@@ -102,8 +102,8 @@ public final class InboxEntry {
     }
 
     /** 顺序键，可为 null。 */
-    public String getOrderingKey() {
-        return orderingKey;
+    public String getSequenceKey() {
+        return sequenceKey;
     }
 
     /** 返回接收状态与处理状态均更新后的新实例（不可变对象的变更语义）。 */
@@ -112,7 +112,7 @@ public final class InboxEntry {
                            String newLastError, Long newProcessedAt) {
         return new InboxEntry(messageId, messageType, payload, newReceiveStatus,
                 newProcessStatus, receivedAt, newProcessedAt != null ? newProcessedAt : processedAt,
-                newRetryCount, newNextRetryAt, newLastError, orderingKey);
+                newRetryCount, newNextRetryAt, newLastError, sequenceKey);
     }
 
     @Override

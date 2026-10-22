@@ -54,8 +54,8 @@ public final class MessageJsonCodec {
             node.putNull("traceId");
         }
         // 顺序键为可选字段：老客户端会忽略它（DECODE 按字段名读，未知字段不报错）
-        if (message.getOrderingKey() != null) {
-            node.put("orderingKey", message.getOrderingKey());
+        if (message.getSequenceKey() != null) {
+            node.put("sequenceKey", message.getSequenceKey());
         }
         return node.toString();
     }
@@ -78,9 +78,9 @@ public final class MessageJsonCodec {
         if (traceId != null && !traceId.isNull()) {
             builder.traceId(traceId.asText());
         }
-        JsonNode orderingKey = node.get("orderingKey");
-        if (orderingKey != null && !orderingKey.isNull()) {
-            builder.orderingKey(orderingKey.asText());
+        JsonNode sequenceKey = node.get("sequenceKey");
+        if (sequenceKey != null && !sequenceKey.isNull()) {
+            builder.sequenceKey(sequenceKey.asText());
         }
         try {
             return builder.build();

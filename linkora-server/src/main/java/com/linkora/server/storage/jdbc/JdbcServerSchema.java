@@ -108,12 +108,12 @@ public final class JdbcServerSchema {
     };
 
     /**
-     * v3：顺序键。同一 (client_id, ordering_key) 下按 seq 单调投递，
+     * v3：顺序键。同一 (client_id, sequence_key) 下按 seq 单调投递，
      * 前一条到终态前不推后一条；索引支撑"同 key 是否有更早未终结记录"的 EXISTS 判断。
      */
     private static final String[] V3_COMMON = {
-            "ALTER TABLE lk_delivery ADD COLUMN ordering_key VARCHAR(128)",
-            "CREATE INDEX idx_delivery_client_key_seq ON lk_delivery (client_id, ordering_key, seq)",
+            "ALTER TABLE lk_delivery ADD COLUMN sequence_key VARCHAR(128)",
+            "CREATE INDEX idx_delivery_client_key_seq ON lk_delivery (client_id, sequence_key, seq)",
     };
 
     /**

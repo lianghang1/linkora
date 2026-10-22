@@ -56,9 +56,9 @@ ProcessStatus:  PENDING → PROCESSING → PROCESSED(终态)
 
 默认**不保证顺序**：重试、补发、pacing 都会让后发布的消息先到达。
 
-需要顺序时给消息带 `orderingKey`（订单号、账户号、设备号等任意业务实体）：
+需要顺序时给消息带 `sequenceKey`（订单号、账户号、设备号等任意业务实体）：
 
-- **下行**：服务端推送门禁——同 `(clientId, orderingKey)` 下，seq 更小的记录未到终态
+- **下行**：服务端推送门禁——同 `(clientId, sequenceKey)` 下，seq 更小的记录未到终态
   （PROCESSED / EXPIRED）时，后续记录一律不推，且在 SQL 里过滤（不占补发批次名额）；
 - **上行**：客户端发送门禁——同键更早入队且未终结的消息未完成时，后一条不发送；
   这条同时修掉了"FAILED 批在 PENDING 批之后重发导致旧消息被超车"的问题；
@@ -78,7 +78,7 @@ ProcessStatus:  PENDING → PROCESSING → PROCESSED(终态)
 
 - **粒度 = 业务实体**：订单号、账户号、设备号。不要用"门店号"这类过大的粒度，
   那会把无关消息串行化；也不要用消息 ID 这类"每条都不同"的值，那等于没有顺序键。
-- **不要自己加前缀维度**：SDK 的分组维度已经是 `(clientId, orderingKey)`，
+- **不要自己加前缀维度**：SDK 的分组维度已经是 `(clientId, sequenceKey)`，
   拼 clientId 是冗余的；拼 messageType 会**破坏同一实体跨事件类型的顺序**
   （`order-created` / `order-paid` 会被拆进不同车道）。
 - **推荐命名 `域名:主键`**（如 `order:20261022-0001`、`refund:R-88`）：避免不同模块

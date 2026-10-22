@@ -293,12 +293,12 @@ public final class LinkoraClient implements AutoCloseable {
     /**
      * 发布对象负载 + 顺序键：同一 key 的消息按发布顺序上行（前一条未到终态前沿用原顺序发送）。
      */
-    public String publish(String messageType, Object payload, String orderingKey) {
+    public String publish(String messageType, Object payload, String sequenceKey) {
         if (payloadSerializer == null) {
             throw new LinkoraException(LinkoraErrorCode.SERIALIZATION_ERROR,
                     "未配置 payloadSerializer，无法序列化对象负载");
         }
-        return publish(messageType, payloadSerializer.serialize(payload), orderingKey);
+        return publish(messageType, payloadSerializer.serialize(payload), sequenceKey);
     }
 
     /**
@@ -312,9 +312,9 @@ public final class LinkoraClient implements AutoCloseable {
     /**
      * 发布字节负载 + 顺序键。
      *
-     * @param orderingKey 顺序键（订单号/账户号/设备号等），null 表示不参与顺序约束
+     * @param sequenceKey 顺序键（订单号/账户号/设备号等），null 表示不参与顺序约束
      */
-    public String publish(String messageType, byte[] payload, String orderingKey) {
+    public String publish(String messageType, byte[] payload, String sequenceKey) {
         if (state == ClientState.CLOSED) {
             throw new LinkoraException(LinkoraErrorCode.INTERNAL_ERROR, "客户端已关闭");
         }
@@ -323,7 +323,7 @@ public final class LinkoraClient implements AutoCloseable {
         OutboxEntry entry;
         try {
             entry = new OutboxEntry(messageId, messageType, payload,
-                    OutboxStatus.PENDING, now, now, 0, null, null, null, orderingKey);
+                    OutboxStatus.PENDING, now, now, 0, null, null, null, sequenceKey);
         } catch (IllegalArgumentException e) {
             throw new LinkoraException(LinkoraErrorCode.INVALID_MESSAGE, e.getMessage(), e);
         }
@@ -429,7 +429,7 @@ public final class LinkoraClient implements AutoCloseable {
         long now = System.currentTimeMillis();
         boolean isNew = store.saveInbox(new InboxEntry(message.getMessageId(), message.getMessageType(),
                 message.getPayload(), ReceiveStatus.PERSISTED, ProcessStatus.PENDING,
-                now, null, 0, null, null, message.getOrderingKey()));
+                now, null, 0, null, null, message.getSequenceKey()));
         if (isNew) {
             // SQLite 已提交 → 立即发送 RECEIVED ACK（失败由恢复扫描补发）
             if (sendAck(message.getMessageId(), AckType.RECEIVED, null, null)) {
@@ -474,11 +474,11 @@ public final class LinkoraClient implements AutoCloseable {
     }
 
     /** 前一条顺序键消息终结后，接续派发同 key 下最早的一条待处理消息。 */
-    private void dispatchNextInOrderingKey(String orderingKey) {
-        if (orderingKey == null) {
+    private void dispatchNextInSequenceKey(String sequenceKey) {
+        if (sequenceKey == null) {
             return;
         }
-        InboxEntry next = store.findNextInboxInKey(orderingKey).orElse(null);
+        InboxEntry next = store.findNextInboxInKey(sequenceKey).orElse(null);
         if (next != null) {
             dispatchInbox(next.getMessageId());
         }
@@ -528,11 +528,11 @@ public final class LinkoraClient implements AutoCloseable {
             return;
         }
         // 顺序键门禁（客户端兜底）：同 key 还有更早的消息没处理完时先让路，
-        // 前一条终结后由 dispatchNextInOrderingKey 接续派发。服务端已做推送门禁，
+        // 前一条终结后由 dispatchNextInSequenceKey 接续派发。服务端已做推送门禁，
         // 这里防的是滚动升级期间的老服务端与未来多线程化 worker。
-        String orderingKey = entry.getOrderingKey();
-        if (orderingKey != null && store.hasEarlierUnsettledInbox(orderingKey, messageId)) {
-            log.debug("同顺序键前序消息未完成，暂缓派发: key={}, messageId={}", orderingKey, messageId);
+        String sequenceKey = entry.getSequenceKey();
+        if (sequenceKey != null && store.hasEarlierUnsettledInbox(sequenceKey, messageId)) {
+            log.debug("同顺序键前序消息未完成，暂缓派发: key={}, messageId={}", sequenceKey, messageId);
             return;
         }
 
@@ -577,7 +577,7 @@ public final class LinkoraClient implements AutoCloseable {
                 entry.getRetryCount(), null, null, System.currentTimeMillis());
         if (store.updateInboxProcessStatus(updated, entry.getProcessStatus())) {
             sendAck(messageId, AckType.PROCESSED, null, null);
-            dispatchNextInOrderingKey(entry.getOrderingKey());
+            dispatchNextInSequenceKey(entry.getSequenceKey());
         } else {
             log.debug("PROCESSED CAS 竞争失败（并发处理或已推进）: messageId={}", messageId);
         }
@@ -602,7 +602,7 @@ public final class LinkoraClient implements AutoCloseable {
             sendAck(messageId, AckType.FAILED, errorCode.getCode(), errorMessage);
             if (terminal) {
                 // 本地彻底失败（等重投驱动续试）：让出顺序键，避免同 key 后续消息永久卡住
-                dispatchNextInOrderingKey(entry.getOrderingKey());
+                dispatchNextInSequenceKey(entry.getSequenceKey());
                 log.warn("业务处理失败次数耗尽，等待服务端重投驱动续试: messageId={}", messageId);
             }
         }
@@ -665,7 +665,7 @@ public final class LinkoraClient implements AutoCloseable {
      * 一条重试中的旧消息会被同 key 的新消息超车。</p>
      */
     private boolean blockedByOrdering(OutboxEntry entry) {
-        String key = entry.getOrderingKey();
+        String key = entry.getSequenceKey();
         return key != null && store.hasEarlierActiveInKey(key, entry.getMessageId());
     }
 
@@ -694,7 +694,7 @@ public final class LinkoraClient implements AutoCloseable {
                     .createdAt(entry.getCreatedAt())
                     .expiresAt(entry.getExpiresAt())
                     .schemaVersion(Protocol.PROTOCOL_VERSION)
-                    .orderingKey(entry.getOrderingKey())
+                    .sequenceKey(entry.getSequenceKey())
                     .build();
         } catch (IllegalArgumentException e) {
             transitionOutbox(entry.with(OutboxStatus.DEAD_LETTER, entry.getRetryCount(),

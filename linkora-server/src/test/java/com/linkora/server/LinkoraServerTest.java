@@ -183,7 +183,7 @@ public class LinkoraServerTest {
     }
 
     @Test
-    public void sameOrderingKeyDeliversOneAtATime() throws Exception {
+    public void sameSequenceKeyDeliversOneAtATime() throws Exception {
         LinkoraServer ordered = LinkoraServer.builder()
                 .clientAuthenticator(new AllowAllClientAuthenticator())
                 .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
@@ -228,7 +228,7 @@ public class LinkoraServerTest {
     }
 
     @Test
-    public void differentOrderingKeysAreNotBlockedByEachOther() throws Exception {
+    public void differentSequenceKeysAreNotBlockedByEachOther() throws Exception {
         gateway.connectedClients.set(1);
         PublishResult a = server.publish(CLIENT, "ORDER_STATUS",
                 "{\"status\":1}".getBytes(StandardCharsets.UTF_8), "order-A");

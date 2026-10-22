@@ -19,7 +19,7 @@ public final class DeliveryRecord {
     private final long createdAt;
     private final long updatedAt;
     /** 顺序键，可为 null（不参与顺序约束）。 */
-    private final String orderingKey;
+    private final String sequenceKey;
 
     public DeliveryRecord(String messageId, String clientId, long seq, MessageState state,
                           int retryCount, Long nextRetryAt, String lastError,
@@ -30,7 +30,7 @@ public final class DeliveryRecord {
 
     public DeliveryRecord(String messageId, String clientId, long seq, MessageState state,
                           int retryCount, Long nextRetryAt, String lastError,
-                          long createdAt, long updatedAt, String orderingKey) {
+                          long createdAt, long updatedAt, String sequenceKey) {
         if (messageId == null || messageId.trim().isEmpty()) {
             throw new IllegalArgumentException("messageId 不能为空");
         }
@@ -52,7 +52,7 @@ public final class DeliveryRecord {
         this.lastError = lastError;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
-        this.orderingKey = orderingKey;
+        this.sequenceKey = sequenceKey;
     }
 
     public String getMessageId() {
@@ -94,8 +94,8 @@ public final class DeliveryRecord {
     }
 
     /** 顺序键，可为 null。 */
-    public String getOrderingKey() {
-        return orderingKey;
+    public String getSequenceKey() {
+        return sequenceKey;
     }
 
     @Override

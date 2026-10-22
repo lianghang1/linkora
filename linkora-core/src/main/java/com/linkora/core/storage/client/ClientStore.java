@@ -73,7 +73,7 @@ public interface ClientStore {
      * outbox 中是否还有同一顺序键、更早入队且未终结（非 SERVER_ACCEPTED/DEAD_LETTER）的消息。
      * 返回 true 时本条应等待，避免"重试的消息"越过同键的新消息先发出去。
      */
-    default boolean hasEarlierActiveInKey(String orderingKey, String messageId) {
+    default boolean hasEarlierActiveInKey(String sequenceKey, String messageId) {
         return false;
     }
 
@@ -81,12 +81,12 @@ public interface ClientStore {
      * inbox 中是否还有同一顺序键、更早收到且未处理完（PENDING/RETRYING/PROCESSING）的消息。
      * 返回 true 时本条不派发，等前一条处理完再派发——这是客户端侧的顺序兜底。
      */
-    default boolean hasEarlierUnsettledInbox(String orderingKey, String messageId) {
+    default boolean hasEarlierUnsettledInbox(String sequenceKey, String messageId) {
         return false;
     }
 
     /** 取同一顺序键下最早一条待处理消息（前一条完成后用它接续派发）。 */
-    default java.util.Optional<InboxEntry> findNextInboxInKey(String orderingKey) {
+    default java.util.Optional<InboxEntry> findNextInboxInKey(String sequenceKey) {
         return java.util.Optional.empty();
     }
 

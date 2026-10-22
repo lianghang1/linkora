@@ -187,21 +187,21 @@ public final class LinkoraServer {
      * 发布带顺序键的消息：同一 clientId 下，同 key 的消息严格按发布顺序投递
      * （前一条到终态之前不推后一条）；key 为 null 时退化为"尽力投递"。
      *
-     * @param orderingKey 顺序键（如订单号、账户号、设备号），≤128 字符；可为 null
+     * @param sequenceKey 顺序键（如订单号、账户号、设备号），≤128 字符；可为 null
      */
     public PublishResult publish(String clientId, String messageType, byte[] payload,
-                                 String orderingKey) {
-        return publish(clientId, messageType, payload, null, null, orderingKey);
+                                 String sequenceKey) {
+        return publish(clientId, messageType, payload, null, null, sequenceKey);
     }
 
     /**
      * 完整发布入口。
      *
      * @param expiresAt   可为 null（不过期）
-     * @param orderingKey 可为 null（不参与顺序约束）
+     * @param sequenceKey 可为 null（不参与顺序约束）
      */
     public PublishResult publish(String clientId, String messageType, byte[] payload,
-                                 Long expiresAt, String traceId, String orderingKey) {
+                                 Long expiresAt, String traceId, String sequenceKey) {
         ensureRunning();
         long now = System.currentTimeMillis();
         LinkoraMessage message;
@@ -215,7 +215,7 @@ public final class LinkoraServer {
                     .expiresAt(expiresAt)
                     .schemaVersion(com.linkora.core.protocol.Protocol.PROTOCOL_VERSION)
                     .traceId(traceId)
-                    .orderingKey(orderingKey)
+                    .sequenceKey(sequenceKey)
                     .build();
         } catch (IllegalArgumentException e) {
             throw new LinkoraException(LinkoraErrorCode.INVALID_MESSAGE, e.getMessage(), e);
@@ -230,13 +230,13 @@ public final class LinkoraServer {
 
     /** 发布对象负载 + 顺序键。 */
     public PublishResult publish(String clientId, String messageType, Object payload,
-                                 String orderingKey) {
+                                 String sequenceKey) {
         if (payloadSerializer == null) {
             throw new LinkoraException(LinkoraErrorCode.SERIALIZATION_ERROR,
                     "未配置 payloadSerializer，无法序列化对象负载");
         }
         return publish(clientId, messageType, payloadSerializer.serialize(payload),
-                null, null, orderingKey);
+                null, null, sequenceKey);
     }
 
     /**
@@ -261,7 +261,7 @@ public final class LinkoraServer {
                 long seq = deliveryRepository.nextDeliverySeq(message.getClientId());
                 record = new DeliveryRecord(message.getMessageId(), message.getClientId(),
                         seq, com.linkora.core.message.MessageState.ACCEPTED, 0, null, null, now, now,
-                        message.getOrderingKey());
+                        message.getSequenceKey());
                 deliveryRepository.init(record);
             } else {
                 log.debug("重复发布触发重投: messageId={}", message.getMessageId());
@@ -274,7 +274,7 @@ public final class LinkoraServer {
         long now = System.currentTimeMillis();
         deliveryRepository.init(new DeliveryRecord(message.getMessageId(), message.getClientId(),
                 seq, com.linkora.core.message.MessageState.ACCEPTED, 0, null, null, now, now,
-                message.getOrderingKey()));
+                message.getSequenceKey()));
         coordinator.pushNow(message.getClientId(), message.getMessageId(), seq);
         log.debug("消息已持久化接受并调度推送: messageId={}, clientId={}, seq={}",
                 message.getMessageId(), message.getClientId(), seq);

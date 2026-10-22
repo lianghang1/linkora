@@ -24,7 +24,7 @@ public final class OutboxEntry {
     private final Long expiresAt;
     private final String lastError;
     /** 顺序键，可为 null（不参与顺序约束）。 */
-    private final String orderingKey;
+    private final String sequenceKey;
 
     public OutboxEntry(String messageId, String messageType, byte[] payload,
                        OutboxStatus status, long createdAt, long updatedAt,
@@ -36,7 +36,7 @@ public final class OutboxEntry {
     public OutboxEntry(String messageId, String messageType, byte[] payload,
                        OutboxStatus status, long createdAt, long updatedAt,
                        int retryCount, Long nextRetryAt, Long expiresAt, String lastError,
-                       String orderingKey) {
+                       String sequenceKey) {
         requireNonBlank(messageId, "messageId");
         requireNonBlank(messageType, "messageType");
         if (payload == null) {
@@ -57,14 +57,14 @@ public final class OutboxEntry {
         this.lastError = lastError;
         // 与 LinkoraMessage 保持一致：null 与空白都归一为 null（= 不参与顺序约束），
         // 否则空串会变成一条"所有空串共用"的假车道，把无关消息串行起来
-        String key = orderingKey == null || orderingKey.trim().isEmpty()
-                ? null : orderingKey.trim();
+        String key = sequenceKey == null || sequenceKey.trim().isEmpty()
+                ? null : sequenceKey.trim();
         if (key != null && key.length() > MAX_ORDERING_KEY_LENGTH) {
             // 提前失败：否则要等到发送时才由 LinkoraMessage 抛异常，那时消息已进死信
-            throw new IllegalArgumentException("orderingKey 长度不得超过 "
+            throw new IllegalArgumentException("sequenceKey 长度不得超过 "
                     + MAX_ORDERING_KEY_LENGTH + "（实际 " + key.length() + "）");
         }
-        this.orderingKey = key;
+        this.sequenceKey = key;
     }
 
     public String getMessageId() {
@@ -108,8 +108,8 @@ public final class OutboxEntry {
     }
 
     /** 顺序键，可为 null。 */
-    public String getOrderingKey() {
-        return orderingKey;
+    public String getSequenceKey() {
+        return sequenceKey;
     }
 
     /** 返回携带更新字段的新实例（不可变对象的变更语义）。 */
@@ -117,7 +117,7 @@ public final class OutboxEntry {
                             Long newNextRetryAt, String newLastError, long now) {
         return new OutboxEntry(messageId, messageType, payload, newStatus,
                 createdAt, now, newRetryCount, newNextRetryAt, expiresAt, newLastError,
-                orderingKey);
+                sequenceKey);
     }
 
     @Override
