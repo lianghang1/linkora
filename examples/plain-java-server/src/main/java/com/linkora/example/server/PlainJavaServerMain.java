@@ -103,9 +103,9 @@ public final class PlainJavaServerMain {
         context.addServlet(new ServletHolder(
                 new SsePushServlet(server.sseSubscribeHandler(), server.sseConnectionRegistry())), "/events");
         context.addServlet(new ServletHolder(
-                new LinkoraEndpointServlet(server.ingestHttpHandler())), "/messages");
+                new LinkoraEndpointServlet(server.ingestHttpHandler(), server.getMaxBodyBytes())), "/messages");
         context.addServlet(new ServletHolder(
-                new LinkoraEndpointServlet(server.ackHttpHandler())), "/acks");
+                new LinkoraEndpointServlet(server.ackHttpHandler(), server.getMaxBodyBytes())), "/acks");
         context.addServlet(new ServletHolder(new PlatformController(
                 new OrderService(server), new ReviewService(server),
                 orderStatusHandler, reviewReplyHandler)), "/api/*");
