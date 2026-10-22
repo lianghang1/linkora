@@ -7,14 +7,14 @@
     <parent>
         <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0</version>
     </parent>
 
     <artifactId>linkora-spring</artifactId>
     <packaging>jar</packaging>
 
     <name>Linkora Spring</name>
-    <description>Spring MVC 宿主装配辅助：从容器 SPI bean 组装 LinkoraServer，并把三个端点 Servlet 注册进任意 ServletContext；按需启用 LinkoraClient 客户端装配（不依赖 Spring Boot）。含 JDBC/SQLite 默认存储实现，宿主可换自实现。</description>
+    <description>Spring MVC 宿主装配辅助：从容器 SPI bean 组装 LinkoraServer，并把三个端点 Servlet 注册进任意 ServletContext；按需启用 LinkoraClient 客户端装配（不依赖 Spring Boot）。含服务端 JDBC 与客户端 SQLite 默认存储（随 server/client 传递），宿主可换自实现。</description>
 
     <dependencies>
         <dependency>
@@ -22,21 +22,10 @@
             <artifactId>linkora-server</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- JDBC 存储：默认存储实现（宿主可换自实现接管事务） -->
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-server-storage-jdbc</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <!-- 客户端编排与 SQLite 存储：客户端装配（@Import 显式启用）所需 -->
+        <!-- 客户端编排（含 OkHttp 传输与 SQLite 存储）：客户端装配（@Import 显式启用）所需 -->
         <dependency>
             <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-client</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-client-storage-sqlite</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

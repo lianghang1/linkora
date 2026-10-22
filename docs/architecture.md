@@ -36,12 +36,9 @@
 
 | 模块 | 职责 |
 |---|---|
-| linkora-core | 消息模型、状态机、错误码、ACK 语义枚举、序列化抽象、服务端/客户端存储 SPI |
-| linkora-client | 客户端生命周期、SSE 接收、outbox 发送调度、ACK 流程、重连退避 |
-| linkora-server | 消息路由、多客户端管理、投递状态协调、补发、死信管理 |
-| linkora-client-storage-sqlite | 独立 SQLite 文件（lk_outbox/lk_inbox/lk_meta），不触碰业务数据库 |
-| linkora-server-storage-jdbc | 服务端持久化（消息正文 + 投递状态分离），CI 覆盖 H2/MySQL 8/PostgreSQL |
-| linkora-transport | 传输实现合集：HTTPS POST、超时、错误分类（OkHttp）；SSE 客户端接收（okhttp-sse）；Servlet async 服务端输出适配 |
+| linkora-core | 消息模型、状态机、错误码、ACK 语义枚举、序列化抽象、服务端/客户端存储 SPI、Jackson 默认序列化（LinkoraJsonUtil） |
+| linkora-client | 客户端生命周期、OkHttp 传输（SSE 接收 + POST 上行）、outbox 发送调度、ACK 流程、重连退避、SQLite 本地存储（lk_outbox/lk_inbox/lk_meta） |
+| linkora-server | 消息路由、多客户端管理、投递状态协调、补发、死信管理、JDBC 持久化（消息正文 + 投递状态分离）与 Servlet async 输出适配 |
 | linkora-spring / starter | 可选集成，不强制 |
 | linkora-testkit | 嵌入式测试服务端（Jetty 9.4）、故障注入工具 |
 

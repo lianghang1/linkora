@@ -38,7 +38,7 @@ import java.util.Map;
 /**
  * 服务端自动装配：宿主提供 {@link DataSource} 即获得 LinkoraServer 与三端点 Servlet。
  *
- * <p>默认使用 linkora-server-storage-jdbc 的 JDBC 仓储；宿主定义自己的
+ * <p>默认使用 linkora-server 内置的 JDBC 仓储；宿主定义自己的
  * Repository/Registry bean（如借助 TransactionAwareDataSourceProxy 接管事务，
  * 见 docs/storage-spi.md）即可整体覆盖。宿主定义自己的 {@link LinkoraServer}
  * bean 时本配置的 server bean 退位，但三端点 Servlet 仍会注册到该实例上。</p>

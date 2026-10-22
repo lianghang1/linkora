@@ -147,12 +147,12 @@ public class JdbcServerStorageTest {
         repo.init(record("m-2", "c-1", 1, MessageState.CREATED));
 
         assertTrue(repo.compareAndSetState("m-2", "c-1", MessageState.CREATED,
-                MessageState.RECEIVED, null, null, 0));
+                MessageState.RECEIVED, null, null, 0, 0));
         // 旧期望重复 CAS（如迟到的重复 ACK）：失败，状态不回退
         assertFalse(repo.compareAndSetState("m-2", "c-1", MessageState.CREATED,
-                MessageState.RECEIVED, null, null, 0));
+                MessageState.RECEIVED, null, null, 0, 0));
         assertTrue(repo.compareAndSetState("m-2", "c-1", MessageState.RECEIVED,
-                MessageState.PROCESSED, null, null, 0));
+                MessageState.PROCESSED, null, null, 0, 0));
         assertEquals(MessageState.PROCESSED, repo.find("m-2", "c-1").get().getState());
     }
 
@@ -172,7 +172,7 @@ public class JdbcServerStorageTest {
                     try {
                         start.await();
                         boolean won = repo.compareAndSetState("m-race", "c-1",
-                                MessageState.CREATED, MessageState.RECEIVED, null, null, 0);
+                                MessageState.CREATED, MessageState.RECEIVED, null, null, 0, 0);
                         if (won) {
                             winners.incrementAndGet();
                         }

@@ -104,6 +104,9 @@ public final class SsePushServlet extends HttpServlet {
         SseClientConnection connection = new SseClientConnection(
                 clientId, asyncContext, response, new DisconnectAdapter());
 
+        // 先注册再交给 handler（handler 会在订阅成功后提交重连补发）：
+        // 保证补发首推时连接已在注册表内，否则首推落空需等一个扫描周期
+        registry.register(connection);
         boolean accepted;
         try {
             accepted = handler.onSubscribe(clientId, lastEventId, snapshotHeaders(request), connection);
@@ -112,12 +115,12 @@ public final class SsePushServlet extends HttpServlet {
             accepted = false;
         }
         if (!accepted || !connection.isOpen()) {
+            registry.unregister(connection);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             asyncContext.complete();
             return;
         }
 
-        registry.register(connection);
         writeInitialFrames(connection);
         scheduleHeartbeat(connection);
         log.debug("SSE 订阅建立: clientId={}, lastEventId={}", clientId, lastEventId);

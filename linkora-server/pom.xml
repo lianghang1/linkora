@@ -7,24 +7,19 @@
     <parent>
         <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0</version>
     </parent>
 
     <artifactId>linkora-server</artifactId>
     <packaging>jar</packaging>
 
     <name>Linkora Server</name>
-    <description>服务端编排：先持久化后推送、重连补发、重试调度、消息接入与 ACK 状态机。</description>
+    <description>服务端编排：JDBC 持久化、先持久化后推送、重连补发、重试调度、消息接入与 ACK 状态机。</description>
 
     <dependencies>
         <dependency>
             <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-serialize-jackson</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -36,13 +31,7 @@
             <artifactId>javax.servlet-api</artifactId>
             <scope>provided</scope>
         </dependency>
-        <!-- 测试依赖：H2 + Jetty 用于端到端验证（生产由宿主提供数据库与容器） -->
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-server-storage-jdbc</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
+        <!-- 测试依赖：H2 + Jetty 用于端到端验证；MySQL 真实库回归见 JdbcServerStorageMySqlIT（生产由宿主提供数据库与容器） -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
@@ -62,6 +51,13 @@
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp-sse</artifactId>
+        </dependency>
+        <!-- MySQL 8 真实库回归（JdbcServerStorageMySqlIT），仅测试作用域 -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.33</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

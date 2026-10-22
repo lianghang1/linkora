@@ -130,9 +130,12 @@ public class SseStreamClientTest {
 
     @Test
     public void receivesEventsIncludingHeartbeat() throws Exception {
-        // 心跳按两端约定以 event: hb 事件发送（okhttp-sse 不透出注释行）
+        // 心跳按两端约定以 event: hb 事件发送（okhttp-sse 不透出注释行）。
+        // 字节限流延迟流 EOF：否则 mock 数据读完立即重连，OPEN 状态与
+        // 重连后的 CONNECTING 存在轮询竞态，断言结果取决于线程调度快慢。
         server.enqueue(sseResponse("id: 1\nevent: ORDER_CREATED\ndata: hello\n\n"
-                + "event: hb\ndata: hb\n\ndata: second\n\n"));
+                + "event: hb\ndata: hb\n\ndata: second\n\n")
+                .throttleBody(16L, 100L, TimeUnit.MILLISECONDS));
 
         SseStreamClient sse = newClient();
         sse.start();

@@ -42,15 +42,18 @@ git add -A; git commit -m '进入 0.3.0-SNAPSHOT 开发'
 
 ## 发版核对清单
 
-1. **组件清单必须只有 10 个**：parent + core/transport/serialize-jackson/server/client/
-   client-storage-sqlite/server-storage-jdbc/spring/spring-boot-starter。
+1. **组件清单必须只有 7 个**：parent + core/client/server/spring/spring-boot-starter
+   （0.2.0 起模块合并为 6 个 SDK jar：serialize-jackson 并入 core、transport 与
+   client-storage-sqlite 并入 client、server-storage-jdbc 并入 server）。
    出现任何 `linkora-example-*` / `linkora-testkit` → **立即 Drop，严禁 Publish**
    （Central 发布后永久不可删除）。
 2. 新增示例模块时，必须把新 artifactId 追加进根 pom 插件配置的 **`excludeArtifacts`**
    （该插件不识别 `maven.deploy.skip` 属性，漏加就会把示例发上 Central）。
 3. `mvn versions:set` 只改 `<version>`，**不会**更新示例应用的 `linkora.version` 属性——
-   四个 spring-boot/mvc 示例固定引用已发布正式包，发版后手动把它们升到新版本并冒烟验证
-   （见 [examples/spring-boot-server](../examples/spring-boot-server/README.md)）。
+   发版前手动把四个 spring-boot/mvc 示例的 `linkora.version`（及示例自身 `<version>`）
+   升到目标版本，先 `mvn install` 把正式包装进本地仓库再 `-f` 冒烟验证；
+   Publish 成功后清掉本地仓库对应版本目录，重新 `-f` 构建确认真实从 Central 拉包
+   （日志出现 `Downloading from sfi: .../io/github/lianghang1/...` 即为证明）。
 
 ## 已踩过的坑
 

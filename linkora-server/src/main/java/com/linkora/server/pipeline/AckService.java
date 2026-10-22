@@ -20,7 +20,9 @@ import java.nio.charset.StandardCharsets;
  * ACK 处理服务（幂等）：
  * <ul>
  *   <li>RECEIVED：推进 ACCEPTED/CREATED → RECEIVED；重复 ACK 不回退已完成状态；</li>
- *   <li>PROCESSED：若接收 ACK 丢失则先补推 RECEIVED 再推进 PROCESSED；重复 ACK 幂等；</li>
+ *   <li>PROCESSED：若接收 ACK 丢失则先补推 RECEIVED 再推进 PROCESSED；
+ *       重试中（RETRYING，含 FAILED 经 RETRYING 中转）收到处理成功同样终结为 PROCESSED；
+ *       重复 ACK 幂等；</li>
  *   <li>FAILED：累计失败计数，未超阈值转 RETRYING（调度重投），超阈值进入死信；</li>
  *   <li>未知 messageId 一律返回 OK（消息可能已被保留策略清理），由服务端日志记录。</li>
  * </ul>
@@ -109,9 +111,11 @@ public final class AckService {
             return AckResult.ok(); // 幂等：不能回退已完成状态
         }
         if (deliveryRepository.compareAndSetState(messageId, clientId,
-                MessageState.ACCEPTED, MessageState.RECEIVED, null, null, record.getRetryCount())
+                MessageState.ACCEPTED, MessageState.RECEIVED, null, null,
+                record.getRetryCount(), record.getRetryCount())
                 || deliveryRepository.compareAndSetState(messageId, clientId,
-                MessageState.CREATED, MessageState.RECEIVED, null, null, record.getRetryCount())) {
+                MessageState.CREATED, MessageState.RECEIVED, null, null,
+                record.getRetryCount(), record.getRetryCount())) {
             log.debug("客户端已持久化接收: messageId={}, clientId={}", messageId, clientId);
             return AckResult.ok();
         }
@@ -135,24 +139,59 @@ public final class AckService {
         // 接收 ACK 丢失时的前向补推：ACCEPTED/CREATED → RECEIVED（失败忽略，随后直接尝试 PROCESSED）
         if (state == MessageState.ACCEPTED) {
             deliveryRepository.compareAndSetState(messageId, clientId,
-                    MessageState.ACCEPTED, MessageState.RECEIVED, null, null, record.getRetryCount());
+                    MessageState.ACCEPTED, MessageState.RECEIVED, null, null,
+                    record.getRetryCount(), record.getRetryCount());
         } else if (state == MessageState.CREATED) {
             deliveryRepository.compareAndSetState(messageId, clientId,
-                    MessageState.CREATED, MessageState.RECEIVED, null, null, record.getRetryCount());
+                    MessageState.CREATED, MessageState.RECEIVED, null, null,
+                    record.getRetryCount(), record.getRetryCount());
         }
-        if (deliveryRepository.compareAndSetState(messageId, clientId,
-                MessageState.RECEIVED, MessageState.PROCESSED, null, null, record.getRetryCount())) {
-            log.debug("业务处理成功: messageId={}, clientId={}", messageId, clientId);
+        // 正常路径 RECEIVED → PROCESSED；重投路径 RETRYING → PROCESSED（重试中客户端处理成功）
+        if (advanceToProcessed(messageId, clientId, MessageState.RECEIVED, record.getRetryCount())
+                || advanceToProcessed(messageId, clientId, MessageState.RETRYING, record.getRetryCount())) {
             return AckResult.ok();
         }
         DeliveryRecord latest = deliveryRepository.find(messageId, clientId).orElse(record);
         if (latest.getState() == MessageState.PROCESSED) {
             return AckResult.ok();
         }
+        if (latest.getState() == MessageState.FAILED) {
+            // 重投前窗口收到处理成功：状态模型不允许 FAILED 直接跳 PROCESSED，
+            // 经 RETRYING 中转（两步 CAS）；竞争失败则重读按幂等判定
+            if (deliveryRepository.compareAndSetState(messageId, clientId,
+                    MessageState.FAILED, MessageState.RETRYING, latest.getLastError(), null,
+                    latest.getRetryCount(), latest.getRetryCount())
+                    && advanceToProcessed(messageId, clientId, MessageState.RETRYING,
+                    latest.getRetryCount())) {
+                return AckResult.ok();
+            }
+            latest = deliveryRepository.find(messageId, clientId).orElse(latest);
+            if (latest.getState() == MessageState.PROCESSED) {
+                return AckResult.ok();
+            }
+        }
+        if (latest.getState() == MessageState.EXPIRED || latest.getState() == MessageState.DEAD_LETTER) {
+            // 终态不可回退：过期/死信后迟到的处理成功 ACK 幂等接受（状态保持终态），
+            // 返回 OK 让客户端不再重复补发，避免无意义的拒绝告警
+            log.debug("终态 {} 收到 PROCESSED ACK，幂等接受: messageId={}, clientId={}",
+                    latest.getState(), messageId, clientId);
+            return AckResult.ok();
+        }
         log.warn("PROCESSED ACK 状态冲突（当前 {}）: messageId={}, clientId={}",
                 latest.getState(), messageId, clientId);
         return AckResult.rejected(LinkoraErrorCode.INTERNAL_ERROR,
                 "当前状态 " + latest.getState() + " 不允许推进到 PROCESSED");
+    }
+
+    /** 推进到 PROCESSED（retry_count 保持不变）。 */
+    private boolean advanceToProcessed(String messageId, String clientId,
+                                       MessageState expected, int retryCount) {
+        boolean moved = deliveryRepository.compareAndSetState(messageId, clientId,
+                expected, MessageState.PROCESSED, null, null, retryCount, retryCount);
+        if (moved) {
+            log.debug("业务处理成功: messageId={}, clientId={}", messageId, clientId);
+        }
+        return moved;
     }
 
     private AckResult handleFailed(DeliveryRecord record, MessageJsonCodec.WireAck wireAck) {
@@ -168,7 +207,8 @@ public final class AckService {
                 + (wireAck.getErrorMessage() == null ? "" : ": " + wireAck.getErrorMessage());
         if (nextRetryCount >= config.getMaxDeliveryRetries()) {
             if (deliveryRepository.compareAndSetState(messageId, clientId, state,
-                    MessageState.DEAD_LETTER, error, null, nextRetryCount)) {
+                    MessageState.DEAD_LETTER, error, null,
+                    record.getRetryCount(), nextRetryCount)) {
                 log.warn("失败次数耗尽，进入死信: messageId={}, clientId={}, retryCount={}",
                         messageId, clientId, nextRetryCount);
             } else {
@@ -183,14 +223,16 @@ public final class AckService {
         MessageState source = state;
         if (source == MessageState.ACCEPTED || source == MessageState.CREATED) {
             deliveryRepository.compareAndSetState(messageId, clientId, source,
-                    MessageState.RECEIVED, null, null, record.getRetryCount());
+                    MessageState.RECEIVED, null, null,
+                    record.getRetryCount(), record.getRetryCount());
             source = deliveryRepository.find(messageId, clientId)
                     .orElse(record).getState();
         }
         if (source == MessageState.RECEIVED || source == MessageState.FAILED
                 || source == MessageState.RETRYING) {
             if (deliveryRepository.compareAndSetState(messageId, clientId, source,
-                    MessageState.FAILED, error, nextRetryAt, nextRetryCount)) {
+                    MessageState.FAILED, error, nextRetryAt,
+                    record.getRetryCount(), nextRetryCount)) {
                 log.debug("业务处理失败，调度重试 #{}: messageId={}, clientId={}, nextRetryAt={}",
                         nextRetryCount, messageId, clientId, nextRetryAt);
             } else {

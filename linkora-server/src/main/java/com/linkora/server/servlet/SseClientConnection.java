@@ -29,6 +29,11 @@ public final class SseClientConnection {
 
     private final Object writeLock = new Object();
     private final AtomicBoolean closed = new AtomicBoolean(false);
+    /**
+     * 认证通过标记：置位前 broadcast 跳过该连接。连接先注册后认证的时序下，
+     * 防止未认证连接在认证耗时窗口内经并发 sweep 收到目标 clientId 的消息内容。
+     */
+    private final AtomicBoolean readyForPush = new AtomicBoolean(false);
     private final AtomicReference<ScheduledFuture<?>> heartbeatTask =
             new AtomicReference<ScheduledFuture<?>>();
 
@@ -53,6 +58,18 @@ public final class SseClientConnection {
     }
 
     /**
+     * 认证通过后由订阅 handler 置位；置位前广播推送跳过该连接。
+     * 必须在提交重连补发之前调用，保证补发首推能命中本连接。
+     */
+    public void markReadyForPush() {
+        readyForPush.set(true);
+    }
+
+    boolean isReadyForPush() {
+        return readyForPush.get();
+    }
+
+    /**
      * 发送完整事件帧（id/event/data）。多行 data 会按 SSE 规范拆分为多个 data 行。
      *
      * @return false 表示连接已关闭或写出失败（连接将被关闭）
@@ -68,6 +85,11 @@ public final class SseClientConnection {
 
     void setHeartbeatTask(ScheduledFuture<?> task) {
         heartbeatTask.set(task);
+        // 连接可能在心跳任务注册前已 close（此时 close 读到 null 无法取消）：
+        // 双检补偿取消，避免任务按固定周期空转并持有连接引用
+        if (closed.get() && heartbeatTask.compareAndSet(task, null)) {
+            task.cancel(false);
+        }
     }
 
     /** 服务端主动关闭（幂等）。 */

@@ -16,8 +16,13 @@ import java.util.Optional;
  */
 public interface MessageRepository {
 
-    /** 幂等保存消息正文。 */
-    void save(LinkoraMessage message);
+    /**
+     * 幂等保存消息正文。主键插入是并发去重的唯一仲裁点：
+     * 调用方依赖返回值区分"新消息"与"并发重复"，只有新插入才允许触发业务回调。
+     *
+     * @return true 表示新插入；false 表示 messageId 已存在（保留原记录）
+     */
+    boolean save(LinkoraMessage message);
 
     Optional<LinkoraMessage> findByMessageId(String messageId);
 }

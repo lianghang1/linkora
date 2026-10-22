@@ -29,9 +29,10 @@ import java.util.concurrent.Executor;
  * <ul>
  *   <li>推送只是"尽力写出"，写出成功 ≠ 客户端收到；唯一可靠信号是客户端 ACK，
  *       因此未完成消息会被周期性重推（指数节奏防风暴），客户端按 messageId 幂等去重；</li>
- *   <li>重连补发以客户端声明的 Last-Event-ID（seq）为起点，未声明时回退到
- *       服务端持久化游标；无论游标如何，周期扫描兜底覆盖一切未完成投递；</li>
- *   <li>过期消息停止投递并标记 EXPIRED（终态）；</li>
+ *   <li>重连补发以客户端声明的 Last-Event-ID（seq）为起点，未声明时按 0 全量补发；
+ *       无论游标如何，周期扫描兜底覆盖一切未完成投递（游标仅作观测，不参与调度决策）；</li>
+ *   <li>过期消息停止投递并标记 EXPIRED（终态）；死信（DEAD_LETTER）停止投递，
+ *       待人工介入推进状态后自然恢复；</li>
  *       <li>同一时刻只有一个执行线程调用本类写方法（由 LinkoraServer 的单线程执行器保证）。</li>
  * </ul>
  *
@@ -107,6 +108,9 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
         }
         clientRegistry.updateConnectionState(clientId,
                 com.linkora.core.storage.server.ConnectionState.CONNECTED, System.currentTimeMillis());
+        // 全部校验通过：置位推送就绪（先注册后认证时序下防止未认证连接收到业务数据），
+        // 随后提交的补发首推即可命中本连接
+        connection.markReadyForPush();
         long afterSeq = parseSeq(lastEventId);
         final String targetClient = clientId;
         executor.execute(new Runnable() {
@@ -185,6 +189,11 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
         String messageId = record.getMessageId();
         String clientId = record.getClientId();
         try {
+            // 死信停止投递：终态查询虽会过滤，但快照可能滞后；读正文前早退省 IO，
+            // 人工介入推进状态后由周期扫描自然恢复投递
+            if (record.getState() == MessageState.DEAD_LETTER) {
+                return;
+            }
             LinkoraMessage message = messageRepository.findByMessageId(messageId).orElse(null);
             if (message == null) {
                 log.warn("投递记录缺少消息正文，跳过推送: {}", record);
@@ -215,7 +224,8 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
                     // FAILED → RETRYING 后再推送；CAS 失败说明并发已推进，重读决定
                     boolean moved = deliveryRepository.compareAndSetState(messageId, clientId,
                             MessageState.FAILED, MessageState.RETRYING,
-                            record.getLastError(), null, record.getRetryCount());
+                            record.getLastError(), null,
+                            record.getRetryCount(), record.getRetryCount());
                     if (!moved) {
                         DeliveryRecord latest = deliveryRepository.find(messageId, clientId).orElse(null);
                         if (latest == null || latest.getState().isTerminal() || !isRetryState(latest.getState())) {
@@ -256,7 +266,8 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
                 MessageState.RECEIVED, MessageState.RETRYING, MessageState.FAILED};
         for (MessageState from : fromStates) {
             if (deliveryRepository.compareAndSetState(messageId, clientId,
-                    from, MessageState.EXPIRED, "消息已过期", null, record.getRetryCount())) {
+                    from, MessageState.EXPIRED, "消息已过期", null,
+                    record.getRetryCount(), record.getRetryCount())) {
                 return true;
             }
         }

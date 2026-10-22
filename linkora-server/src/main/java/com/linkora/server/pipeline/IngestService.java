@@ -103,7 +103,14 @@ public final class IngestService {
                     message.getMessageId(), request.getClientId());
             return IngestResult.duplicate(message.getMessageId());
         }
-        messageRepository.save(message);
+        boolean inserted = messageRepository.save(message);
+        if (!inserted) {
+            // 并发上报同一 messageId：先到者已持久化并回调业务监听器，
+            // 后到者必须止步于此，否则同一消息的业务 handler 会被执行两次
+            log.debug("并发重复上报（幂等命中）: messageId={}, clientId={}",
+                    message.getMessageId(), request.getClientId());
+            return IngestResult.duplicate(message.getMessageId());
+        }
         log.debug("消息已持久化接受: messageId={}, clientId={}, type={}",
                 message.getMessageId(), message.getClientId(), message.getMessageType());
         notifyListeners(message);

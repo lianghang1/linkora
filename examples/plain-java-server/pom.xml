@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-examples</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0</version>
     </parent>
 
     <artifactId>linkora-example-plain-java-server</artifactId>
@@ -20,16 +20,6 @@
         <dependency>
             <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-server</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-serialize-jackson</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-server-storage-jdbc</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 示例独立运行需要 servlet-api 在运行时类路径（生产中由宿主容器提供） -->

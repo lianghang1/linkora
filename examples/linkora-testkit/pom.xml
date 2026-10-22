@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-examples</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0</version>
     </parent>
 
     <artifactId>linkora-testkit</artifactId>
@@ -20,11 +20,6 @@
         <dependency>
             <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-server</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-server-storage-jdbc</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- dependencyManagement 中 Jetty/H2 为 test scope，本模块自身就是测试工具，显式提升为 compile -->
@@ -49,12 +44,6 @@
             <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-client</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-client-storage-sqlite</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>

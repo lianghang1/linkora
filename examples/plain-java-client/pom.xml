@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-examples</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0</version>
     </parent>
 
     <artifactId>linkora-example-plain-java-client</artifactId>
@@ -20,16 +20,6 @@
         <dependency>
             <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-client</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-serialize-jackson</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-client-storage-sqlite</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 示例需要自带日志实现，宿主环境通常已有 -->

@@ -6,7 +6,7 @@
 
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-parent</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <packaging>pom</packaging>
 
     <name>Linkora</name>
@@ -36,10 +36,6 @@
 
     <modules>
         <module>linkora-core</module>
-        <module>linkora-client-storage-sqlite</module>
-        <module>linkora-server-storage-jdbc</module>
-        <module>linkora-transport</module>
-        <module>linkora-serialize-jackson</module>
         <module>linkora-server</module>
         <module>linkora-client</module>
         <module>linkora-spring</module>

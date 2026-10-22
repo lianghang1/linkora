@@ -13,6 +13,8 @@ public interface SseSubscribeHandler {
     /**
      * 决定是否接受该订阅。返回 false 时适配器回写 401 并断开。
      * 实现 MUST 依据认证上下文校验 clientId，不能只信任请求参数。
+     * 接受订阅时 MUST 在返回前调用 {@code connection.markReadyForPush()}，
+     * 否则该连接不会收到任何广播推送（未就绪连接对广播不可见）。
      *
      * @param clientId    客户端声明标识（请求头 X-Linkora-Client-Id 或查询参数）
      * @param lastEventId 客户端携带的续传游标（Last-Event-ID 请求头），可为 null

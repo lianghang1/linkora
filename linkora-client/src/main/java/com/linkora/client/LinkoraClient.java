@@ -32,12 +32,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Linkora 客户端编排入口。
@@ -79,6 +81,8 @@ public final class LinkoraClient implements AutoCloseable {
     private final ExecutorService ioExecutor;
     private final ExecutorService workerExecutor;
     private final AtomicBoolean drainQueued = new AtomicBoolean(false);
+    /** 已见最大下行投递序号（SSE 事件 id），用于跳号检测；-1 表示尚未收到任何消息。 */
+    private final AtomicLong lastDownSeq = new AtomicLong(-1);
 
     private volatile SseStreamClient sseClient;
     private volatile ClientState state = ClientState.NEW;
@@ -193,6 +197,16 @@ public final class LinkoraClient implements AutoCloseable {
             return;
         }
         state = ClientState.CLOSED;
+        // 先取消调度任务再关执行器：外部调度器（ownsScheduler=false）不会被关闭，
+        // 不取消会让定时任务继续投递触发 RejectedExecutionException 噪音
+        ScheduledFuture<?> sender = senderTask;
+        if (sender != null) {
+            sender.cancel(false);
+        }
+        ScheduledFuture<?> recovery = recoveryTask;
+        if (recovery != null) {
+            recovery.cancel(false);
+        }
         SseStreamClient sse = sseClient;
         if (sse != null) {
             sse.close();
@@ -312,6 +326,7 @@ public final class LinkoraClient implements AutoCloseable {
             if (!SERVER_MESSAGE_EVENT_TYPE.equals(type)) {
                 return; // 心跳与未知类型忽略（服务端业务事件固定为 "msg"）
             }
+            trackDownSeq(id);
             final String payload = data;
             ioExecutor.execute(new Runnable() {
                 @Override
@@ -334,6 +349,28 @@ public final class LinkoraClient implements AutoCloseable {
     };
 
     // ---------------- IO 任务：下行接收 ----------------
+
+    // 跳号意味着区间内消息不会再来（已过期 EXPIRED 或被服务端清理），业务方需知晓可能缺数据；
+    // 补发与新消息并发推送时可能短暂乱序导致一次性误报，持续跳号才需排查
+    private void trackDownSeq(String id) {
+        if (id == null || id.isEmpty()) {
+            return;
+        }
+        long seq;
+        try {
+            seq = Long.parseLong(id);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        long last = lastDownSeq.get();
+        if (last >= 0 && seq > last + 1) {
+            log.warn("下行序号跳号: ({}, {})，区间内消息可能已过期或被清理而丢失", last, seq);
+        }
+        // 游标只前进不回退，乱序到达的补发消息不影响检测
+        while (seq > last && !lastDownSeq.compareAndSet(last, seq)) {
+            last = lastDownSeq.get();
+        }
+    }
 
     private void handleIncoming(String json) {
         if (state != ClientState.RUNNING) {
@@ -494,13 +531,19 @@ public final class LinkoraClient implements AutoCloseable {
     /** 合并去重的补传触发。 */
     private void submitDrain() {
         if (drainQueued.compareAndSet(false, true)) {
-            ioExecutor.execute(new Runnable() {
-                @Override
-                public void run() {
-                    drainQueued.set(false);
-                    drainOutbox();
-                }
-            });
+            try {
+                ioExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        drainQueued.set(false);
+                        drainOutbox();
+                    }
+                });
+            } catch (RejectedExecutionException e) {
+                // 与 close() 竞态：执行器已关闭。消息已在 outbox 落库，
+                // 重启后由恢复扫描补传，此处静默复位去重标记
+                drainQueued.set(false);
+            }
         }
     }
 
@@ -791,7 +834,7 @@ public final class LinkoraClient implements AutoCloseable {
             return this;
         }
 
-        /** 必填：本地持久化存储（生产使用 linkora-client-storage-sqlite）。 */
+        /** 必填：本地持久化存储（生产使用内置 SqliteClientStore）。 */
         public Builder clientStore(ClientStore store) {
             this.store = store;
             return this;

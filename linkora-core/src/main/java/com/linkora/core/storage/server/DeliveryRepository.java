@@ -27,17 +27,21 @@ public interface DeliveryRepository {
     Optional<DeliveryRecord> find(String messageId, String clientId);
 
     /**
-     * CAS 状态更新。
+     * CAS 状态更新。期望状态与期望 retry_count 必须同时匹配才写入，
+     * 防止过期快照无条件覆盖并发推进后的 retry_count（如迟到 ACK 回退失败计数）。
      *
-     * @param expected   期望的当前状态
-     * @param target     目标状态（合法性由调用方通过 MessageState 校验）
-     * @param lastError  可诊断错误信息，可为 null
-     * @param nextRetryAt 下次重试时间，可为 null
-     * @return true 表示写入成功；false 表示当前状态不等于 expected
+     * @param expected           期望的当前状态
+     * @param target             目标状态（合法性由调用方通过 MessageState 校验）
+     * @param lastError          可诊断错误信息，可为 null
+     * @param nextRetryAt        下次重试时间，可为 null
+     * @param expectedRetryCount 期望的当前失败计数
+     * @param newRetryCount      写入的新失败计数
+     * @return true 表示写入成功；false 表示当前状态或 retry_count 不等于期望
      */
     boolean compareAndSetState(String messageId, String clientId,
                                MessageState expected, MessageState target,
-                               String lastError, Long nextRetryAt, int retryCount);
+                               String lastError, Long nextRetryAt,
+                               int expectedRetryCount, int newRetryCount);
 
     /**
      * 查询指定客户端 seq 大于 afterSeqExclusive 的未完成消息（未到终态），

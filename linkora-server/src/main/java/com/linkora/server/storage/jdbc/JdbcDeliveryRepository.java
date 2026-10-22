@@ -102,20 +102,22 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
     @Override
     public boolean compareAndSetState(String messageId, String clientId,
                                       MessageState expected, MessageState target,
-                                      String lastError, Long nextRetryAt, int retryCount) {
+                                      String lastError, Long nextRetryAt,
+                                      int expectedRetryCount, int newRetryCount) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
                      "UPDATE lk_delivery SET state = ?, retry_count = ?, next_retry_at = ?, "
                              + "last_error = ?, updated_at = ? "
-                             + "WHERE message_id = ? AND client_id = ? AND state = ?")) {
+                             + "WHERE message_id = ? AND client_id = ? AND state = ? AND retry_count = ?")) {
             ps.setString(1, target.name());
-            ps.setInt(2, retryCount);
+            ps.setInt(2, newRetryCount);
             setNullableLong(ps, 3, nextRetryAt);
             setNullableString(ps, 4, lastError);
             ps.setLong(5, System.currentTimeMillis());
             ps.setString(6, messageId);
             ps.setString(7, clientId);
             ps.setString(8, expected.name());
+            ps.setInt(9, expectedRetryCount);
             return ps.executeUpdate() == 1;
         } catch (SQLException e) {
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,

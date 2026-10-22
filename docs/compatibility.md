@@ -76,11 +76,10 @@ Boot 宿主只引 `linkora-spring-boot-starter`，Spring MVC 宿主只引
 
 全家桶引入的代价与逃生门：
 
-- 纯服务端宿主也会传递携带客户端相关依赖（linkora-client、
-  client-storage-sqlite、sqlite-jdbc、okhttp/kotlin-stdlib，合计约 16MB）。
+- 纯服务端宿主也会传递携带客户端相关依赖（linkora-client 含 sqlite-jdbc、
+  okhttp/kotlin-stdlib，合计约 16MB）。
   未使用的类不会初始化，native 库不会加载，**无运行时代价，仅打包体积**；
-  在意的宿主可用 `<exclusions>` 排除 `linkora-client` 与
-  `linkora-client-storage-sqlite`；
+  在意的宿主可用 `<exclusions>` 排除 `linkora-client`；
 - 宿主自身 classpath 已有 okhttp 或 sqlite-jdbc 时，用
   `dependencyManagement` 将其锁定为与本 SDK 相同的版本（见上方依赖矩阵），
   避免 Maven 就近原则仲裁出不兼容版本。

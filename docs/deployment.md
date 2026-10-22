@@ -66,7 +66,7 @@ context.addServlet(new ServletHolder(
 
 ## 客户端部署
 
-- 引入 `linkora-client` + `linkora-client-storage-sqlite`；
+- 引入 `linkora-client`（自带 OkHttp 传输与 SQLite 本地存储）；
 - SQLite 库文件位置：`new SqliteClientStore(Path)`（父目录自动创建）；
   **每个客户端实例独占一个库文件**，多实例共享同一文件会被 WAL 锁竞争拖慢；
 - 磁盘要求：消息积压上限 ≈ 未送达消息量，按业务峰值估算；

@@ -7,6 +7,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * 按 clientId 组织的 SSE 连接注册表。线程安全。
  * 同一 clientId 允许存在多条并发连接（如客户端重连竞态窗口），
@@ -16,6 +19,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class SseConnectionRegistry {
 
+    private static final Logger log = LoggerFactory.getLogger(SseConnectionRegistry.class);
+
     private final ConcurrentHashMap<String, List<SseClientConnection>> connections =
             new ConcurrentHashMap<String, List<SseClientConnection>>();
 
@@ -23,7 +28,15 @@ public final class SseConnectionRegistry {
         List<SseClientConnection> list = new CopyOnWriteArrayList<SseClientConnection>();
         List<SseClientConnection> existing = connections.putIfAbsent(
                 connection.getClientId(), list);
-        (existing == null ? list : existing).add(connection);
+        List<SseClientConnection> target = existing == null ? list : existing;
+        target.add(connection);
+        int size = target.size();
+        if (size > 1) {
+            // 正常仅为重连竞态窗口（旧连接即将 unregister）；若持续出现，通常是同一 clientId
+            // 的配置/token 被复制到了多台设备——多台会同时消费下行并各自 ACK，产生业务级重复处理
+            log.warn("同一 clientId 存在 {} 条并发 SSE 连接: clientId={}（短时出现属重连竞态，"
+                    + "持续出现需排查配置是否被复制到多台设备）", size, connection.getClientId());
+        }
     }
 
     public void unregister(SseClientConnection connection) {
@@ -52,6 +65,10 @@ public final class SseConnectionRegistry {
     public int broadcast(String clientId, String id, String event, String data) {
         int delivered = 0;
         for (SseClientConnection connection : getConnections(clientId)) {
+            if (!connection.isReadyForPush()) {
+                // 未通过认证的连接不接收业务数据（认证失败即将被注销）
+                continue;
+            }
             if (connection.sendEvent(id, event, data)) {
                 delivered++;
             }

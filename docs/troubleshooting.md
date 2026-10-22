@@ -93,6 +93,22 @@ classpath 中存在**多个版本**的 sqlite-jdbc，native 库加载冲突。
 SLF4J 门面缺少实现：宿主加入任一实现（logback / log4j2 / slf4j-simple）。
 缺实现时 SLF4J 退化为 NOP，SDK 自身不报错。
 
+### 时间字段直读不直观（BIGINT epoch 毫秒）
+
+时间列（`created_at/expires_at/next_retry_at/last_active_at` 等）统一存
+epoch 毫秒：规避 JDBC `TIMESTAMP` 的时区换算漂移（宿主 JVM 时区 × 数据库
+会话时区不一致导致值失真）与各库日期类型方言差异。查库排查时用函数即时转换：
+
+```sql
+-- MySQL：按会话时区显示，通常即可读
+SELECT message_id, FROM_UNIXTIME(created_at / 1000) AS created_at
+FROM lk_message ORDER BY created_at DESC LIMIT 20;
+
+-- H2：DATEADD 以 epoch 基准换算，结果为 UTC 墙上时间（北京时间需 +8h）
+SELECT message_id, DATEADD('MILLISECOND', created_at, TIMESTAMP '1970-01-01 00:00:00') AS created_at
+FROM lk_message ORDER BY created_at DESC LIMIT 20;
+```
+
 ### 死消息/历史数据清理
 
 - 客户端：SERVER_ACCEPTED outbox 与已完成 inbox 按

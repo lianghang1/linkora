@@ -7,12 +7,12 @@ Linkora 把持久化抽象为两端独立的 SPI，上层编排（linkora-server
 
 | 端 | 接口 | 模块 | 默认实现 |
 |---|---|---|---|
-| 服务端 | `MessageRepository` | linkora-core | `JdbcMessageRepository`（linkora-server-storage-jdbc） |
+| 服务端 | `MessageRepository` | linkora-core | `JdbcMessageRepository`（linkora-server） |
 | 服务端 | `DeliveryRepository` | linkora-core | `JdbcDeliveryRepository` |
 | 服务端 | `ClientRegistry` | linkora-core | `JdbcClientRegistry` |
 | 服务端 | `ClientCursorRepository` | linkora-core | `JdbcClientCursorRepository` |
-| 服务端 | schema 迁移 | — | `JdbcServerSchema.migrate(DataSource)`（linkora-server-storage-jdbc） |
-| 客户端 | `ClientStore` | linkora-core | `SqliteClientStore`（linkora-client-storage-sqlite） |
+| 服务端 | schema 迁移 | — | `JdbcServerSchema.migrate(DataSource)`（linkora-server） |
+| 客户端 | `ClientStore` | linkora-core | `SqliteClientStore`（linkora-client） |
 
 关联数据类：服务端 `DeliveryRecord` / `ClientRegistration`；客户端 `OutboxEntry` / `InboxEntry`。
 
@@ -154,21 +154,21 @@ lk_delivery        投递状态            (message_id+client_id PK, seq, state,
 
 | 端 | 测试类 | 覆盖点 |
 |---|---|---|
-| 客户端 SQLite | `SqliteClientStoreHostTxTest`（linkora-client-storage-sqlite） | 宿主事务内迁移 + outbox/inbox/meta 写入：未提交对外不可见、回滚全部消失、提交全部生效；`close()` 不关闭宿主连接；CAS 推进随宿主回滚消失 |
-| 服务端 H2 | `JdbcServerStorageTest`（linkora-server-storage-jdbc，seq ambient 用例） | seq 分配加入宿主事务：未提交不可见、回滚后可重新分配、宿主连接 autoCommit 状态不被仓储破坏 |
-| 服务端 MySQL 真实库 | `JdbcServerHostTransactionMySqlIT`（linkora-server-storage-jdbc） | ① 五类写路径（注册/消息/投递/seq/游标）在宿主事务内同生共死，seq 落库值正确；② seq 分配的独立回滚语义 + 提交后独立分配正常续号；③ 宿主提交后 CAS 推进与接管写入共存 |
+| 客户端 SQLite | `SqliteClientStoreHostTxTest`（linkora-client） | 宿主事务内迁移 + outbox/inbox/meta 写入：未提交对外不可见、回滚全部消失、提交全部生效；`close()` 不关闭宿主连接；CAS 推进随宿主回滚消失 |
+| 服务端 H2 | `JdbcServerStorageTest`（linkora-server，seq ambient 用例） | seq 分配加入宿主事务：未提交不可见、回滚后可重新分配、宿主连接 autoCommit 状态不被仓储破坏 |
+| 服务端 MySQL 真实库 | `JdbcServerHostTransactionMySqlIT`（linkora-server） | ① 五类写路径（注册/消息/投递/seq/游标）在宿主事务内同生共死，seq 落库值正确；② seq 分配的独立回滚语义 + 提交后独立分配正常续号；③ 宿主提交后 CAS 推进与接管写入共存 |
 
 运行命令：
 
 ```
 # 客户端 SQLite 接管测试（纯单元，无需外部数据库）
-mvn -pl linkora-client-storage-sqlite test
+mvn -pl linkora-client test
 
 # 服务端 H2 全量（含 seq 接管用例）
-mvn -pl linkora-server-storage-jdbc test
+mvn -pl linkora-server test
 
 # 服务端 MySQL 真实库接管回归（MySQL 5.7 / 8 均验证过，单行执行）
-mvn -pl linkora-server-storage-jdbc "-Dtest=JdbcServerHostTransactionMySqlIT" test "-Dlinkora.it.mysql=true" "-Dlinkora.it.mysql.password=密码"
+mvn -pl linkora-server "-Dtest=JdbcServerHostTransactionMySqlIT" test "-Dlinkora.it.mysql=true" "-Dlinkora.it.mysql.password=密码"
 ```
 
 实测结果（2026-10-22，本机 MySQL 5.7.25 / H2 / SQLite）：客户端 17/17、

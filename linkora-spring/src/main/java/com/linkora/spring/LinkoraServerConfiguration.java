@@ -22,7 +22,7 @@ import java.util.stream.Collectors;
  *
  * <p>使用方式：宿主提供 {@link ClientRegistry} / {@link MessageRepository} /
  * {@link DeliveryRepository} / {@link ClientCursorRepository} 四个 bean
- * （可直接用 linkora-server-storage-jdbc 的 JDBC 实现，也可自实现接管事务，
+ * （可直接用 linkora-server 内置的 JDBC 实现，也可自实现接管事务，
  * 见 docs/storage-spi.md），本配置负责组装与生命周期
  * （上下文刷新时 start，销毁时 close，两者均幂等）。</p>
  *

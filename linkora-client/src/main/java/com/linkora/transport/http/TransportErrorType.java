@@ -14,8 +14,12 @@ public enum TransportErrorType {
     /** 读写超时（含 HTTP 408），默认可重试。注意：超时 ≠ 服务端一定没有写入。 */
     TIMEOUT(true),
 
-    /** 线程被中断，默认不重试（由调用方决定恢复语义）。 */
-    INTERRUPTED(false),
+    /**
+     * 线程被中断，默认可重试：中断只代表本地等待终止，请求可能已发出也可能未发出，
+     * 两种情况重试都安全（服务端按 messageId 幂等去重）。关闭期中断的消息转入
+     * FAILED 等重启补传，不得直接判死信。
+     */
+    INTERRUPTED(true),
 
     /** 4xx 客户端错误（不含 408/429），默认不可重试——重试同样会失败。 */
     CLIENT_ERROR(false),

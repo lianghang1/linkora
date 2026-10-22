@@ -7,16 +7,29 @@
     <parent>
         <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.2.0</version>
     </parent>
 
     <artifactId>linkora-core</artifactId>
     <packaging>jar</packaging>
 
     <name>Linkora Core</name>
-    <description>消息模型、状态机、错误码、序列化抽象与服务端/客户端存储 SPI。零第三方运行时依赖。</description>
+    <description>消息模型、状态机、错误码、序列化抽象与服务端/客户端存储 SPI，含基于 Jackson 的默认序列化实现。</description>
 
     <dependencies>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <!-- Jackson 版本统一由父 pom 锁定 2.17.2，防宿主 BOM 压版本导致混装 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

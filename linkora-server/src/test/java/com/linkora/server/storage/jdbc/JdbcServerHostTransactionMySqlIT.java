@@ -31,7 +31,7 @@ import static org.junit.Assert.assertTrue;
  * 立即全局可见，事务性只有版本记录与 DML——本套测试聚焦 DML 写路径。</p>
  *
  * <pre>
- *   mvn -pl linkora-server-storage-jdbc "-Dtest=JdbcServerHostTransactionMySqlIT" test \
+ *   mvn -pl linkora-server "-Dtest=JdbcServerHostTransactionMySqlIT" test \
  *       "-Dlinkora.it.mysql=true" "-Dlinkora.it.mysql.password=密码"
  * </pre>
  *
@@ -328,7 +328,7 @@ public class JdbcServerHostTransactionMySqlIT {
 
             JdbcDeliveryRepository standalone = new JdbcDeliveryRepository(real);
             assertTrue(standalone.compareAndSetState("m-cas", "c-1",
-                    MessageState.CREATED, MessageState.RECEIVED, null, null, 0));
+                    MessageState.CREATED, MessageState.RECEIVED, null, null, 0, 0));
             assertEquals(MessageState.RECEIVED,
                     standalone.find("m-cas", "c-1").get().getState());
         } finally {

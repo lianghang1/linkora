@@ -23,7 +23,7 @@
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring-boot-starter</artifactId> <!-- 或 linkora-spring -->
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -37,7 +37,7 @@
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring-boot-starter</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -142,7 +142,7 @@ boolean accepted = uplinkPublisher.awaitServerAccepted(messageId, 30_000);
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -185,7 +185,7 @@ LinkoraServlets.register(linkoraServer, servletContext); // 一行
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -231,7 +231,7 @@ linkora.client.db-path=data/client.db
    宿主自身也用 SQLite 时，用 `dependencyManagement` 锁定为与 SDK 相同的版本（3.46.1.3），
    多版本共存会报 native 库初始化错误。
 6. 全家桶传递依赖约 16MB（客户端能力 + SQLite + OkHttp）。纯服务端宿主在意体积时，
-   用 `<exclusions>` 排除 `linkora-client` 与 `linkora-client-storage-sqlite` 即可，
+   用 `<exclusions>` 排除 `linkora-client` 即可（OkHttp 与 SQLite 随客户端传递），
    未使用的类不会初始化、native 库不会加载，无运行时代价。
 
 **存储**

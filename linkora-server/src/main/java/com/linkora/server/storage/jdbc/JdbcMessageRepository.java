@@ -38,7 +38,7 @@ public final class JdbcMessageRepository implements MessageRepository {
     }
 
     @Override
-    public void save(LinkoraMessage message) {
+    public boolean save(LinkoraMessage message) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
                      "INSERT INTO lk_message (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?)")) {
@@ -51,8 +51,10 @@ public final class JdbcMessageRepository implements MessageRepository {
             ps.setInt(7, message.getSchemaVersion());
             setNullableString(ps, 8, message.getTraceId());
             ps.executeUpdate();
+            return true;
         } catch (SQLIntegrityConstraintViolationException duplicate) {
             // 幂等语义：messageId 已存在，保留原记录、不覆盖、不报错
+            return false;
         } catch (SQLException e) {
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
                     "保存消息失败: " + message.getMessageId(), e, message.getMessageId());

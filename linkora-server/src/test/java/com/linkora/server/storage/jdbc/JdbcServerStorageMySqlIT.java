@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  * CAS 竞争、seq 并发分配、游标单调、注册表幂等。默认跳过，需真实库时开启：
  *
  * <pre>
- *   mvn -pl linkora-server-storage-jdbc "-Dtest=JdbcServerStorageMySqlIT" test \
+ *   mvn -pl linkora-server "-Dtest=JdbcServerStorageMySqlIT" test \
  *       "-Dlinkora.it.mysql=true" "-Dlinkora.it.mysql.password=你的密码"
  * </pre>
  *
@@ -178,7 +178,7 @@ public class JdbcServerStorageMySqlIT {
                     try {
                         start.await();
                         boolean won = repo.compareAndSetState("m-race", "c-1",
-                                MessageState.CREATED, MessageState.RECEIVED, null, null, 0);
+                                MessageState.CREATED, MessageState.RECEIVED, null, null, 0, 0);
                         if (won) {
                             winners.incrementAndGet();
                         }

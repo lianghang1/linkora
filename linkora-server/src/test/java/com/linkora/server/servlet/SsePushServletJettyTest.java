@@ -290,7 +290,11 @@ public class SsePushServletJettyTest {
             if (onSubscribeHook != null) {
                 return onSubscribeHook.onSubscribe(clientId, lastEventId, headers, connection);
             }
-            return !rejectAll;
+            boolean accepted = !rejectAll;
+            if (accepted) {
+                connection.markReadyForPush();
+            }
+            return accepted;
         }
 
         @Override
