@@ -10,7 +10,7 @@
 
 只想用起来，看下面的两种宿主模式即可；想了解核心实现，见文末[文档导航](#文档导航)。
 
-## 选你的宿主模式
+## 快速开始：选你的宿主模式
 
 无论服务端还是客户端，**每个角色只引 1 个 Maven 包**，存储实现随包传递，无需单独声明：
 
@@ -208,41 +208,30 @@ linkora.client.db-path=data/client.db
 
 ---
 
-## 注意事项（使用前必读）
+## 使用前必读
 
-**投递与 ACK**
+**三条铁律（违反会产生故障）**
 
-1. 投递语义是**至少一次**：同一条消息可能被重复收到，业务处理必须幂等（用消息 ID 去重）。
-2. 下行消息处理完**必须显式调用** `message.ackProcessed()`（失败调 `ackFailed(...)`），
+1. **投递语义是至少一次**：同一条消息可能被重复送达，业务处理必须幂等（用消息 ID 去重）。
+2. **下行消息必须显式 ACK**：处理完调用 `message.ackProcessed()`（失败调 `ackFailed(...)`），
    不 ACK 服务端会按策略无限重试。
+3. **生产必须配 HMAC 认证**：不提供 `ClientAuthenticator` 时服务端回退为**放行全部请求**
+   并打告警（仅限本地开发）。接入步骤见 [docs/security.md](docs/security.md)。
 
-**安全（生产必改）**
+**版本与依赖约束**
 
-3. 不提供 `ClientAuthenticator` 时服务端回退为**放行全部请求**的默认认证器并打告警——
-   仅限本地开发。生产必须使用 HMAC 认证（高熵 token + 签名 + 失败锁定 + 防重放），
-   接入步骤见 [docs/security.md](docs/security.md)。
+| 约束 | 说明 |
+|---|---|
+| JDK ≥ 8 | Spring 5.x / Boot 2.x **全系兼容**（测试基线 5.3.31 / 2.7.18，宿主声明自己的版本即生效）；上限 Spring 6 / Boot 3 不支持（javax→jakarta） |
+| sqlite-jdbc 版本必须唯一 | 宿主自身也用 SQLite 时，用 `dependencyManagement` 锁定为与 SDK 相同的 3.46.1.3，多版本共存会报 native 库初始化错误 |
+| 全家桶传递依赖约 16MB | 纯服务端宿主在意体积时用 `<exclusions>` 排除 `linkora-client`（OkHttp 与 SQLite 随客户端传递）；未使用的类不初始化、native 库不加载，无运行时代价 |
 
-**依赖与版本**
-
-4. Spring 版本范围：Spring 5.x / Boot 2.x **全系兼容**（SDK 以 5.3.31 / 2.7.18 为测试基线，
-   宿主声明自己的 spring-context / spring-boot 版本即生效）；**上限 Spring 6 / Boot 3.x
-   不支持**（javax→jakarta 不兼容）。JDK 最低 8。
-5. 客户端 SQLite 依赖 `sqlite-jdbc`：宿主 classpath 必须保证该库**版本唯一**——
-   宿主自身也用 SQLite 时，用 `dependencyManagement` 锁定为与 SDK 相同的版本（3.46.1.3），
-   多版本共存会报 native 库初始化错误。
-6. 全家桶传递依赖约 16MB（客户端能力 + SQLite + OkHttp）。纯服务端宿主在意体积时，
-   用 `<exclusions>` 排除 `linkora-client` 即可（OkHttp 与 SQLite 随客户端传递），
-   未使用的类不会初始化、native 库不会加载，无运行时代价。
-
-**存储**
-
-7. 服务端只要求宿主给一个 `DataSource`（复用业务库，无需新增中间件），
-   首次启动自动建表；客户端缺省 SQLite（WAL + FULL，进程崩溃/断电不丢消息）。
-8. 宿主想用业务库接管存储（事务性发件箱）：
-   - Boot 宿主：定义自己的 `ClientRegistry`/`ClientStore` 等 bean 即可自动让位；
-   - MVC 宿主：自定义 `ClientStore` bean 需加 `@Primary`
-     （纯 Spring 没有 `@ConditionalOnMissingBean`，不会自动让位）。
-   事务接管完整示例见 `examples/spring-tx-server`（服务端）与 `examples/tx-client`（客户端）。
+**存储**：服务端复用宿主 `DataSource`（无需新增中间件，首次启动自动建表）；
+客户端缺省 SQLite（WAL + FULL，进程崩溃/断电不丢消息）。宿主可用业务库接管存储
+（事务性发件箱）——Boot 宿主定义自己的 `ClientRegistry`/`ClientStore` 等 bean 即可
+自动让位；MVC 宿主自定义 bean 需加 `@Primary`（纯 Spring 没有
+`@ConditionalOnMissingBean`）。完整示例见 `examples/spring-tx-server`（服务端）与
+`examples/tx-client`（客户端），SPI 设计见 [docs/storage-spi.md](docs/storage-spi.md)。
 
 ---
 
@@ -277,6 +266,7 @@ JDK 8 + Maven 3.6+：`mvn clean test`（全部自动化测试，无需外部中�
 | 可靠投递语义、状态机、重试与死信 | [docs/reliability.md](docs/reliability.md) |
 | HMAC 认证、防爆破、凭据管理 | [docs/security.md](docs/security.md) |
 | 部署、配置全集、升级与备份 | [docs/deployment.md](docs/deployment.md) |
+| 自定义存储 / 宿主事务接管 | [docs/storage-spi.md](docs/storage-spi.md) |
 | 架构与模块边界（核心实现） | [docs/architecture.md](docs/architecture.md) |
 | JDK/容器/数据库/依赖兼容性矩阵 | [docs/compatibility.md](docs/compatibility.md) |
 | 常见问题排查 | [docs/troubleshooting.md](docs/troubleshooting.md) |
