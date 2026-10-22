@@ -14,19 +14,22 @@
     <packaging>pom</packaging>
 
     <name>Linkora Examples</name>
-    <description>可运行示例聚合模块：普通 Java 客户端与普通 Java 服务端（嵌入式 Jetty 仅为示例便利，生产服务端嵌入宿主 Servlet 容器）。</description>
+    <description>可运行示例聚合模块：testkit 与普通 Java/事务示例走仓库源码；spring-boot-server、spring-mvc-server 四个应用为独立 pom（无父级），固定引用 Maven Central 已发布的 linkora 正式包，可单独构建验证发布产物。</description>
 
     <!-- 示例模块不发布到 Maven Central（release profile 的 deploy/上传均跳过） -->
     <properties>
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
 
+    <!-- spring-boot/mvc 示例应用为独立 pom（模拟真实宿主），仍纳入本聚合便于全量构建 -->
     <modules>
         <module>linkora-testkit</module>
         <module>plain-java-server</module>
         <module>plain-java-client</module>
-        <module>spring-mvc-server</module>
-        <module>spring-boot-server</module>
+        <module>spring-boot-server/server-app</module>
+        <module>spring-boot-server/client-app</module>
+        <module>spring-mvc-server/server-app</module>
+        <module>spring-mvc-server/client-app</module>
         <module>spring-tx-server</module>
         <module>tx-client</module>
     </modules>

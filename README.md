@@ -280,3 +280,4 @@ JDK 8 + Maven 3.6+：`mvn clean test`（全部自动化测试，无需外部中�
 | 架构与模块边界（核心实现） | [docs/architecture.md](docs/architecture.md) |
 | JDK/容器/数据库/依赖兼容性矩阵 | [docs/compatibility.md](docs/compatibility.md) |
 | 常见问题排查 | [docs/troubleshooting.md](docs/troubleshooting.md) |
+| 版本发布到 Maven Central 的流程 | [docs/release.md](docs/release.md) |
