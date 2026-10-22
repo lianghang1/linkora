@@ -306,77 +306,242 @@ linkora.client.db-path=data/client.db
 
 ## 换掉内置存储：自定义存储与事务接管
 
-内置存储开箱即用，但**两端都支持换成自己的实现**。两个典型真实诉求：
+内置存储开箱即用，但**两端都支持换成自己的实现**。下面按真实项目形态给出完整接法，
+所有代码模式与 `examples/spring-tx-server` / `examples/tx-client` 可运行示例一致。
 
-### 客户端：不想要 SQLite 文件，收发队列进 MySQL
+### 场景一：Spring Boot + JPA + MySQL 服务端——业务与消息同一事务（事务性发件箱）
 
-场景：客户端部署环境不方便落地文件，或运维希望收发队列与业务数据一样进 MySQL 统一管理。
+项目已有 `spring-boot-starter-data-jpa` + `mysql-connector-j` + 本 SDK 的 starter，
+`application.yml` 里 JPA 与 linkora 配置共存：
 
-实现 `com.linkora.core.storage.client.ClientStore` 接口（outbox / inbox / meta 共 14 个方法，
-把内置 SQLite 的 4 张表换成你的 MySQL 表即可）。两条**必须遵守的语义**：
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/store?useUnicode=true&characterEncoding=utf8
+    username: store
+    password: xxx
+  jpa:
+    hibernate:
+      ddl-auto: validate
 
-1. `updateOutboxStatus(updated, expected)` / `updateInboxReceiveStatus(...)` /
-   `updateInboxProcessStatus(...)` 是 **CAS**：必须生成
-   `UPDATE ... SET ... WHERE status = expected` 并返回是否真的更新了行——
-   这是崩溃恢复与并发去重的根基，去掉 expected 条件会产生重复发送/重复回调；
-2. 实现必须线程安全（SDK 多线程并发调用）。
+linkora:
+  server:
+    register-clients:
+      store-001: true
+```
 
-装配（一行替换内置实现）：
+新增一个配置类：**四个存储 SPI 的连接取自"事务感知数据源"**（包住 JPA 在用的那个
+DataSource，同一个连接池、同一个库），覆盖 starter 的默认装配：
 
 ```java
-// Boot 宿主：声明即生效，starter 发现你提供了 ClientStore 会自动放弃内置 SQLite
+@Configuration
+public class LinkoraConfig {
+
+    /** JPA 自动配置的那个 DataSource（HikariCP + MySQL），直接注入，不新建。 */
+    @Bean
+    public TransactionAwareDataSourceProxy linkoraTxDataSource(DataSource dataSource) {
+        return new TransactionAwareDataSourceProxy(dataSource);
+    }
+
+    // 四个存储 SPI：传事务感知数据源；@Transactional 内的持久化自动加入当前事务
+    @Bean public MessageRepository linkoraMessageRepository(TransactionAwareDataSourceProxy ds) { return new JdbcMessageRepository(ds); }
+    @Bean public DeliveryRepository linkoraDeliveryRepository(TransactionAwareDataSourceProxy ds) { return new JdbcDeliveryRepository(ds); }
+    @Bean public ClientRegistry linkoraClientRegistry(TransactionAwareDataSourceProxy ds) { return new JdbcClientRegistry(ds); }
+    @Bean public ClientCursorRepository linkoraCursorRepository(TransactionAwareDataSourceProxy ds) { return new JdbcClientCursorRepository(ds); }
+}
+```
+
+业务代码照常写 `@Transactional`，业务表与消息表一起提交/回滚：
+
+```java
+@Service
+public class OrderService {
+
+    private final OrderRepository orderRepository;   // 你的 JPA Repository
+    private final LinkoraServer linkora;
+
+    public OrderService(OrderRepository orderRepository, LinkoraServer linkora) {
+        this.orderRepository = orderRepository;
+        this.linkora = linkora;
+    }
+
+    @Transactional
+    public void placeOrder(Order order) {
+        orderRepository.save(order);                                    // 业务表
+        linkora.publish(order.getStoreId(), "order-created", order);    // lk_message / lk_delivery 同一事务
+        // 后续任意一步抛异常 → 订单行与消息一起回滚，
+        // 客户端永远看不到"失败订单"的通知；正常返回 → 一起提交后按常规流程推送
+    }
+}
+```
+
+行为边界：`@Transactional` 内发生的 publish / ACK / 上行持久化自动加入当前事务；
+Linkora 后台编排线程（重试扫描、SSE 推送）始终在事务外运行，不受影响；
+表结构迁移在原始 DataSource 上于参与事务前执行。
+
+### 场景二：Spring MVC + JPA + MySQL 服务端
+
+与 Boot 的差异只在装配入口，事务原理完全相同。JPA 配置类（项目里已有）：
+
+```java
+@Configuration
+@EnableTransactionManagement
+@EnableJpaRepositories(basePackages = "com.example.store.repo")
+public class JpaConfig {
+
+    @Bean
+    public HikariDataSource dataSource() {
+        HikariDataSource ds = new HikariDataSource();
+        ds.setJdbcUrl("jdbc:mysql://127.0.0.1:3306/store?useUnicode=true&characterEncoding=utf8");
+        ds.setUsername("store");
+        ds.setPassword("xxx");
+        return ds;
+    }
+
+    @Bean
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory(HikariDataSource dataSource) {
+        /* Hibernate + MySQL，照你项目现有的配 */
+    }
+
+    @Bean
+    public PlatformTransactionManager transactionManager(EntityManagerFactory emf) {
+        return new JpaTransactionManager(emf);   // JPA 事务管理器
+    }
+}
+```
+
+linkora 配置类与场景一**逐字相同**（四个 SPI bean 传 `TransactionAwareDataSourceProxy`），
+只是它和 `JpaConfig` 都在你的 `@Import` 清单里；端点注册用前文"模式二"的方式 A/B。
+业务 Service 同样 `@Transactional` 里 `publish`，业务行与消息行由
+`JpaTransactionManager` 一起提交/回滚。
+
+### 场景三：客户端（Spring Boot）不想要 SQLite 文件，收发队列进 MySQL
+
+客户端也是 Spring Boot 应用、运维要求队列与业务数据一样进 MySQL 统一管理时：
+
+**第 1 步：在你的 MySQL 库里建 3 张表**（`lk_` 前缀字段结构与内置 SQLite 版一致）：
+
+```sql
+CREATE TABLE lk_outbox (
+  message_id    VARCHAR(64) PRIMARY KEY,
+  message_type  VARCHAR(255) NOT NULL,
+  payload       BLOB NOT NULL,
+  status        VARCHAR(32) NOT NULL,
+  created_at    BIGINT NOT NULL,
+  updated_at    BIGINT NOT NULL,
+  retry_count   INT NOT NULL DEFAULT 0,
+  next_retry_at BIGINT,
+  expires_at    BIGINT,
+  last_error    TEXT,
+  KEY idx_outbox_status_retry (status, next_retry_at),
+  KEY idx_outbox_cleanup (status, updated_at)
+);
+
+CREATE TABLE lk_inbox (
+  message_id     VARCHAR(64) PRIMARY KEY,
+  message_type   VARCHAR(255) NOT NULL,
+  payload        BLOB NOT NULL,
+  receive_status VARCHAR(32) NOT NULL,
+  process_status VARCHAR(32) NOT NULL,
+  received_at    BIGINT NOT NULL,
+  processed_at   BIGINT,
+  retry_count    INT NOT NULL DEFAULT 0,
+  next_retry_at  BIGINT,
+  last_error     TEXT,
+  KEY idx_inbox_recv_ack (receive_status, received_at),
+  KEY idx_inbox_proc_retry (process_status, next_retry_at),
+  KEY idx_inbox_cleanup (receive_status, process_status)
+);
+
+CREATE TABLE lk_meta (
+  meta_key   VARCHAR(128) PRIMARY KEY,
+  meta_value TEXT NOT NULL
+);
+```
+
+**第 2 步：实现 `ClientStore` 接口**（14 个方法）。两个必须遵守的语义：
+状态更新是 **CAS**（`UPDATE ... WHERE status = expected`，返回是否真的更新了行——
+崩溃恢复与并发去重的根基）；幂等写入用"主键唯一约束 + 捕获重复键"。骨架与两个
+关键方法（其余 12 个方法按同样模式写，SQL 逐字参考 `examples/tx-client` 的
+`H2ClientStore`，换 MySQL 方言即可）：
+
+```java
+public class MySqlClientStore implements ClientStore {
+
+    private final DataSource dataSource;
+
+    public MySqlClientStore(DataSource dataSource) { this.dataSource = dataSource; }
+
+    @Override
+    public boolean saveOutbox(OutboxEntry entry) {
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(
+                     "INSERT INTO lk_outbox (message_id, message_type, payload, status, "
+                             + "created_at, updated_at, retry_count, next_retry_at, expires_at, last_error) "
+                             + "VALUES (?,?,?,?,?,?,?,?,?,?)")) {
+            ps.setString(1, entry.getMessageId());
+            ps.setString(2, entry.getMessageType());
+            ps.setBytes(3, entry.getPayload());
+            ps.setString(4, entry.getStatus().name());
+            ps.setLong(5, entry.getCreatedAt());
+            ps.setLong(6, entry.getUpdatedAt());
+            ps.setInt(7, entry.getRetryCount());
+            setNullableLong(ps, 8, entry.getNextRetryAt());
+            setNullableLong(ps, 9, entry.getExpiresAt());
+            setNullableString(ps, 10, entry.getLastError());
+            return ps.executeUpdate() == 1;
+        } catch (SQLIntegrityConstraintViolationException duplicate) {
+            return false;   // messageId 已存在：幂等语义，保留原记录
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR, "saveOutbox 失败", e);
+        }
+    }
+
+    @Override
+    public boolean updateOutboxStatus(OutboxEntry updated, OutboxStatus expected) {
+        // CAS：WHERE 里必须带期望状态，去掉会产生重复发送/重复回调
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(
+                     "UPDATE lk_outbox SET status = ?, updated_at = ?, retry_count = ?, "
+                             + "next_retry_at = ?, last_error = ? "
+                             + "WHERE message_id = ? AND status = ?")) {
+            ps.setString(1, updated.getStatus().name());
+            ps.setLong(2, updated.getUpdatedAt());
+            ps.setInt(3, updated.getRetryCount());
+            setNullableLong(ps, 4, updated.getNextRetryAt());
+            setNullableString(ps, 5, updated.getLastError());
+            ps.setString(6, updated.getMessageId());
+            ps.setString(7, expected.name());
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR, "updateOutboxStatus 失败", e);
+        }
+    }
+
+    // 其余 12 个方法：findOutbox / findInbox / updateInboxReceiveStatus /
+    // updateInboxProcessStatus / saveMeta / getMeta / delete... 同样模式
+    // （setNullableLong / setNullableString 为普通的 null 判空 + setNull/setLong 辅助方法，此处省略）
+}
+```
+
+**第 3 步：装配**——声明即生效，starter 发现你提供了 `ClientStore` 自动放弃内置 SQLite
+（`db-path` 配置随之失效）：
+
+```java
 @Bean
 public ClientStore clientStore(DataSource dataSource) {
-    return new MySqlClientStore(dataSource); // 你自己的实现
+    return new MySqlClientStore(dataSource);
 }
 ```
 
-MVC 宿主（`@Import(LinkoraClientConfiguration.class)`）同理，但自定义 `ClientStore` bean
-需加 `@Primary`（纯 Spring 没有 `@ConditionalOnMissingBean`）。启用自定义存储后
-`linkora.client.db-path` 配置不再生效。
+MVC 宿主（`@Import(LinkoraClientConfiguration.class)`）同理，但自定义 bean 需加 `@Primary`。
+客户端业务代码完全不变（`MessageListener` / `UplinkPublisher` 照旧）；若业务方法在
+`@Transactional` 内调 `publish`，outbox 写入同样随宿主事务一起提交/回滚。
 
-### 服务端：业务写库与发消息同一事务（事务性发件箱）
-
-场景：下单失败时，"通知门店"的消息要和订单行**一起回滚**——对客户端而言这条消息从未存在。
-做法是四个存储 SPI 的连接取自**事务感知数据源**，内置 JDBC 实现直接复用、无需手写 SQL：
-
-```java
-@Bean
-public TransactionAwareDataSourceProxy linkoraTxDataSource(DataSource businessDataSource) {
-    // 包一层宿主业务 DataSource（同一个连接池、同一个库）
-    return new TransactionAwareDataSourceProxy(businessDataSource);
-}
-
-// 四个存储 SPI bean 都传代理数据源（Boot 宿主同样声明这四个 bean 覆盖默认装配）
-@Bean public MessageRepository linkoraMessageRepository(TransactionAwareDataSourceProxy ds) { return new JdbcMessageRepository(ds); }
-@Bean public DeliveryRepository linkoraDeliveryRepository(TransactionAwareDataSourceProxy ds) { return new JdbcDeliveryRepository(ds); }
-@Bean public ClientRegistry linkoraClientRegistry(TransactionAwareDataSourceProxy ds) { return new JdbcClientRegistry(ds); }
-@Bean public ClientCursorRepository linkoraCursorRepository(TransactionAwareDataSourceProxy ds) { return new JdbcClientCursorRepository(ds); }
-```
-
-业务代码照常写 `@Transactional`：
-
-```java
-@Transactional
-public void placeOrder(OrderRequest req) {
-    orderDao.insert(req);                                          // 业务行
-    linkora.publish(req.getStoreId(), "order-created", payload);   // 消息行加入同一事务
-    // 抛异常 → 业务行与消息一起回滚；正常返回 → 一起提交，之后按常规流程推送
-}
-```
-
-行为说明：`@Transactional` 内发生的 publish / ACK / 上行持久化自动加入当前宿主事务；
-Linkora 后台编排线程（重试扫描、SSE 推送）始终在事务外运行，不受影响。
-表结构迁移（`JdbcServerSchema.migrate`）在**原始** DataSource 上于参与事务前执行。
-
-**完全自实现服务端存储**（连内置 JDBC 实现也不要）：实现 `ClientRegistry` /
-`MessageRepository` / `DeliveryRepository` / `ClientCursorRepository` 四个接口、声明为
-bean 即可，表结构完全由你管理。此时必须遵守：仓储方法自管事务时**尊重连接的
-autoCommit 状态**——仅 `autoCommit=true` 时自行提交；为 `false`（宿主事务接管）时
-严禁中途 commit/rollback，否则会破坏发件箱语义。
-
-完整可运行参考：`examples/spring-tx-server`（服务端事务接管，含回滚演示）与
-`examples/tx-client`（客户端自定义存储）。
+**服务端完全自实现**（连内置 JDBC 实现也不要）：实现 `ClientRegistry` / `MessageRepository` /
+`DeliveryRepository` / `ClientCursorRepository` 四个接口、声明为 bean 即可，表结构完全由你
+管理。必须遵守：仓储方法自管事务时**尊重连接的 autoCommit 状态**——仅 `autoCommit=true`
+时自行提交；为 `false`（宿主事务接管）时严禁中途 commit/rollback，否则破坏发件箱语义。
 
 ---
 
