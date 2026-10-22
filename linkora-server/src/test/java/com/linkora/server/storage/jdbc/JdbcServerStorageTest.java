@@ -373,6 +373,33 @@ public class JdbcServerStorageTest {
     }
 
     @Test
+    public void expiredHeadInSameKeyReleasesFollowingMessage() {
+        // 关键安全性：如果队头那条永远拿不到终态，同键后续会被永久堵住。
+        // 过期是自愈路径——过期推进把队头置为 EXPIRED（终态），车道随即放行。
+        DataSource ds = freshH2("dlv-ordering-expire");
+        JdbcMessageRepository messages = new JdbcMessageRepository(ds);
+        JdbcDeliveryRepository deliveries = new JdbcDeliveryRepository(ds);
+
+        messages.save(message("head-1", NOW - 10_000, NOW - 5_000)); // 已过期
+        deliveries.init(new DeliveryRecord("head-1", "c-1", 1, MessageState.RECEIVED, 0,
+                null, null, NOW, NOW, "order-5"));
+        messages.save(message("tail-1", NOW - 10_000, null));
+        deliveries.init(new DeliveryRecord("tail-1", "c-1", 2, MessageState.ACCEPTED, 0,
+                null, null, NOW, NOW, "order-5"));
+
+        // 过期推进前：只返回队头自己（它该被重投），后续被挡住
+        List<DeliveryRecord> before = deliveries.findUnfinishedAfterSeq("c-1", 0, NOW, 100);
+        assertEquals("队头未终结时，只允许队头自己进入投递窗口", 1, before.size());
+        assertEquals("head-1", before.get(0).getMessageId());
+
+        // 推进过期 → 队头变终态 → 后续立即可投
+        assertEquals(1, deliveries.expireOverdue(NOW, 100));
+        List<DeliveryRecord> after = deliveries.findUnfinishedAfterSeq("c-1", 0, NOW, 100);
+        assertEquals("队头过期后，同键后续必须放行", 1, after.size());
+        assertEquals("tail-1", after.get(0).getMessageId());
+    }
+
+    @Test
     public void deadLetterInSameKeyReleasesFollowingMessage() {
         JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-ordering-dead"));
         // 前一条已进死信：不再投递，但也不能把同键后续消息永久卡住
