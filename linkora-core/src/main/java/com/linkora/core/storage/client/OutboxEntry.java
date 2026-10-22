@@ -10,6 +10,9 @@ import com.linkora.core.message.OutboxStatus;
  */
 public final class OutboxEntry {
 
+    /** 与 {@code LinkoraMessage.MAX_ORDERING_KEY_LENGTH} 对齐。 */
+    public static final int MAX_ORDERING_KEY_LENGTH = 128;
+
     private final String messageId;
     private final String messageType;
     private final byte[] payload;
@@ -54,8 +57,14 @@ public final class OutboxEntry {
         this.lastError = lastError;
         // 与 LinkoraMessage 保持一致：null 与空白都归一为 null（= 不参与顺序约束），
         // 否则空串会变成一条"所有空串共用"的假车道，把无关消息串行起来
-        this.orderingKey = orderingKey == null || orderingKey.trim().isEmpty()
+        String key = orderingKey == null || orderingKey.trim().isEmpty()
                 ? null : orderingKey.trim();
+        if (key != null && key.length() > MAX_ORDERING_KEY_LENGTH) {
+            // 提前失败：否则要等到发送时才由 LinkoraMessage 抛异常，那时消息已进死信
+            throw new IllegalArgumentException("orderingKey 长度不得超过 "
+                    + MAX_ORDERING_KEY_LENGTH + "（实际 " + key.length() + "）");
+        }
+        this.orderingKey = key;
     }
 
     public String getMessageId() {

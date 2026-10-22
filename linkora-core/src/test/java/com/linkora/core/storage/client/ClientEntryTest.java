@@ -23,6 +23,27 @@ public class ClientEntryTest {
     }
 
     @Test
+    public void orderingKeyValidationAndNormalization() {
+        String tooLong = new String(new char[129]).replace('\0', 'x');
+        try {
+            new OutboxEntry("m1", "T", payload(), OutboxStatus.PENDING,
+                    1L, 1L, 0, null, null, null, tooLong);
+            fail("超过 128 字符的 orderingKey 应在入队时直接拒绝，而不是等到发送阶段");
+        } catch (IllegalArgumentException expected) {
+            // 期望：客户端 publish 立即失败，不落库
+        }
+        assertEquals("恰好 128 字符应允许",
+                128, new OutboxEntry("m1", "T", payload(), OutboxStatus.PENDING,
+                        1L, 1L, 0, null, null, null, new String(new char[128]).replace('\0', 'k'))
+                        .getOrderingKey().length());
+        // 前后空白被裁剪，纯空白归一为 null
+        assertEquals("order:1", new OutboxEntry("m1", "T", payload(), OutboxStatus.PENDING,
+                1L, 1L, 0, null, null, null, "  order:1  ").getOrderingKey());
+        assertEquals(null, new OutboxEntry("m1", "T", payload(), OutboxStatus.PENDING,
+                1L, 1L, 0, null, null, null, "   ").getOrderingKey());
+    }
+
+    @Test
     public void outboxEntryValidation() {
         assertRejected(new Runnable() {
             public void run() {
