@@ -2,9 +2,7 @@ package com.linkora.example.springmvc;
 
 import com.linkora.core.storage.server.ClientRegistration;
 import com.linkora.core.storage.server.ClientRegistry;
-import com.linkora.example.springmvc.service.NotifyService;
 import com.linkora.server.LinkoraServer;
-import com.linkora.server.PublishResult;
 import com.linkora.spring.LinkoraServlets;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -63,7 +61,7 @@ public final class SpringMvcServerMain {
 
         LinkoraServer server = context.getBean(LinkoraServer.class);
 
-        // 2. 注册演示客户端（幂等）并下发欢迎消息
+        // 2. 注册演示客户端（幂等）
         if (!server.isRunning()) {
             throw new IllegalStateException("LinkoraServer 应由容器启动");
         }
@@ -81,13 +79,10 @@ public final class SpringMvcServerMain {
         LinkoraServlets.register(server, handler.getServletContext());
         jetty.start();
 
-        PublishResult welcome = context.getBean(NotifyService.class)
-                .sendGreeting(DEMO_CLIENT_ID, "欢迎接入 Linkora（Spring MVC 宿主）！");
-        log.info("已下发欢迎消息: {}", welcome.getMessageId());
-
         System.out.println("========================================");
         System.out.println("Linkora Spring MVC 示例已启动");
-        System.out.println("  业务接口 : http://127.0.0.1:" + port + "/api/status");
+        System.out.println("  业务接口 : http://127.0.0.1:" + port + "/api/orders /api/reviews");
+        System.out.println("  上行查询 : http://127.0.0.1:" + port + "/api/uplink/order-status-updates");
         System.out.println("  SSE 下行 : http://127.0.0.1:" + port + "/events");
         System.out.println("  消息上报 : http://127.0.0.1:" + port + "/messages");
         System.out.println("  ACK 上报 : http://127.0.0.1:" + port + "/acks");

@@ -16,7 +16,7 @@ LinkoraServer server = LinkoraServer.builder()
         .cursorRepository(new JdbcClientCursorRepository(dataSource))
         .config(ServerConfig.builder().build())
         // 可选：上行消息业务监听器，客户端上报持久化成功后被回调（Spring 宿主
-        // 注册 IngestListener bean 即自动接入，见示例 ClientReportService）
+        // 注册 IngestListener bean 即自动接入，见示例 service/uplink 包）
         .ingestListener(message -> handleUplink(message))
         .build();
 server.start();
