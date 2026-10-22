@@ -68,6 +68,19 @@ public class SseStreamClientTest {
         assertEquals("事件 data", expectedData, parts[2]);
     }
 
+    /**
+     * 轮询等待连接进入期望状态：状态转换在单线程调度器上异步执行，且 onOpen 与
+     * onEvent 从不同 OkHttp 线程 post、提交顺序无保证，事件可能先于 OPEN 可见、
+     * close 后 CLOSED 可能稍后可见——故不断言瞬时值只轮询终态。
+     */
+    private void awaitState(SseStreamClient sse, SseConnectionState expected)
+            throws InterruptedException {
+        long deadline = System.currentTimeMillis() + AWAIT_SECONDS * 1000;
+        while (sse.getState() != expected && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+    }
+
     private static MockResponse sseResponse(String body) {
         return new MockResponse()
                 .setHeader("Content-Type", "text/event-stream")
@@ -130,6 +143,7 @@ public class SseStreamClientTest {
                 heartbeat.split("\\|")[1].contains("hb"));
         // SSE 规范：Last Event ID 具有粘性，未带 id 的后续事件沿用最近 id
         assertEvent("1", "second");
+        awaitState(sse, SseConnectionState.OPEN);
         assertEquals(SseConnectionState.OPEN, sse.getState());
         assertEquals("1", sse.getLastEventId());
     }
@@ -185,6 +199,7 @@ public class SseStreamClientTest {
         assertEvent(null, "a");
 
         sse.close();
+        awaitState(sse, SseConnectionState.CLOSED);
         assertEquals(SseConnectionState.CLOSED, sse.getState());
 
         TimeUnit.MILLISECONDS.sleep(500);

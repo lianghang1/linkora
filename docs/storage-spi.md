@@ -115,6 +115,9 @@ lk_delivery        投递状态            (message_id+client_id PK, seq, state,
    自管事务的方法必须尊重连接当前 autoCommit 状态：仅 `autoCommit=true` 时
    本地提交；`false` 视为宿主事务接管，严禁中途 commit/rollback
    （`JdbcDeliveryRepository.nextDeliverySeq` 是参考实现，见第 6 节 checklist）。
+   注意：内置 `Jdbc*Repository` 四个类本身即按此契约实现——无需自实现，
+   用宿主代理连接（抑制 close 的 JDK Proxy，或 `TransactionAwareDataSourceProxy`）
+   包住真实连接再喂给仓储即可直接接管，服务端全套测试见 5.4。
 
 接管模式语义要点（务必理解后再上线）：
 
@@ -125,19 +128,65 @@ lk_delivery        投递状态            (message_id+client_id PK, seq, state,
 - SSE 首推在持久化后异步进行，可能在宿主事务提交前就尝试推送
   （读到的是事务外旧数据，推送落空）；提交后扫描周期内会自动补推，不影响正确性。
 
-### 5.3 客户端接管（宿主自实现 ClientStore）
+### 5.3 客户端接管（宿主自实现 ClientStore 或共享 SQLite 连接）
 
-让 outbox 写入与宿主业务同事务（客户端侧事务性发件箱）：
+让 outbox 写入与宿主业务同事务（客户端侧事务性发件箱），两种方式：
 
-- 宿主实现 `ClientStore` 接入业务库（H2/MySQL 等任意 JDBC 源）；
-- 在宿主事务内调用 `LinkoraClient.publish()`：`saveOutbox` 加入当前事务，
-  **业务回滚 → outbox 记录随之消失**，消息从未存在；
-  **业务提交 → 后台发送线程拾取并 POST**，此后进入常规可靠投递流程；
-- 事务外调用（后台发送/恢复线程）逐语句提交，与宿主事务互不干扰；
-- 实现方式与服务端相同：`TransactionAwareDataSourceProxy` 包装宿主连接池，
+- **方式一（SQLite 同文件场景，零代码）**：使用宿主接管构造
+  `new SqliteClientStore(Connection hostConnection)`——所有写入（含 schema 迁移）
+  加入宿主连接当前事务，提交/回滚由宿主裁决；`close()` 仅标记不可用，
+  不关闭宿主连接。约定：连接的 WAL/synchronous 等 PRAGMA 由宿主负责
+  （事务内执行 `PRAGMA journal_mode` 会失败，该构造不再设置）；
+- **方式二**：宿主实现 `ClientStore` 接入业务库（H2/MySQL 等任意 JDBC 源），
+  实现方式与服务端相同：`TransactionAwareDataSourceProxy` 包装宿主连接池，
   或自实现连接绑定。
 
+接入后在宿主事务内调用 `LinkoraClient.publish()`：`saveOutbox` 加入当前事务，
+**业务回滚 → outbox 记录随之消失**，消息从未存在；
+**业务提交 → 后台发送线程拾取并 POST**，此后进入常规可靠投递流程；
+事务外调用（后台发送/恢复线程）逐语句提交，与宿主事务互不干扰。
+
 完整可运行示例：`examples/spring-tx-server`（服务端接管）、`examples/tx-client`（客户端接管）。
+
+### 5.4 宿主接管模式整套测试记录
+
+内置实现的全链路接管语义由自动化测试锁定（客户端 + 服务端、H2 + MySQL 真实库）：
+
+| 端 | 测试类 | 覆盖点 |
+|---|---|---|
+| 客户端 SQLite | `SqliteClientStoreHostTxTest`（linkora-client-storage-sqlite） | 宿主事务内迁移 + outbox/inbox/meta 写入：未提交对外不可见、回滚全部消失、提交全部生效；`close()` 不关闭宿主连接；CAS 推进随宿主回滚消失 |
+| 服务端 H2 | `JdbcServerStorageTest`（linkora-server-storage-jdbc，seq ambient 用例） | seq 分配加入宿主事务：未提交不可见、回滚后可重新分配、宿主连接 autoCommit 状态不被仓储破坏 |
+| 服务端 MySQL 真实库 | `JdbcServerHostTransactionMySqlIT`（linkora-server-storage-jdbc） | ① 五类写路径（注册/消息/投递/seq/游标）在宿主事务内同生共死，seq 落库值正确；② seq 分配的独立回滚语义 + 提交后独立分配正常续号；③ 宿主提交后 CAS 推进与接管写入共存 |
+
+运行命令：
+
+```
+# 客户端 SQLite 接管测试（纯单元，无需外部数据库）
+mvn -pl linkora-client-storage-sqlite test
+
+# 服务端 H2 全量（含 seq 接管用例）
+mvn -pl linkora-server-storage-jdbc test
+
+# 服务端 MySQL 真实库接管回归（MySQL 5.7 / 8 均验证过，单行执行）
+mvn -pl linkora-server-storage-jdbc "-Dtest=JdbcServerHostTransactionMySqlIT" test "-Dlinkora.it.mysql=true" "-Dlinkora.it.mysql.password=密码"
+```
+
+实测结果（2026-10-22，本机 MySQL 5.7.25 / H2 / SQLite）：客户端 17/17、
+服务端 H2 14/14、MySQL 接管 3/3 + 常规回归 5/5，全部通过。
+
+**DDL 事务性差异**（两端迁移在接管模式下的行为分歧，务必区分）：
+
+- SQLite：DDL 具备事务性——接管模式下迁移（建表 + 版本记录）整体随宿主
+  提交/回滚，回滚后表结构回到迁移前状态；
+- MySQL：DDL 隐式提交——建表语句立即全局可见且不可回滚，接管模式下迁移的
+  事务性仅覆盖版本记录与 DML；"对象已存在"错误（1050 表 / 1061 索引）按
+  崩溃续跑幂等命中放行，保证重跑安全。
+
+**实践注意**：测试或排障时泄漏的未提交接管事务会持有 MySQL MDL 元数据锁，
+阻塞同库后续 DDL（DROP/ALTER 长时间无响应）。`JdbcServerHostTransactionMySqlIT`
+采用双重防护，宿主自建测试建议照做：用例 try/finally 中防御性
+rollback+close 释放 ambient 连接；`cleanSchema` 先执行
+`SET SESSION lock_wait_timeout = 30`，让锁互锁快速失败而非永久挂死。
 
 ## 6. 自实现 checklist
 

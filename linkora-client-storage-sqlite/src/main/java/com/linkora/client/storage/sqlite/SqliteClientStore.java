@@ -55,6 +55,8 @@ public final class SqliteClientStore implements ClientStore, Closeable {
     private final Connection connection;
     private final Object lock = new Object();
     private volatile boolean closed;
+    /** 宿主事务接管模式：连接由宿主持有与提交/回滚裁决，close() 不关闭连接。 */
+    private final boolean hostManaged;
 
     /** 打开（必要时创建）指定路径的 SQLite 存储文件，父目录不存在时自动创建。 */
     public SqliteClientStore(Path dbFile) {
@@ -64,6 +66,33 @@ public final class SqliteClientStore implements ClientStore, Closeable {
     /** 使用自定义 JDBC URL 打开存储（如 :memory: 或带参数的 URL）。 */
     public SqliteClientStore(String jdbcUrl) {
         this(jdbcUrl, null);
+    }
+
+    /**
+     * 宿主事务接管构造：store 使用宿主提供的连接，所有写入加入宿主当前事务，
+     * 严禁中途 commit/rollback/setAutoCommit——提交、回滚、连接配置全部由宿主裁决。
+     *
+     * <p>适用场景：宿主业务数据与客户端本地队列共用同一 SQLite 文件，
+     * 要求"业务写 + outbox/inbox 写"同生共死（如 Spring @Transactional 包住
+     * 业务写与 client.publish 的场景）。约定：</p>
+     * <ul>
+     *   <li>连接的 WAL/synchronous 等 PRAGMA 由宿主负责（宿主事务内执行
+     *       {@code PRAGMA journal_mode} 会失败，故本构造不再设置）；</li>
+     *   <li>构造时用宿主连接执行幂等 schema 迁移：连接处于自动提交时迁移
+     *       自行提交；处于手动提交时加入宿主事务，随宿主一起提交/回滚；</li>
+     *   <li>{@link #close()} 仅标记存储不可用，不关闭宿主连接。</li>
+     * </ul>
+     */
+    public SqliteClientStore(Connection hostConnection) {
+        try {
+            SqliteSchema.migrate(hostConnection);
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "宿主接管模式下 SQLite schema 迁移失败", e);
+        }
+        this.connection = hostConnection;
+        this.hostManaged = true;
+        log.debug("SQLite 客户端存储已按宿主接管模式打开（连接由宿主管理）");
     }
 
     private SqliteClientStore(String jdbcUrl, Path parentDir) {
@@ -76,6 +105,7 @@ public final class SqliteClientStore implements ClientStore, Closeable {
             configurePragmas(conn);
             SqliteSchema.migrate(conn);
             this.connection = conn;
+            this.hostManaged = false;
             log.debug("SQLite 客户端存储已打开: {}", jdbcUrl);
         } catch (Exception e) {
             if (conn != null) {
@@ -334,6 +364,11 @@ public final class SqliteClientStore implements ClientStore, Closeable {
                 return;
             }
             closed = true;
+            if (hostManaged) {
+                // 宿主接管模式：连接归宿主所有，仅标记存储不可用
+                log.debug("SQLite 客户端存储已关闭（宿主连接保持打开）");
+                return;
+            }
             try {
                 connection.close();
                 log.debug("SQLite 客户端存储已关闭");

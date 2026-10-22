@@ -133,8 +133,13 @@ public final class JdbcServerSchema {
 
     private static void applyMigration(Connection connection, int version, String script,
                                        boolean mysql) throws SQLException {
-        boolean oldAutoCommit = connection.getAutoCommit();
-        connection.setAutoCommit(false);
+        // 宿主事务接管模式（连接已在手动提交）：迁移加入当前事务，提交/回滚由
+        // 宿主裁决，严禁中途 commit/rollback（否则提前提交宿主业务写入）；
+        // 自管模式（自动提交连接）保持原行为：本地事务自行提交。
+        boolean localTx = connection.getAutoCommit();
+        if (localTx) {
+            connection.setAutoCommit(false);
+        }
         try {
             for (String statement : script.split(";")) {
                 String sql = statement.trim();
@@ -154,17 +159,23 @@ public final class JdbcServerSchema {
             }
             try (PreparedStatement ps = connection.prepareStatement(
                     "INSERT INTO lk_schema_version (version, applied_at) VALUES (?, ?)")) {
-                ps.setLong(1, version);
+                ps.setInt(1, version);
                 ps.setLong(2, System.currentTimeMillis());
                 ps.executeUpdate();
             }
-            connection.commit();
+            if (localTx) {
+                connection.commit();
+            }
             log.info("已应用服务端 schema 迁移 v{}", version);
         } catch (SQLException e) {
-            connection.rollback();
+            if (localTx) {
+                connection.rollback();
+            }
             throw e;
         } finally {
-            connection.setAutoCommit(oldAutoCommit);
+            if (localTx) {
+                connection.setAutoCommit(true);
+            }
         }
     }
 }
