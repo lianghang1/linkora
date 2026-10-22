@@ -17,9 +17,10 @@
 # 1) 全模块版本号转正式版（PowerShell 的 -D 参数必须整体加引号）
 mvn versions:set "-DnewVersion=0.2.0" "-DgenerateBackupPoms=false"
 
-# 2) 检查 diff（根 pom 与全部模块 pom 的 <version>），提交
+# 2) 检查 diff（根 pom 与全部模块 pom 的 <version>），提交并打 tag
 git add -A
 git commit -m '发版 0.2.0'
+git tag -a v0.2.0 -m 'Linkora 0.2.0'
 
 # 3) 构建签名并上传 Portal（PowerShell 必须先把 GPG 加入 PATH）
 $env:Path = 'D:\DevTools\GnuPG\bin;' + $env:Path
@@ -27,7 +28,8 @@ mvn clean deploy -Prelease
 
 # 4) 构建结束时日志输出 deploymentId，Portal → Deployments 核对组件清单后点 Publish
 #    （autoPublish=false，永远人工确认后发布）
-# 5) 约 30 分钟后生效，验证：
+# 5) Publish 成功后推送 tag，并验证约 30 分钟后生效：
+git push origin v0.2.0
 #    https://repo1.maven.org/maven2/io/github/lianghang1/linkora-parent/maven-metadata.xml
 ```
 
