@@ -6,7 +6,9 @@ import com.linkora.core.storage.server.ClientCursorRepository;
 import com.linkora.core.storage.server.ClientRegistry;
 import com.linkora.core.storage.server.DeliveryRecord;
 import com.linkora.core.storage.server.DeliveryRepository;
+import com.linkora.core.storage.server.ExpirySweeper;
 import com.linkora.core.storage.server.MessageRepository;
+import com.linkora.core.storage.server.RetentionCleaner;
 import com.linkora.serialize.jackson.MessageJsonCodec;
 import com.linkora.server.ServerConfig;
 import com.linkora.server.auth.AuthRequest;
@@ -33,6 +35,9 @@ import java.util.concurrent.Executor;
  *       无论游标如何，周期扫描兜底覆盖一切未完成投递（游标仅作观测，不参与调度决策）；</li>
  *   <li>过期消息停止投递并标记 EXPIRED（终态）；死信（DEAD_LETTER）停止投递，
  *       待人工介入推进状态后自然恢复；</li>
+ *   <li>过期推进与保留策略清理是"不依赖在线状态"的维护动作：仓储实现了
+ *       {@link ExpirySweeper} / {@link RetentionCleaner} 时随扫描周期低频执行，
+ *       否则跳过（自实现仓储可自行归档）；</li>
  *       <li>同一时刻只有一个执行线程调用本类写方法（由 LinkoraServer 的单线程执行器保证）。</li>
  * </ul>
  *
@@ -59,6 +64,14 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
     private final ConcurrentHashMap<String, PushPacing> pacing =
             new ConcurrentHashMap<String, PushPacing>();
 
+    /** 维护动作（过期推进/清理）的最小执行间隔：不必跟着 5s 的推送节奏跑。 */
+    private static final long MAINTENANCE_INTERVAL_MS = 60_000L;
+
+    /** 可选能力：仓储未实现对应接口时为 null，维护动作整体跳过。 */
+    private final ExpirySweeper expirySweeper;
+    private final RetentionCleaner retentionCleaner;
+    private volatile long lastMaintenanceAt = 0L;
+
     public DeliveryCoordinator(ClientAuthenticator authenticator,
                                ClientRegistry clientRegistry,
                                MessageRepository messageRepository,
@@ -82,6 +95,10 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
         this.gateway = gateway;
         this.config = config;
         this.executor = executor;
+        this.expirySweeper = deliveryRepository instanceof ExpirySweeper
+                ? (ExpirySweeper) deliveryRepository : null;
+        this.retentionCleaner = deliveryRepository instanceof RetentionCleaner
+                ? (RetentionCleaner) deliveryRepository : null;
     }
 
     // ---------------- SseSubscribeHandler ----------------
@@ -148,7 +165,10 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
         });
     }
 
-    /** 周期扫描：向所有在线客户端补推未完成投递（含过期处理与到期重试）。 */
+    /**
+     * 周期扫描：向所有在线客户端补推未完成投递（含到期重试），
+     * 并按固定间隔执行"不依赖在线状态"的维护动作（过期推进 + 保留策略清理）。
+     */
     public void sweep() {
         for (String clientId : gateway.activeClientIds()) {
             try {
@@ -159,6 +179,43 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
                 }
             } catch (RuntimeException e) {
                 log.warn("补发扫描失败: clientId={}", clientId, e);
+            }
+        }
+        runMaintenance();
+    }
+
+    /**
+     * 维护动作：先把"已过期但客户端一直离线"的记录推进到 EXPIRED，
+     * 再按保留期清理终态记录与孤儿正文。
+     *
+     * <p>两者互不阻塞：任一步失败只告警，下一轮继续。</p>
+     */
+    private void runMaintenance() {
+        long now = System.currentTimeMillis();
+        if (now - lastMaintenanceAt < MAINTENANCE_INTERVAL_MS) {
+            return;
+        }
+        lastMaintenanceAt = now;
+        if (expirySweeper != null) {
+            try {
+                int expired = expirySweeper.expireOverdue(now, config.getExpirySweepBatchSize());
+                if (expired > 0) {
+                    log.info("离线过期推进完成：{} 条投递记录标记为 EXPIRED", expired);
+                }
+            } catch (RuntimeException e) {
+                log.warn("过期推进失败（下一轮继续）", e);
+            }
+        }
+        if (retentionCleaner != null && config.isRetentionEnabled()) {
+            try {
+                long deadline = now - config.getRetentionMs();
+                int purged = retentionCleaner.purgeSettledBefore(deadline, config.getRetentionBatchSize());
+                if (purged > 0) {
+                    log.info("保留策略清理完成：删除 {} 条终态投递记录（保留期 {} ms）",
+                            purged, config.getRetentionMs());
+                }
+            } catch (RuntimeException e) {
+                log.warn("保留策略清理失败（下一轮继续）", e);
             }
         }
     }

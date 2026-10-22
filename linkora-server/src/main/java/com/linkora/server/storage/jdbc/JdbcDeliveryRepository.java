@@ -5,6 +5,8 @@ import com.linkora.core.error.LinkoraException;
 import com.linkora.core.message.MessageState;
 import com.linkora.core.storage.server.DeliveryRecord;
 import com.linkora.core.storage.server.DeliveryRepository;
+import com.linkora.core.storage.server.ExpirySweeper;
+import com.linkora.core.storage.server.RetentionCleaner;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -26,11 +28,14 @@ import java.util.Optional;
  *   <li>per-client seq 原子分配：在单事务内 INSERT-OR-SKIP 初始化行、
  *       {@code UPDATE last_seq = last_seq + 1}（行锁串行化）、同事务读回，
  *       并发分配严格递增且无重复、无跳号。</li>
+ *   <li>同时实现 {@link RetentionCleaner} 与 {@link ExpirySweeper}：保留策略与
+ *       过期推进都落在投递表上，由协调器的周期扫描调用。</li>
  * </ul>
  *
  * @author lianghang
  */
-public final class JdbcDeliveryRepository implements DeliveryRepository {
+public final class JdbcDeliveryRepository implements DeliveryRepository,
+        RetentionCleaner, ExpirySweeper {
 
     private static final String COLUMNS =
             "message_id, client_id, seq, state, retry_count, next_retry_at, last_error, created_at, updated_at";
@@ -266,6 +271,161 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
                 }
                 return rs.getLong(1);
             }
+        }
+    }
+
+    // ---------------- 保留策略与过期推进（可选能力） ----------------
+
+    /** 仍需投递的非终态集合（DEAD_LETTER 已停止投递，不参与过期推进）。 */
+    private static final String UNFINISHED_STATE_LIST =
+            "'CREATED', 'ACCEPTED', 'RECEIVED', 'FAILED', 'RETRYING'";
+
+    /**
+     * 不依赖客户端在线状态推进过期：EXISTS 关联 lk_message.expires_at，
+     * 只动未终结的记录；先取主键再批量更新，避免一条 UPDATE 扫全表。
+     */
+    @Override
+    public int expireOverdue(long now, int batchSize) {
+        List<String[]> keys = selectKeys(
+                "SELECT d.message_id, d.client_id FROM lk_delivery d "
+                        + "WHERE d.state IN (" + UNFINISHED_STATE_LIST + ") "
+                        + "AND EXISTS (SELECT 1 FROM lk_message m WHERE m.message_id = d.message_id "
+                        + "AND m.expires_at IS NOT NULL AND m.expires_at < ?) "
+                        + "LIMIT ?",
+                now, batchSize, "查询待过期投递记录失败");
+        if (keys.isEmpty()) {
+            return 0;
+        }
+        return batchUpdate(
+                "UPDATE lk_delivery SET state = ?, last_error = ?, updated_at = ? "
+                        + "WHERE message_id = ? AND client_id = ? "
+                        + "AND state IN (" + UNFINISHED_STATE_LIST + ")",
+                MessageState.EXPIRED, "消息已过期", now, keys, "标记投递过期失败");
+    }
+
+    /**
+     * 清理已终结且超过保留期的投递记录，并回收不再被引用的消息正文。
+     *
+     * <p>DEAD_LETTER 永不清理——它是"需要人工介入"的唯一凭据。</p>
+     */
+    @Override
+    public int purgeSettledBefore(long deadline, int batchSize) {
+        List<String[]> settled = selectKeys(
+                "SELECT message_id, client_id FROM lk_delivery "
+                        + "WHERE state IN (" + TERMINAL_STATE_LIST + ") AND updated_at < ? "
+                        + "ORDER BY updated_at ASC LIMIT ?",
+                deadline, batchSize, "查询待清理投递记录失败");
+        if (settled.isEmpty()) {
+            return 0;
+        }
+        int deleted = batchDelete(
+                "DELETE FROM lk_delivery WHERE message_id = ? AND client_id = ? "
+                        + "AND state IN (" + TERMINAL_STATE_LIST + ")",
+                settled, "清理投递记录失败");
+        purgeOrphanMessages(deadline, batchSize);
+        return deleted;
+    }
+
+    /**
+     * 删除不再被任何投递记录引用的消息正文。
+     *
+     * <p>先查主键再删：MySQL 不允许在子查询里引用被更新的同一张表（错误 1093），
+     * 先取 id 列表是唯一两端通吃的写法。</p>
+     */
+    private void purgeOrphanMessages(long deadline, int batchSize) {
+        List<String> messageIds = new ArrayList<String>();
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT m.message_id FROM lk_message m WHERE m.created_at < ? "
+                             + "AND NOT EXISTS (SELECT 1 FROM lk_delivery d WHERE d.message_id = m.message_id) "
+                             + "ORDER BY m.created_at ASC LIMIT ?")) {
+            ps.setLong(1, deadline);
+            ps.setInt(2, batchSize);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    messageIds.add(rs.getString(1));
+                }
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "查询孤儿消息失败", e);
+        }
+        if (messageIds.isEmpty()) {
+            return;
+        }
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "DELETE FROM lk_message WHERE message_id = ?")) {
+            for (String messageId : messageIds) {
+                ps.setString(1, messageId);
+                ps.addBatch();
+            }
+            ps.executeBatch();
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "清理消息正文失败", e);
+        }
+    }
+
+    /** 按时间上界 + 条数上限取待处理主键（(messageId, clientId) 二元组）。 */
+    private List<String[]> selectKeys(String sql, long timeBound, int limit, String errorMessage) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setLong(1, timeBound);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<String[]> keys = new ArrayList<String[]>();
+                while (rs.next()) {
+                    keys.add(new String[]{rs.getString(1), rs.getString(2)});
+                }
+                return keys;
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR, errorMessage, e);
+        }
+    }
+
+    private int batchUpdate(String sql, MessageState state, String lastError, long now,
+                            List<String[]> keys, String errorMessage) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql)) {
+            for (String[] key : keys) {
+                ps.setString(1, state.name());
+                ps.setString(2, lastError);
+                ps.setLong(3, now);
+                ps.setString(4, key[0]);
+                ps.setString(5, key[1]);
+                ps.addBatch();
+            }
+            int affected = 0;
+            for (int count : ps.executeBatch()) {
+                if (count > 0) {
+                    affected += count;
+                }
+            }
+            return affected;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR, errorMessage, e);
+        }
+    }
+
+    private int batchDelete(String sql, List<String[]> keys, String errorMessage) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql)) {
+            for (String[] key : keys) {
+                ps.setString(1, key[0]);
+                ps.setString(2, key[1]);
+                ps.addBatch();
+            }
+            int affected = 0;
+            for (int count : ps.executeBatch()) {
+                if (count > 0) {
+                    affected += count;
+                }
+            }
+            return affected;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR, errorMessage, e);
         }
     }
 
