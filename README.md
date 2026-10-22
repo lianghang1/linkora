@@ -540,8 +540,21 @@ MVC 宿主（`@Import(LinkoraClientConfiguration.class)`）同理，但自定义
 
 **服务端完全自实现**（连内置 JDBC 实现也不要）：实现 `ClientRegistry` / `MessageRepository` /
 `DeliveryRepository` / `ClientCursorRepository` 四个接口、声明为 bean 即可，表结构完全由你
-管理。必须遵守：仓储方法自管事务时**尊重连接的 autoCommit 状态**——仅 `autoCommit=true`
-时自行提交；为 `false`（宿主事务接管）时严禁中途 commit/rollback，否则破坏发件箱语义。
+管理。必须遵守（内置实现已按此契约写好，仅自实现者需要照做）——仓储方法要**判断 JDBC
+连接的 autoCommit 状态**（`java.sql.Connection` 的属性，不是 Linkora 配置）来决定谁负责提交：
+
+```java
+try (Connection c = dataSource.getConnection()) {
+    boolean ownTx = c.getAutoCommit();  // true = 当前没有外部事务（如 Linkora 后台扫描线程调用）
+    // ... 执行 SQL ...
+    if (ownTx) {
+        c.commit();     // 事务外：方法内自行提交
+    }
+    // autoCommit=false 说明正处在宿主 @Transactional 内：只执行 SQL，
+    // 绝不能自己 commit/rollback，由 Spring 在事务边界统一提交/回滚——
+    // 否则业务回滚时消息行已被你提交，发件箱语义被破坏
+}
+```
 
 ---
 
