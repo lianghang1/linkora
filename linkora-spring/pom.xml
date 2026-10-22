@@ -14,12 +14,18 @@
     <packaging>jar</packaging>
 
     <name>Linkora Spring</name>
-    <description>Spring MVC 宿主薄装配辅助：从容器 SPI bean 组装 LinkoraServer，并把三个端点 Servlet 注册进任意 ServletContext（不依赖 Spring Boot）。</description>
+    <description>Spring MVC 宿主装配辅助：从容器 SPI bean 组装 LinkoraServer，并把三个端点 Servlet 注册进任意 ServletContext（不依赖 Spring Boot）。含 JDBC 存储实现，宿主可换自实现接管事务。</description>
 
     <dependencies>
         <dependency>
             <groupId>com.linkora</groupId>
             <artifactId>linkora-server</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- JDBC 存储：默认存储实现（宿主可换自实现接管事务） -->
+        <dependency>
+            <groupId>com.linkora</groupId>
+            <artifactId>linkora-server-storage-jdbc</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -41,12 +47,6 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.linkora</groupId>
-            <artifactId>linkora-server-storage-jdbc</artifactId>
-            <version>${project.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>

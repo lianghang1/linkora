@@ -2,7 +2,7 @@
 
 与 [spring-boot-server](../spring-boot-server/README.md) 相同的业务场景与分层结构，
 差异在于装配方式：服务端是 Spring MVC 注解容器 + 内嵌 Jetty（`linkora-spring`
-薄装配，不依赖 Spring Boot），客户端是**纯 Java、零 Spring 依赖**，手动装配。
+装配，不依赖 Spring Boot），客户端是**纯 Java、零 Spring 依赖**，手动装配。
 消息处理链路详解见 [docs/message-handling.md](../../docs/message-handling.md)。
 
 ## 业务场景与消息

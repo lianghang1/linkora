@@ -55,9 +55,9 @@
 
 已提供 Spring 集成模块（**不影响核心模块零 Spring 依赖**）：
 
-- `linkora-spring`：Spring MVC 宿主薄装配辅助（基于 Spring 5.3.31，
-  不依赖 Spring Boot）。宿主提供四个存储 SPI bean，
-  `LinkoraServerConfiguration` 组装并管理 `LinkoraServer` 生命周期，
+- `linkora-spring`：Spring MVC 宿主装配辅助（基于 Spring 5.3.31，
+  不依赖 Spring Boot）。含 JDBC 存储实现，宿主也可自实现四个存储 SPI bean
+  接管事务，`LinkoraServerConfiguration` 组装并管理 `LinkoraServer` 生命周期，
   `LinkoraServlets.register()` 一行注册三端点；
 - `linkora-spring-boot-starter`：Spring Boot 2.7.18 自动装配
   （`linkora.server.*` / `linkora.client.*` 配置项，DataSource 即得服务端）；

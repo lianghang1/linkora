@@ -22,7 +22,7 @@
 | linkora-transport | OkHttp 4.x 传输实现 + Servlet 3.1 异步适配器（嵌入宿主已有容器） |
 | linkora-serialize-jackson | Jackson JSON 编解码（仅用 2.13+ 稳定 API） |
 | linkora-testkit | 测试支撑：嵌入式服务器、录制监听器、测试凭据库（不进生产） |
-| linkora-spring | Spring MVC 宿主薄装配辅助（不依赖 Spring Boot） |
+| linkora-spring | Spring MVC 宿主装配辅助（不依赖 Spring Boot，含 JDBC 存储） |
 | linkora-spring-boot-starter | Spring Boot 2.7 自动装配（DataSource 即得服务端，客户端可配） |
 | examples/* | 可运行示例：普通 Java ×2、Spring MVC、Spring Boot、服务端/客户端事务接管 ×2 |
 
