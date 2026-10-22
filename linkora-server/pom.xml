@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.linkora</groupId>
+        <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-parent</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
@@ -18,11 +18,11 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.linkora</groupId>
+            <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.linkora</groupId>
+            <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-serialize-jackson</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -38,7 +38,7 @@
         </dependency>
         <!-- 测试依赖：H2 + Jetty 用于端到端验证（生产由宿主提供数据库与容器） -->
         <dependency>
-            <groupId>com.linkora</groupId>
+            <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-server-storage-jdbc</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>

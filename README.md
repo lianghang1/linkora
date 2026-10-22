@@ -21,7 +21,7 @@
 
 ```xml
 <dependency>
-    <groupId>com.linkora</groupId>
+    <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring-boot-starter</artifactId> <!-- 或 linkora-spring -->
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
@@ -35,7 +35,7 @@
 
 ```xml
 <dependency>
-    <groupId>com.linkora</groupId>
+    <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring-boot-starter</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
@@ -140,7 +140,7 @@ boolean accepted = uplinkPublisher.awaitServerAccepted(messageId, 30_000);
 
 ```xml
 <dependency>
-    <groupId>com.linkora</groupId>
+    <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>
@@ -183,7 +183,7 @@ LinkoraServlets.register(linkoraServer, servletContext); // 一行
 ```xml
 <!-- 同一个包，客户端能力随包传递 -->
 <dependency>
-    <groupId>com.linkora</groupId>
+    <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-spring</artifactId>
     <version>0.1.0-SNAPSHOT</version>
 </dependency>

@@ -4,13 +4,35 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.linkora</groupId>
+    <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>Linkora</name>
     <description>面向线上服务与多个线下 Java 客户端的可靠双端通信 SDK（SSE 下行 + HTTPS POST 上行）</description>
+    <url>https://github.com/lianghang1/linkora</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>lianghang</id>
+            <name>lianghang</name>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/lianghang1/linkora.git</connection>
+        <developerConnection>scm:git:git@github.com:lianghang1/linkora.git</developerConnection>
+        <url>https://github.com/lianghang1/linkora</url>
+    </scm>
 
     <modules>
         <module>linkora-core</module>
@@ -47,17 +69,17 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>com.linkora</groupId>
+                <groupId>io.github.lianghang1</groupId>
                 <artifactId>linkora-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.linkora</groupId>
+                <groupId>io.github.lianghang1</groupId>
                 <artifactId>linkora-spring</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.linkora</groupId>
+                <groupId>io.github.lianghang1</groupId>
                 <artifactId>linkora-spring-boot-starter</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -174,4 +196,78 @@
             </plugins>
         </pluginManagement>
     </build>
+
+    <!-- 发布到 Maven Central（Central Portal）：mvn clean deploy -Prelease
+         前置：Portal 账号 + io.github.lianghang1 命名空间验证 + settings.xml 配 server id=central + GPG 密钥 -->
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <!-- Central 必需：源码包 -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- Central 必需：Javadoc 包；doclint 关闭避免中文注释严格校验失败 -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.10.1</version>
+                        <configuration>
+                            <doclint>none</doclint>
+                            <charset>UTF-8</charset>
+                            <encoding>UTF-8</encoding>
+                            <docencoding>UTF-8</docencoding>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- Central 必需：GPG 签名（跳过试跑：-Dgpg.skip=true） -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.6</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- Central Portal 上传（server id=central，token 配置在 settings.xml） -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.6.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <!-- 校验通过即返回，去 Portal 页面确认后点 Publish；自动直发可改 true -->
+                            <autoPublish>false</autoPublish>
+                            <waitUntil>validated</waitUntil>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

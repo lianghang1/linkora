@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.linkora</groupId>
+        <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-parent</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
@@ -19,18 +19,18 @@
     <dependencies>
         <!-- 复用 linkora-spring 的服务端装配核心（LinkoraServerAssembler），传递 linkora-server 与 JDBC 存储 -->
         <dependency>
-            <groupId>com.linkora</groupId>
+            <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-spring</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- 客户端编排与 SQLite 存储：引入 starter 即获得客户端完整能力（宿主可换自实现 ClientStore） -->
         <dependency>
-            <groupId>com.linkora</groupId>
+            <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-client</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.linkora</groupId>
+            <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-client-storage-sqlite</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -57,7 +57,7 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.linkora</groupId>
+            <groupId>io.github.lianghang1</groupId>
             <artifactId>linkora-testkit</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
