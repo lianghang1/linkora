@@ -388,8 +388,7 @@ public final class LinkoraClient implements AutoCloseable {
             message = codec.decodeMessage(json);
         } catch (LinkoraException e) {
             // 解不开也必须给服务端一个明确答复：否则它会按 pacing（最长 60s 一次）
-            // 无限重推，带 sequenceKey 时还会永久占住该键的车道。
-            // messageId 是 JSON 的第一个字段，坏消息通常仍能抠出来。
+            // 无限重推。messageId 是 JSON 的第一个字段，坏消息通常仍能抠出来。
             String failedId = extractMessageIdLenient(json);
             if (failedId == null) {
                 log.warn("下行消息解析失败且无法提取 messageId，只能依赖消息过期兜底: {}",
