@@ -46,7 +46,8 @@ mvn -pl examples/plain-java-client exec:java "-Dexec.mainClass=com.linkora.examp
 ```
 
 Spring 宿主示例（每个示例内含 server-app 服务端 + client-app 客户端，
-完整演示下行监听/处理/ACK、上行发送、服务端下发）：
+演示"线上下单/评价通知线下、线下回传订单状态/回复评价"的四向消息闭环，
+业务代码采用 controller/service 分层，见各示例 README 与 docs/message-handling.md）：
 
 ```bash
 # Spring Boot 宿主（starter 自动装配）
@@ -65,10 +66,10 @@ mvn -pl examples/spring-tx-server compile exec:java "-Dexec.mainClass=com.linkor
 mvn -pl examples/tx-client compile exec:java "-Dexec.mainClass=com.linkora.example.txclient.TxClientMain"
 ```
 
-服务端业务接口：Spring Boot 宿主 `http://127.0.0.1:8082/api/status`、
-Spring MVC 宿主 `http://127.0.0.1:8081/api/status`；下发消息用
-`POST /api/notify?clientId=demo-client&text=hello`（client-app 亦会
-自动触发一次下发形成收发闭环）。
+服务端业务接口（触发下行通知）：Spring Boot 宿主 `http://127.0.0.1:8082/api/orders`、
+`/api/reviews`；Spring MVC 宿主 `http://127.0.0.1:8081/api/orders`、`/api/reviews`。
+上行处理结果查询：`GET /api/uplink/order-status-updates`、`GET /api/uplink/review-replies`
+（client-app 会自动跑完四向闭环并输出 `[PASS]`）。
 
 ## 文档
 
@@ -76,6 +77,7 @@ Spring MVC 宿主 `http://127.0.0.1:8081/api/status`；下发消息用
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | 架构与模块边界 |
 | [docs/protocol.md](docs/protocol.md) | 线路协议与消息/ACK 结构 |
+| [docs/message-handling.md](docs/message-handling.md) | 消息处理链路与业务接入（上行/下行回调） |
 | [docs/reliability.md](docs/reliability.md) | 可靠投递语义与状态机 |
 | [docs/security.md](docs/security.md) | HMAC 认证、防爆破、凭据管理 |
 | [docs/deployment.md](docs/deployment.md) | 部署、配置、升级与备份 |
