@@ -55,6 +55,7 @@ public class LinkoraClientEndToEndTest {
     private LinkoraClient client;
     private final List<String> processedIds = new CopyOnWriteArrayList<String>();
     private final AtomicInteger listenerCalls = new AtomicInteger(0);
+    private final AtomicInteger slowCalls = new AtomicInteger(0);
     private volatile boolean failProcessing = false;
 
     @Before
@@ -108,6 +109,19 @@ public class LinkoraClientEndToEndTest {
                         .retryBackoffMaxMs(200)
                         .build())
                 .build();
+        // 慢监听器：不显式 ACK，靠"返回即自动 ACK"。用于验证恢复扫描重复派发时
+        // 业务是否会被执行多次（单 worker 串行 + 处理完立即 PROCESSED，第二个任务应直接跳过）。
+        client.addListener("SLOW_EVENT", new MessageListener() {
+            @Override
+            public void onMessage(LinkoraReceivedMessage message) {
+                slowCalls.incrementAndGet();
+                try {
+                    Thread.sleep(600L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
         client.addListener("BIZ_EVENT", new MessageListener() {
             @Override
             public void onMessage(LinkoraReceivedMessage message) {
@@ -133,6 +147,18 @@ public class LinkoraClientEndToEndTest {
         } catch (Exception e) {
             // 忽略关闭异常
         }
+    }
+
+    @Test
+    public void slowListenerRunsOnceDespiteRecoveryRescan() throws Exception {
+        // recoveryIntervalMs=200ms，监听器耗时 600ms：恢复扫描会在处理中把它再派发一次。
+        // 单 worker 串行 → 第二个任务必然在第一个 ACK 之后才执行 → 看到 PROCESSED 直接跳过。
+        server.publish(CLIENT_ID, "SLOW_EVENT", "{\"n\":1}".getBytes(StandardCharsets.UTF_8));
+        long deadline = System.currentTimeMillis() + 2500L;
+        while (System.currentTimeMillis() < deadline) {
+            Thread.sleep(100L);
+        }
+        assertEquals("自动 ACK 下，重复派发的任务不得重复执行业务", 1, slowCalls.get());
     }
 
     // ---------------- 上行 ----------------
