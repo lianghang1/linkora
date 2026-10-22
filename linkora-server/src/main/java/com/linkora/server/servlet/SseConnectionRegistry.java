@@ -81,6 +81,15 @@ public final class SseConnectionRegistry {
         return Collections.unmodifiableSet(connections.keySet());
     }
 
+    /** 全部连接快照（写超时巡检、监控用）。 */
+    public List<SseClientConnection> allConnections() {
+        List<SseClientConnection> all = new ArrayList<SseClientConnection>();
+        for (List<SseClientConnection> list : connections.values()) {
+            all.addAll(list);
+        }
+        return all;
+    }
+
     public int totalConnections() {
         int total = 0;
         for (List<SseClientConnection> list : connections.values()) {
