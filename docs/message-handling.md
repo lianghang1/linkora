@@ -76,7 +76,7 @@
 
 | 宿主 | 接入方式 |
 |---|---|
-| Spring Boot | 上行：写一个实现 SDK `UplinkHandler` 的 `@Service`，starter 自动收集并经内置 `UplinkRouter` 分发（零装配代码）；需要泛化回调时也可实现 `IngestListener` bean |
+| Spring Boot | 上行：写一个继承 SDK `JsonUplinkHandler<T>`（payload 自动 JSON 反序列化）或实现 `UplinkHandler` 的 `@Service`，starter 自动收集并经内置 `UplinkRouter` 分发（零装配代码）；需要泛化回调时也可实现 `IngestListener` bean |
 | Spring MVC | 同上，`linkora-spring` 的 `LinkoraServerConfiguration` 自动接入 |
 | 纯 Java | `LinkoraServer.builder().ingestListener(listener)` 手动注册 |
 

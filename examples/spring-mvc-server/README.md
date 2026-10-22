@@ -27,12 +27,13 @@ com.linkora.example.springmvc
     ├── OrderService              # 下行：组装订单消息 → linkoraServer.publish
     ├── ReviewService             # 下行：组装评价消息 → linkoraServer.publish
     └── uplink
-        ├── OrderStatusHandler    # 处理订单状态回传（实现 SDK 的 UplinkHandler），内存记录供查询
-        └── ReviewReplyHandler    # 处理评价回复（实现 SDK 的 UplinkHandler），内存记录供查询
+        ├── OrderStatusHandler    # 处理订单状态回传（继承 SDK 的 JsonUplinkHandler<T>），内存记录供查询
+        └── ReviewReplyHandler    # 处理评价回复（继承 SDK 的 JsonUplinkHandler<T>），内存记录供查询
 ```
 
 上行接线：`LinkoraServerConfiguration` 自动收集容器里全部 `UplinkHandler` bean
-（SDK 接口 `com.linkora.core.uplink.UplinkHandler`），经内置路由器按
+（SDK 接口 `com.linkora.core.uplink.UplinkHandler`；推荐直接继承
+`JsonUplinkHandler<T>`，payload 自动反序列化为业务 DTO），经内置路由器按
 messageType 分发——新增一种上行消息 = 新增一个 handler 类，零装配代码。
 
 ## 客户端结构（client-app，引 linkora-spring 单包）

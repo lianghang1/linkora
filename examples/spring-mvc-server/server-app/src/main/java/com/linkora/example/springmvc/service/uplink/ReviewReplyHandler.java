@@ -1,10 +1,7 @@
 package com.linkora.example.springmvc.service.uplink;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.linkora.core.error.LinkoraException;
 import com.linkora.core.message.LinkoraMessage;
-import com.linkora.core.uplink.UplinkHandler;
-import com.linkora.serialize.jackson.LinkoraJsonUtil;
+import com.linkora.serialize.jackson.JsonUplinkHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,13 +11,14 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * 评价回复处理器（线上侧）：处理线下门店对用户评价的回复。
- * payload 为 JSON：{@code {"reviewId":"RV-2001","reply":"感谢反馈"}}。
+ * 评价回复处理器（线上侧）：处理线下门店对用户评价的回复，继承 SDK 的
+ * {@link JsonUplinkHandler}，payload 自动反序列化为 {@link ReplyPayload}。
+ * payload：{@code {"reviewId":"RV-2001","reply":"感谢反馈"}}。
  *
  * @author lianghang
  */
 @Service
-public class ReviewReplyHandler implements UplinkHandler {
+public class ReviewReplyHandler extends JsonUplinkHandler<ReviewReplyHandler.ReplyPayload> {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewReplyHandler.class);
 
@@ -30,29 +28,29 @@ public class ReviewReplyHandler implements UplinkHandler {
     /** 已收到的回复（演示用内存记录，真实场景应落库）。 */
     private final List<ReviewReply> received = new CopyOnWriteArrayList<ReviewReply>();
 
+    public ReviewReplyHandler() {
+        super(ReplyPayload.class);
+    }
+
     @Override
     public String messageType() {
         return TOPIC_REVIEW_REPLY;
     }
 
     @Override
-    public void handle(LinkoraMessage message) {
-        String reviewId;
-        String reply;
-        try {
-            JsonNode payload = LinkoraJsonUtil.readTree(message.getPayload());
-            reviewId = payload.path("reviewId").asText("");
-            reply = payload.path("reply").asText("");
-        } catch (LinkoraException e) {
-            log.warn("评价回复消息 payload 解析失败，忽略: messageId={}", message.getMessageId(), e);
-            return;
-        }
-        received.add(new ReviewReply(reviewId, reply, message.getClientId(),
+    protected void handle(LinkoraMessage message, ReplyPayload payload) {
+        received.add(new ReviewReply(payload.reviewId, payload.reply, message.getClientId(),
                 System.currentTimeMillis()));
         log.info("线下评价回复: clientId={}, reviewId={}, reply={}, messageId={}",
-                message.getClientId(), reviewId, reply, message.getMessageId());
+                message.getClientId(), payload.reviewId, payload.reply, message.getMessageId());
         System.out.println("[上行-评价回复] clientId=" + message.getClientId()
-                + " 评价 " + reviewId + " ← " + reply);
+                + " 评价 " + payload.reviewId + " ← " + payload.reply);
+    }
+
+    /** 评价回复 payload DTO。 */
+    public static final class ReplyPayload {
+        public String reviewId;
+        public String reply;
     }
 
     /** 已处理的回复列表（供 GET /api/uplink/review-replies 查询）。 */
