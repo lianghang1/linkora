@@ -58,6 +58,32 @@ public class JdbcServerStorageTest {
         });
     }
 
+    @Test
+    public void migrationReplaysDdlAlreadyApplied() {
+        // 真实崩溃场景：ALTER 已执行（DDL 隐式提交），但 version 未写入 → 重启重跑同一条 ALTER。
+        // 若"列已存在"不被容错，服务端会永久起不来。
+        DataSource ds = freshH2("schema-replay");
+        JdbcServerSchema.migrate(ds);
+        int latest = JdbcServerSchema.LATEST_VERSION;
+        try (Connection c = ds.getConnection();
+             java.sql.Statement st = c.createStatement()) {
+            st.executeUpdate("DELETE FROM lk_schema_version WHERE version = " + latest);
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException(e);
+        }
+
+        JdbcServerSchema.migrate(ds);
+
+        try (Connection c = ds.getConnection();
+             java.sql.Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT MAX(version) FROM lk_schema_version")) {
+            rs.next();
+            assertEquals("重放后版本应回到最新", latest, rs.getInt(1));
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     // ---------------- MessageRepository ----------------
 
     @Test

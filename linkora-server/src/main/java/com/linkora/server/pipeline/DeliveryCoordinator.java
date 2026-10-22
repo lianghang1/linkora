@@ -65,6 +65,16 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
     private final ConcurrentHashMap<String, PushPacing> pacing =
             new ConcurrentHashMap<String, PushPacing>();
 
+    /**
+     * 轮转游标的强制回卷周期。
+     *
+     * <p>游标只在"本批装满"时前进，被 SQL 过滤掉的记录（未到重试时间、同键被门禁挡住）
+     * 不进入结果集，因此游标一旦越过它们就不会再回头。持续满批（每个扫描周期都有
+     * ≥ pushBatchSize 条可投）时会一直前进，那些记录将长期不被重试。
+     * 定期强制回卷到 0 兜住这种场景：最坏延迟一个周期。</p>
+     */
+    private static final long SWEEP_CURSOR_RESET_MS = 30_000L;
+
     /** 维护动作（过期推进/清理）的最小执行间隔：不必跟着 5s 的推送节奏跑。 */
     private static final long MAINTENANCE_INTERVAL_MS = 60_000L;
 
@@ -81,6 +91,9 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
      */
     private final ConcurrentHashMap<String, Long> sweepCursor =
             new ConcurrentHashMap<String, Long>();
+
+    /** 上次强制回卷游标的时间；仅 sweep 单线程访问，volatile 兜可见性。 */
+    private volatile long lastCursorResetAt = 0L;
 
     public DeliveryCoordinator(ClientAuthenticator authenticator,
                                ClientRegistry clientRegistry,
@@ -184,6 +197,11 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
      */
     public void sweep() {
         long now = System.currentTimeMillis();
+        if (now - lastCursorResetAt >= SWEEP_CURSOR_RESET_MS) {
+            // 定期回卷：游标会越过"被 SQL 过滤掉的记录"，持续满批时它们永远轮不到
+            lastCursorResetAt = now;
+            sweepCursor.clear();
+        }
         Set<String> active = gateway.activeClientIds();
         for (String clientId : active) {
             try {

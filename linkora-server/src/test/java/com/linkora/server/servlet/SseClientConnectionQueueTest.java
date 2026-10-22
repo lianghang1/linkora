@@ -124,6 +124,23 @@ public class SseClientConnectionQueueTest {
         release.countDown();
     }
 
+    @Test
+    public void oversizedFrameHonorsByteBudgetNotJustFrameCount() {
+        // 帧数闸门（capacity=100）挡不住大消息：单帧 1.37MB 时 100 帧就是 137MB。
+        // 字节闸门（8MB）必须先生效。
+        AtomicInteger disconnects = new AtomicInteger();
+        SseClientConnection connection = connection(new java.io.StringWriter(), 100, disconnects);
+
+        StringBuilder huge = new StringBuilder(9 * 1024 * 1024);
+        for (int i = 0; i < 9 * 1024 * 1024; i++) {
+            huge.append('x');
+        }
+
+        assertFalse("超过字节预算必须拒绝入队", connection.sendEvent("1", "message", huge.toString()));
+        assertFalse("字节超限应断开连接，靠重连补发", connection.isOpen());
+        assertEquals(1, disconnects.get());
+    }
+
     // ---------------- 构造与桩 ----------------
 
     private SseClientConnection connection(Writer sink, int capacity, final AtomicInteger disconnects) {

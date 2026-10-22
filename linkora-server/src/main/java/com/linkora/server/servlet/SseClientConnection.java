@@ -59,6 +59,19 @@ public final class SseClientConnection {
     private final AtomicReference<ScheduledFuture<?>> heartbeatTask =
             new AtomicReference<ScheduledFuture<?>>();
 
+    /**
+     * 单连接排队帧的字节上限（第二道闸）。
+     *
+     * <p>队列按帧数限流（默认 1024），但单帧大小由 payload 决定：1MB payload 的帧约
+     * 1.37MB，1024 帧即 1.4GB——帧数闸门对大消息形同虚设。这里按累计字节再挡一次，
+     * 超过即断开（消息仍在 lk_delivery，重连补发恢复）。</p>
+     */
+    private static final long MAX_QUEUED_BYTES = 8L * 1024 * 1024;
+
+    /** 已入队但尚未写出的帧的累计字节（UTF-16 char 数近似，base64 载荷 1:1）。 */
+    private final java.util.concurrent.atomic.AtomicLong queuedBytes =
+            new java.util.concurrent.atomic.AtomicLong();
+
     /** 当前这次 flush 的开始时间（0 表示空闲），供写超时看门狗判定僵尸连接。 */
     private volatile long writingSince = 0L;
 
@@ -157,8 +170,17 @@ public final class SseClientConnection {
         if (closed.get()) {
             return false;
         }
+        long size = frame.length();
+        if (queuedBytes.addAndGet(size) > MAX_QUEUED_BYTES) {
+            queuedBytes.addAndGet(-size);
+            log.warn("SSE 待写字节超过 {}MB，主动断开连接: clientId={}",
+                    MAX_QUEUED_BYTES >> 20, clientId);
+            close(new IOException("SSE 待写字节超过 " + (MAX_QUEUED_BYTES >> 20) + "MB"));
+            return false;
+        }
         if (!pending.offer(frame)) {
             // 队列满：该客户端已长期跟不上，主动断开靠重连补发恢复，绝不无限缓冲
+            queuedBytes.addAndGet(-size);
             log.warn("SSE 发送队列已满（容量 {}），主动断开连接: clientId={}",
                     queueCapacity, clientId);
             close(new IOException("SSE 发送队列已满（容量 " + queueCapacity + "）"));
@@ -190,6 +212,7 @@ public final class SseClientConnection {
         try {
             String frame;
             while (!closed.get() && (frame = pending.poll()) != null) {
+                queuedBytes.addAndGet(-frame.length());
                 if (!write(frame)) {
                     return;
                 }

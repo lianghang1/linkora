@@ -132,7 +132,7 @@ public final class JdbcServerSchema {
             createVersionTable(connection);
             int current = currentVersion(connection);
             for (int version = current + 1; version <= migrations.length; version++) {
-                applyMigration(connection, version, migrations[version - 1], mysql);
+                applyMigration(connection, version, migrations[version - 1]);
             }
         } catch (SQLException e) {
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
@@ -159,8 +159,20 @@ public final class JdbcServerSchema {
         }
     }
 
-    private static void applyMigration(Connection connection, int version, String[] statements,
-                                       boolean mysql) throws SQLException {
+    /**
+     * "对象已存在"类错误：迁移天然幂等，重复执行视为成功。
+     *
+     * <p>MySQL：1050 表已存在 / 1060 列已存在 / 1061 索引名重复；
+     * H2：42101 表已存在 / 42111 索引已存在 / 42121 列已存在。</p>
+     */
+    private static boolean isAlreadyExists(SQLException e) {
+        int code = e.getErrorCode();
+        return code == 1050 || code == 1060 || code == 1061
+                || code == 42101 || code == 42111 || code == 42121;
+    }
+
+    private static void applyMigration(Connection connection, int version, String[] statements)
+            throws SQLException {
         // 宿主事务接管模式（连接已在手动提交）：迁移加入当前事务，提交/回滚由
         // 宿主裁决，严禁中途 commit/rollback（否则提前提交宿主业务写入）；
         // 自管模式（自动提交连接）保持原行为：本地事务自行提交。
@@ -173,9 +185,11 @@ public final class JdbcServerSchema {
                 try (Statement st = connection.createStatement()) {
                     st.execute(sql);
                 } catch (SQLException e) {
-                    // MySQL DDL 隐式提交：崩溃续跑时对象可能已存在，视为幂等命中
-                    if (mysql && (e.getErrorCode() == 1050 || e.getErrorCode() == 1061)) {
-                        log.info("迁移对象已存在（MySQL 崩溃续跑幂等命中）: {}", sql);
+                    // DDL 隐式提交（MySQL）或独立提交（H2）：崩溃续跑时对象可能已存在。
+                    // 必须把"列已存在"也纳入幂等命中——ALTER ADD COLUMN 成功、后续建索引
+                    // 失败时 version 未写入，重启会重跑同一条 ALTER，不容错就永久起不来。
+                    if (isAlreadyExists(e)) {
+                        log.info("迁移对象已存在（崩溃续跑幂等命中）: {}", sql);
                         continue;
                     }
                     throw e;
