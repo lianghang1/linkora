@@ -308,7 +308,9 @@ linkora.client.db-path=data/client.db
 
 内置存储开箱即用，但**两端都支持换成自己的实现**。两个典型真实诉求：
 
-### 客户端：不想要 SQLite 文件，收发队列进公司统一的 MySQL
+### 客户端：不想要 SQLite 文件，收发队列进 MySQL
+
+场景：客户端部署环境不方便落地文件，或运维希望收发队列与业务数据一样进 MySQL 统一管理。
 
 实现 `com.linkora.core.storage.client.ClientStore` 接口（outbox / inbox / meta 共 14 个方法，
 把内置 SQLite 的 4 张表换成你的 MySQL 表即可）。两条**必须遵守的语义**：
