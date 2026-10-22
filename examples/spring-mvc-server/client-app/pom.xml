@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-example-spring-mvc-server</artifactId>
-        <version>0.1.0-SNAPSHOT</version>
+        <version>0.1.0</version>
     </parent>
 
     <artifactId>linkora-example-spring-mvc-client-app</artifactId>
