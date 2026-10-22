@@ -24,6 +24,11 @@
         </dependency>
         <dependency>
             <groupId>com.linkora</groupId>
+            <artifactId>linkora-serialize-jackson</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.linkora</groupId>
             <artifactId>linkora-server-storage-jdbc</artifactId>
             <version>${project.version}</version>
         </dependency>

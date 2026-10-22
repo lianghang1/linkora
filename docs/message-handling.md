@@ -37,8 +37,8 @@
 | 2. 端点 Servlet 接收 → `LinkoraServer.ingestHttpHandler()` | `linkora-server`（servlet 包）/ `LinkoraServer` | 框架 |
 | 3. `IngestService.ingest()`：认证 → 校验 → 持久化 | `linkora-server` `IngestService` | 框架 |
 | 4. **持久化成功后回调 `IngestListener.onIngested`** | `IngestService.notifyListeners()` | 框架调用、业务实现 |
-| 5. 业务转发器按 messageType 路由 | 示例 `UplinkMessageDispatcher` | 业务侧 |
-| 6. `UplinkHandler.handle()` 执行业务 | 示例 `OrderStatusHandler` / `ReviewReplyHandler` | 业务侧 |
+| 5. 内置路由器按 messageType 路由 | SDK `com.linkora.server.uplink.UplinkRouter`（Spring 宿主自动接入） | 框架 |
+| 6. `UplinkHandler.handle()` 执行业务 | 示例 `OrderStatusHandler` / `ReviewReplyHandler`（实现 SDK 的 `com.linkora.core.uplink.UplinkHandler`） | 业务侧 |
 
 要点：
 
@@ -76,7 +76,7 @@
 
 | 宿主 | 接入方式 |
 |---|---|
-| Spring Boot | 写一个实现 `IngestListener` 的 `@Service`，starter 自动接入；多消息类型推荐示例的 `UplinkHandler` + `UplinkMessageDispatcher` 路由模式 |
+| Spring Boot | 上行：写一个实现 SDK `UplinkHandler` 的 `@Service`，starter 自动收集并经内置 `UplinkRouter` 分发（零装配代码）；需要泛化回调时也可实现 `IngestListener` bean |
 | Spring MVC | 同上，`linkora-spring` 的 `LinkoraServerConfiguration` 自动接入 |
 | 纯 Java | `LinkoraServer.builder().ingestListener(listener)` 手动注册 |
 

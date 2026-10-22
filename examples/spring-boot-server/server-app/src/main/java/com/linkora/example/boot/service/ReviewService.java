@@ -1,7 +1,7 @@
 package com.linkora.example.boot.service;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.linkora.example.boot.support.JsonUtil;
+import com.linkora.serialize.jackson.LinkoraJsonUtil;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.PublishResult;
 import org.springframework.stereotype.Service;
@@ -28,7 +28,7 @@ public class ReviewService {
 
     /** 线上发布评价并通知线下门店。 */
     public PublishResult createReview(String clientId, String reviewId, String content) {
-        ObjectNode payload = JsonUtil.MAPPER.createObjectNode();
+        ObjectNode payload = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         payload.put("reviewId", reviewId);
         payload.put("content", content);
         return linkoraServer.publish(clientId, TOPIC_REVIEW_CREATED,

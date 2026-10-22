@@ -1,6 +1,7 @@
 package com.linkora.spring;
 
 import com.linkora.client.LinkoraClient;
+import com.linkora.client.UplinkPublisher;
 import com.linkora.core.storage.client.ClientStore;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.Bean;
@@ -47,5 +48,14 @@ public class LinkoraClientConfiguration {
                 environment.getProperty("linkora.client.sender-interval-ms", Long.class),
                 environment.getProperty("linkora.client.recovery-interval-ms", Long.class),
                 environment.getProperty("linkora.client.idle-timeout-ms", Long.class));
+    }
+
+    /**
+     * 上行发送便捷入口（发布 + 等待服务端确认），随 {@link LinkoraClient} 一起提供。
+     */
+    @Bean
+    public UplinkPublisher linkoraUplinkPublisher(LinkoraClient linkoraClient,
+                                                  ClientStore clientStore) {
+        return new UplinkPublisher(linkoraClient, clientStore);
     }
 }

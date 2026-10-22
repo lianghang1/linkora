@@ -1,7 +1,6 @@
 package com.linkora.serialize.jackson;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.linkora.core.error.LinkoraErrorCode;
 import com.linkora.core.error.LinkoraException;
@@ -30,19 +29,6 @@ import java.util.Base64;
  */
 public final class MessageJsonCodec {
 
-    private final ObjectMapper mapper;
-
-    public MessageJsonCodec() {
-        this(new ObjectMapper());
-    }
-
-    public MessageJsonCodec(ObjectMapper mapper) {
-        if (mapper == null) {
-            throw new IllegalArgumentException("ObjectMapper 不能为 null");
-        }
-        this.mapper = mapper;
-    }
-
     // ---------------- 消息信封 ----------------
 
     /** 将消息编码为线路 JSON 字符串。 */
@@ -50,7 +36,7 @@ public final class MessageJsonCodec {
         if (message == null) {
             throw new IllegalArgumentException("message 不能为 null");
         }
-        ObjectNode node = mapper.createObjectNode();
+        ObjectNode node = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         node.put("messageId", message.getMessageId());
         node.put("clientId", message.getClientId());
         node.put("messageType", message.getMessageType());
@@ -115,7 +101,7 @@ public final class MessageJsonCodec {
         if (messageId == null || messageId.trim().isEmpty() || ackType == null) {
             throw new IllegalArgumentException("messageId 与 ackType 不能为空");
         }
-        ObjectNode node = mapper.createObjectNode();
+        ObjectNode node = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         node.put("messageId", messageId);
         node.put("ackType", ackType.name());
         if (errorCode != null) {
@@ -151,7 +137,7 @@ public final class MessageJsonCodec {
 
     /** 编码摄入（上行上报）应答：status = ACCEPTED / DUPLICATE。 */
     public String encodeIngestResponse(boolean duplicate, String messageId) {
-        ObjectNode node = mapper.createObjectNode();
+        ObjectNode node = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         node.put("status", duplicate ? "DUPLICATE" : "ACCEPTED");
         node.put("messageId", messageId);
         return node.toString();
@@ -166,7 +152,7 @@ public final class MessageJsonCodec {
 
     /** 编码 ACK 应答。 */
     public String encodeAckResponse() {
-        ObjectNode node = mapper.createObjectNode();
+        ObjectNode node = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         node.put("status", "OK");
         return node.toString();
     }
@@ -179,7 +165,7 @@ public final class MessageJsonCodec {
 
     /** 编码统一错误应答体（配合对应 HTTP 状态码使用）。 */
     public String encodeErrorResponse(LinkoraErrorCode errorCode, String errorMessage) {
-        ObjectNode node = mapper.createObjectNode();
+        ObjectNode node = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         node.put("errorCode", errorCode == null ? LinkoraErrorCode.INTERNAL_ERROR.getCode() : errorCode.getCode());
         node.put("errorMessage", errorMessage == null ? "" : errorMessage);
         return node.toString();
@@ -192,7 +178,7 @@ public final class MessageJsonCodec {
             throw new LinkoraException(LinkoraErrorCode.INVALID_MESSAGE, "请求体为空");
         }
         try {
-            return mapper.readTree(json.getBytes(StandardCharsets.UTF_8));
+            return LinkoraJsonUtil.getObjectMapper().readTree(json.getBytes(StandardCharsets.UTF_8));
         } catch (Exception e) {
             throw new LinkoraException(LinkoraErrorCode.INVALID_MESSAGE, "JSON 解析失败", e);
         }
@@ -203,7 +189,7 @@ public final class MessageJsonCodec {
             throw new LinkoraException(LinkoraErrorCode.INVALID_MESSAGE, "响应体为空");
         }
         try {
-            return mapper.readTree(body);
+            return LinkoraJsonUtil.getObjectMapper().readTree(body);
         } catch (Exception e) {
             throw new LinkoraException(LinkoraErrorCode.INVALID_MESSAGE, "响应 JSON 解析失败", e);
         }

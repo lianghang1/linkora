@@ -6,7 +6,7 @@ import com.linkora.client.OutboxListener;
 import com.linkora.core.message.OutboxStatus;
 import com.linkora.core.storage.client.ClientStore;
 import com.linkora.core.storage.client.OutboxEntry;
-import com.linkora.example.client.support.JsonUtil;
+import com.linkora.serialize.jackson.LinkoraJsonUtil;
 
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
@@ -36,7 +36,7 @@ abstract class AbstractUplinkService {
 
     /** 新建 JSON payload 对象。 */
     protected static ObjectNode newPayload() {
-        return JsonUtil.MAPPER.createObjectNode();
+        return LinkoraJsonUtil.getObjectMapper().createObjectNode();
     }
 
     /**

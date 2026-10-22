@@ -1,6 +1,7 @@
 package com.linkora.spring.boot;
 
 import com.linkora.client.LinkoraClient;
+import com.linkora.client.UplinkPublisher;
 import com.linkora.core.storage.client.ClientStore;
 import com.linkora.spring.LinkoraClientAssembler;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -54,5 +55,15 @@ public class LinkoraClientAutoConfiguration {
                 properties.getSenderIntervalMs(),
                 properties.getRecoveryIntervalMs(),
                 properties.getIdleTimeoutMs());
+    }
+
+    /**
+     * 上行发送便捷入口（发布 + 等待服务端确认）；宿主已定义 UplinkPublisher bean 时不生效。
+     */
+    @Bean
+    @ConditionalOnMissingBean(UplinkPublisher.class)
+    public UplinkPublisher linkoraUplinkPublisher(LinkoraClient linkoraClient,
+                                                  ClientStore clientStore) {
+        return new UplinkPublisher(linkoraClient, clientStore);
     }
 }

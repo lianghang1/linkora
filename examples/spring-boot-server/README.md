@@ -25,15 +25,14 @@ com.linkora.example.boot
     ├── OrderService              # 下行：组装订单消息 → linkoraServer.publish
     ├── ReviewService             # 下行：组装评价消息 → linkoraServer.publish
     └── uplink
-        ├── UplinkHandler         # 上行处理器接口（messageType + handle）
-        ├── UplinkMessageDispatcher  # 实现 IngestListener（唯一框架入口），按类型转发
-        ├── OrderStatusHandler    # 处理订单状态回传，内存记录供查询
-        └── ReviewReplyHandler    # 处理评价回复，内存记录供查询
+        ├── OrderStatusHandler    # 处理订单状态回传（实现 SDK 的 UplinkHandler），内存记录供查询
+        └── ReviewReplyHandler    # 处理评价回复（实现 SDK 的 UplinkHandler），内存记录供查询
 ```
 
-上行接线是全自动的：`UplinkMessageDispatcher` 是容器中唯一的 `IngestListener`
-bean，starter 将其接入 `LinkoraServer`；它再按 messageType 把消息路由给容器里
-全部 `UplinkHandler` 实现。新增一种上行消息 = 新增一个 handler 类。
+上行接线是全自动的：starter 自动收集容器里全部 `UplinkHandler` bean
+（SDK 接口 `com.linkora.core.uplink.UplinkHandler`，两个方法：messageType + handle），
+经内置路由器按 messageType 分发——**新增一种上行消息 = 新增一个 handler 类，
+零装配代码**。
 
 ## 客户端结构（client-app）
 
@@ -44,10 +43,12 @@ com.linkora.example.bootclient
 │   ├── OrderCreatedHandler       # 下行：新订单通知 → 打印 → ackProcessed
 │   └── ReviewCreatedHandler      # 下行：新评价通知 → 打印 → ackProcessed
 └── service
-    ├── AbstractUplinkService     # 公共：outbox 发送 + SERVER_ACCEPTED 确认
-    ├── OrderStatusService        # 上行：改订单状态 → 通知线上
-    └── ReviewReplyService        # 上行：回复评价 → 通知线上
+    ├── OrderStatusService        # 上行：改订单状态 → UplinkPublisher 发布
+    └── ReviewReplyService        # 上行：回复评价 → UplinkPublisher 发布
 ```
+
+上行发送直接用 starter 自动注册的 `UplinkPublisher` bean（SDK 类，
+封装"写本地队列发布 + 等待服务端确认"），业务 service 只负责组装 payload。
 
 ## 运行（仓库根目录，首次先 `mvn install -DskipTests`）
 

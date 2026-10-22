@@ -99,6 +99,7 @@ public class LinkoraServerAutoConfiguration {
                                        ClientCursorRepository cursorRepository,
                                        org.springframework.beans.factory.ObjectProvider<ClientAuthenticator> authenticatorProvider,
                                        org.springframework.beans.factory.ObjectProvider<IngestListener> ingestListenerProvider,
+                                       org.springframework.beans.factory.ObjectProvider<com.linkora.core.uplink.UplinkHandler> uplinkHandlerProvider,
                                        LinkoraServerProperties properties) {
         if (properties.isAutoMigrate()) {
             // 在 server bean 装配（随后的 start）之前完成 schema 迁移
@@ -106,10 +107,12 @@ public class LinkoraServerAutoConfiguration {
         }
         List<IngestListener> ingestListeners = ingestListenerProvider.stream()
                 .collect(java.util.stream.Collectors.toList());
+        List<com.linkora.core.uplink.UplinkHandler> uplinkHandlers = uplinkHandlerProvider.stream()
+                .collect(java.util.stream.Collectors.toList());
         return LinkoraServerAssembler.build(
                 authenticatorProvider.getIfAvailable(),
                 clientRegistry, messageRepository, deliveryRepository, cursorRepository,
-                toServerConfig(properties), null, ingestListeners);
+                toServerConfig(properties), null, ingestListeners, uplinkHandlers);
     }
 
     private static ServerConfig toServerConfig(LinkoraServerProperties p) {

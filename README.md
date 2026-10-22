@@ -66,15 +66,19 @@ public class OrderService {
 }
 ```
 
-接收上行消息 = 实现一个 `IngestListener` bean（客户端 POST 上来、持久化完成后回调；
-回调异常不影响上行结果，上行可靠性由业务侧自行处理）：
+接收上行消息 = 实现一个 `UplinkHandler` bean（**推荐方式**：装配层自动收集全部
+handler bean 经内置路由器按 messageType 分发，零装配代码；需要更泛化的回调
+也可以直接实现 `IngestListener` bean）：
 
 ```java
-@Component
-public class UplinkListener implements IngestListener {
+@Service
+public class OrderStatusHandler implements UplinkHandler {
     @Override
-    public void onIngested(LinkoraMessage message) {
-        // message.getMessageType() 区分类型；业务侧自行落库/分发并保证幂等
+    public String messageType() { return "order-status-updated"; }
+
+    @Override
+    public void handle(LinkoraMessage message) {
+        // 已持久化的上行消息在此处理（业务侧自行落库/分发并保证幂等）
     }
 }
 ```
@@ -120,11 +124,12 @@ public class LinkoraBinding {
 }
 ```
 
-上行发送 = 注入 `LinkoraClient` 调 `publish`（写本地队列后自动发送与重试，
-崩溃不丢；`addOutboxListener` 可等"服务端已接受"确认）：
+上行发送 = 注入 `UplinkPublisher`（客户端装配自动注册的 bean）调 `publish`
+（写本地队列后自动发送与重试，崩溃不丢；`awaitServerAccepted` 可等"服务端已接受"确认）：
 
 ```java
-client.publish("order-status-updated", payloadBytes);
+String messageId = uplinkPublisher.publish("order-status-updated", payload); // 对象自动 JSON 序列化
+boolean accepted = uplinkPublisher.awaitServerAccepted(messageId, 30_000);
 ```
 
 ---

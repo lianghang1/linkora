@@ -105,7 +105,7 @@
                 <artifactId>jackson-databind</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
-            <!-- Boot BOM 会将 jackson-core/annotations 压到 2.13.x，与 databind 2.17.x 混用会 NoClassDefFoundError，必须显式锁定 -->
+            <!-- Boot BOM 会将 jackson-core/annotations/jsr310 压到 2.13.x，与 databind 2.17.x 混用会 NoClassDefFoundError，必须显式锁定 -->
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-core</artifactId>
@@ -114,6 +114,11 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-annotations</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
             <dependency>

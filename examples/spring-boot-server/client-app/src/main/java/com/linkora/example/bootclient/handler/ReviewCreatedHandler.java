@@ -4,9 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.linkora.client.LinkoraReceivedMessage;
 import com.linkora.client.MessageListener;
 import com.linkora.core.error.LinkoraErrorCode;
-import com.linkora.example.bootclient.support.JsonUtil;
+import com.linkora.serialize.jackson.LinkoraJsonUtil;
 
-import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -32,8 +31,8 @@ public class ReviewCreatedHandler implements MessageListener {
     public void onMessage(LinkoraReceivedMessage message) {
         JsonNode payload;
         try {
-            payload = JsonUtil.MAPPER.readTree(message.getPayload());
-        } catch (IOException e) {
+            payload = LinkoraJsonUtil.readTree(message.getPayload());
+        } catch (com.linkora.core.error.LinkoraException e) {
             // 业务处理失败显式 ACK FAILED，服务端按策略重试
             message.ackFailed(LinkoraErrorCode.INVALID_MESSAGE,
                     "payload 不是合法 JSON: " + e.getMessage());

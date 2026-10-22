@@ -1,13 +1,14 @@
 package com.linkora.example.springmvc.service.uplink;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.linkora.core.error.LinkoraException;
 import com.linkora.core.message.LinkoraMessage;
-import com.linkora.example.springmvc.support.JsonUtil;
+import com.linkora.core.uplink.UplinkHandler;
+import com.linkora.serialize.jackson.LinkoraJsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -39,10 +40,10 @@ public class OrderStatusHandler implements UplinkHandler {
         String orderNo;
         String status;
         try {
-            JsonNode payload = JsonUtil.MAPPER.readTree(message.getPayload());
+            JsonNode payload = LinkoraJsonUtil.readTree(message.getPayload());
             orderNo = payload.path("orderNo").asText("");
             status = payload.path("status").asText("");
-        } catch (IOException e) {
+        } catch (LinkoraException e) {
             log.warn("订单状态消息 payload 解析失败，忽略: messageId={}", message.getMessageId(), e);
             return;
         }

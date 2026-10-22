@@ -5,6 +5,7 @@ import com.linkora.core.storage.server.ClientCursorRepository;
 import com.linkora.core.storage.server.ClientRegistry;
 import com.linkora.core.storage.server.DeliveryRepository;
 import com.linkora.core.storage.server.MessageRepository;
+import com.linkora.core.uplink.UplinkHandler;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.ServerConfig;
 import com.linkora.server.auth.ClientAuthenticator;
@@ -14,6 +15,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Spring 宿主装配辅助：容器内存在四个存储 SPI bean 时自动组装 {@link LinkoraServer}。
@@ -30,7 +32,9 @@ import java.util.List;
  *       生产环境务必提供真实认证器（见 docs/security.md）；</li>
  *   <li>{@link ServerConfig} bean —— 缺省使用默认参数；</li>
  *   <li>{@link PayloadSerializer} bean —— 需要发布对象负载时提供；</li>
- *   <li>{@link IngestListener} bean —— 可注册多个，全部按顺序接入 LinkoraServer。</li>
+ *   <li>{@link IngestListener} bean —— 可注册多个，全部按顺序接入 LinkoraServer；</li>
+ *   <li>{@link UplinkHandler} bean —— 推荐的上行接入方式：声明即自动经
+ *       {@code UplinkRouter} 按 messageType 分发，无需自写监听器与路由。</li>
  * </ul>
  *
  * <p>本类只依赖 spring-context，不依赖 Spring Boot；Boot 宿主请优先使用
@@ -55,6 +59,8 @@ public class LinkoraServerConfiguration {
      * @param configProvider 服务端配置提供者（可选）
      * @param payloadSerializerProvider 对象负载序列化器提供者（可选）
      * @param ingestListenerProvider 上行消息业务监听器提供者（可选，可注册多个）
+     * @param uplinkHandlerProvider 上行消息处理器提供者（可选，推荐方式：
+     *        非空时自动经 UplinkRouter 按 messageType 分发）
      */
     @Bean(initMethod = "start", destroyMethod = "close")
     public LinkoraServer linkoraServer(
@@ -65,15 +71,18 @@ public class LinkoraServerConfiguration {
             ObjectProvider<ClientAuthenticator> authenticatorProvider,
             ObjectProvider<ServerConfig> configProvider,
             ObjectProvider<PayloadSerializer> payloadSerializerProvider,
-            ObjectProvider<IngestListener> ingestListenerProvider) {
+            ObjectProvider<IngestListener> ingestListenerProvider,
+            ObjectProvider<UplinkHandler> uplinkHandlerProvider) {
 
         List<IngestListener> ingestListeners = ingestListenerProvider.stream()
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
+        List<UplinkHandler> uplinkHandlers = uplinkHandlerProvider.stream()
+                .collect(Collectors.toList());
         return LinkoraServerAssembler.build(
                 authenticatorProvider.getIfAvailable(),
                 clientRegistry, messageRepository, deliveryRepository, cursorRepository,
                 configProvider.getIfAvailable(),
                 payloadSerializerProvider.getIfAvailable(),
-                ingestListeners);
+                ingestListeners, uplinkHandlers);
     }
 }

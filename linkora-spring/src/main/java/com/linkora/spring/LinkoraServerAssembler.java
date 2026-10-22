@@ -5,14 +5,17 @@ import com.linkora.core.storage.server.ClientCursorRepository;
 import com.linkora.core.storage.server.ClientRegistry;
 import com.linkora.core.storage.server.DeliveryRepository;
 import com.linkora.core.storage.server.MessageRepository;
+import com.linkora.core.uplink.UplinkHandler;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.ServerConfig;
 import com.linkora.server.auth.AllowAllClientAuthenticator;
 import com.linkora.server.auth.ClientAuthenticator;
 import com.linkora.server.pipeline.IngestListener;
+import com.linkora.server.uplink.UplinkRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -28,6 +31,33 @@ public final class LinkoraServerAssembler {
     private static final Logger log = LoggerFactory.getLogger(LinkoraServerAssembler.class);
 
     private LinkoraServerAssembler() {
+    }
+
+    /**
+     * 组装 {@link LinkoraServer}：认证器为 null 时回退 AllowAll 并告警（仅限本地
+     * 开发与测试，生产环境必须提供真实认证器）；config/serializer 为 null 时使用
+     * 默认；监听器按传入顺序接入；uplinkHandlers 非空时自动追加一个
+     * {@link UplinkRouter} 按 messageType 分发。
+     */
+    public static LinkoraServer build(ClientAuthenticator authenticator,
+                                      ClientRegistry clientRegistry,
+                                      MessageRepository messageRepository,
+                                      DeliveryRepository deliveryRepository,
+                                      ClientCursorRepository cursorRepository,
+                                      ServerConfig config,
+                                      PayloadSerializer payloadSerializer,
+                                      List<IngestListener> ingestListeners,
+                                      List<UplinkHandler> uplinkHandlers) {
+        if (uplinkHandlers != null && !uplinkHandlers.isEmpty()) {
+            if (ingestListeners == null) {
+                ingestListeners = new ArrayList<IngestListener>();
+            } else {
+                ingestListeners = new ArrayList<IngestListener>(ingestListeners);
+            }
+            ingestListeners.add(new UplinkRouter(uplinkHandlers));
+        }
+        return build(authenticator, clientRegistry, messageRepository, deliveryRepository,
+                cursorRepository, config, payloadSerializer, ingestListeners);
     }
 
     /**

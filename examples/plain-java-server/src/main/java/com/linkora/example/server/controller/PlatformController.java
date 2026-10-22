@@ -5,7 +5,7 @@ import com.linkora.example.server.service.OrderService;
 import com.linkora.example.server.service.ReviewService;
 import com.linkora.example.server.service.uplink.OrderStatusHandler;
 import com.linkora.example.server.service.uplink.ReviewReplyHandler;
-import com.linkora.example.server.support.JsonUtil;
+import com.linkora.serialize.jackson.LinkoraJsonUtil;
 import com.linkora.server.PublishResult;
 
 import java.io.IOException;
@@ -78,14 +78,14 @@ public class PlatformController extends HttpServlet {
     }
 
     private void publishResult(HttpServletResponse resp, PublishResult result) throws IOException {
-        ObjectNode body = JsonUtil.MAPPER.createObjectNode();
+        ObjectNode body = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         body.put("messageId", result.getMessageId());
         body.put("duplicate", result.isDuplicate());
         writeJson(resp, body);
     }
 
     private void writeJson(HttpServletResponse resp, Object body) throws IOException {
-        byte[] bytes = JsonUtil.MAPPER.writeValueAsBytes(body);
+        byte[] bytes = LinkoraJsonUtil.toJsonBytes(body);
         resp.setContentType("application/json;charset=UTF-8");
         resp.setContentLength(bytes.length);
         resp.getOutputStream().write(bytes);

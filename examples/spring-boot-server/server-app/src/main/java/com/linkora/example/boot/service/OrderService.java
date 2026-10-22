@@ -1,7 +1,7 @@
 package com.linkora.example.boot.service;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.linkora.example.boot.support.JsonUtil;
+import com.linkora.serialize.jackson.LinkoraJsonUtil;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.PublishResult;
 import org.springframework.stereotype.Service;
@@ -30,7 +30,7 @@ public class OrderService {
      * 线上下单并通知线下门店：先持久化（门店离线则上线补投），在线时经 SSE 实时送达。
      */
     public PublishResult placeOrder(String clientId, String orderNo, String item) {
-        ObjectNode payload = JsonUtil.MAPPER.createObjectNode();
+        ObjectNode payload = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         payload.put("orderNo", orderNo);
         payload.put("item", item);
         return linkoraServer.publish(clientId, TOPIC_ORDER_CREATED,
