@@ -32,7 +32,7 @@ public final class JdbcServerSchema {
     private static final Logger log = LoggerFactory.getLogger(JdbcServerSchema.class);
 
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    public static final int LATEST_VERSION = 2;
+    public static final int LATEST_VERSION = 3;
 
     private static final String CREATE_VERSION_TABLE =
             "CREATE TABLE IF NOT EXISTS lk_schema_version ("
@@ -106,10 +106,29 @@ public final class JdbcServerSchema {
             "ALTER TABLE lk_message MODIFY COLUMN payload_base64 LONGTEXT NOT NULL",
     };
 
+    /**
+     * v3：顺序键。lk_message 存键（推送时线路 JSON 需要还原它），
+     * lk_delivery 存键（同 (client_id, sequence_key) 下按 seq 单调投递，
+     * 前一条到终态前不推后一条）；索引支撑"同 key 是否有更早未终结记录"的
+     * NOT EXISTS 判断。ADD COLUMN 重复执行均幂等，崩溃重放安全。
+     */
+    private static final String[] V3_H2 = {
+            "ALTER TABLE lk_message ADD COLUMN IF NOT EXISTS sequence_key VARCHAR(128)",
+            "ALTER TABLE lk_delivery ADD COLUMN IF NOT EXISTS sequence_key VARCHAR(128)",
+            "CREATE INDEX IF NOT EXISTS idx_delivery_client_key_seq "
+                    + "ON lk_delivery (client_id, sequence_key, seq)",
+    };
+    private static final String[] V3_MYSQL = {
+            "ALTER TABLE lk_message ADD COLUMN sequence_key VARCHAR(128)",
+            "ALTER TABLE lk_delivery ADD COLUMN sequence_key VARCHAR(128)",
+            "CREATE INDEX idx_delivery_client_key_seq "
+                    + "ON lk_delivery (client_id, sequence_key, seq)",
+    };
+
     private static final String[][] MIGRATIONS =
-            {concat(V1_TABLES, V1_INDEXES_H2), V2_H2};
+            {concat(V1_TABLES, V1_INDEXES_H2), V2_H2, V3_H2};
     private static final String[][] MIGRATIONS_MYSQL =
-            {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL};
+            {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL, V3_MYSQL};
 
     private static String[] concat(String[] tables, String[] indexes) {
         String[] all = new String[tables.length + indexes.length];
@@ -171,7 +190,9 @@ public final class JdbcServerSchema {
                     st.execute(sql);
                 } catch (SQLException e) {
                     // MySQL DDL 隐式提交：崩溃续跑时对象可能已存在，视为幂等命中
-                    if (mysql && (e.getErrorCode() == 1050 || e.getErrorCode() == 1061)) {
+                    // （1050 表已存在 / 1060 列已存在 / 1061 索引已存在）
+                    if (mysql && (e.getErrorCode() == 1050 || e.getErrorCode() == 1060
+                            || e.getErrorCode() == 1061)) {
                         log.info("迁移对象已存在（MySQL 崩溃续跑幂等命中）: {}", sql);
                         continue;
                     }

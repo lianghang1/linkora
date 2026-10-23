@@ -26,7 +26,8 @@ import java.util.Optional;
 public final class JdbcMessageRepository implements MessageRepository {
 
     private static final String COLUMNS =
-            "message_id, client_id, message_type, payload_base64, created_at, expires_at, schema_version, trace_id";
+            "message_id, client_id, message_type, payload_base64, created_at, expires_at, "
+                    + "schema_version, trace_id, sequence_key";
 
     private final DataSource dataSource;
 
@@ -41,7 +42,7 @@ public final class JdbcMessageRepository implements MessageRepository {
     public boolean save(LinkoraMessage message) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
-                     "INSERT INTO lk_message (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?)")) {
+                     "INSERT INTO lk_message (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?)")) {
             ps.setString(1, message.getMessageId());
             ps.setString(2, message.getClientId());
             ps.setString(3, message.getMessageType());
@@ -50,6 +51,7 @@ public final class JdbcMessageRepository implements MessageRepository {
             setNullableLong(ps, 6, message.getExpiresAt());
             ps.setInt(7, message.getSchemaVersion());
             setNullableString(ps, 8, message.getTraceId());
+            setNullableString(ps, 9, message.getSequenceKey());
             ps.executeUpdate();
             return true;
         } catch (SQLIntegrityConstraintViolationException duplicate) {
@@ -86,6 +88,7 @@ public final class JdbcMessageRepository implements MessageRepository {
                 .expiresAt(getNullableLong(rs, "expires_at"))
                 .schemaVersion(rs.getInt("schema_version"))
                 .traceId(rs.getString("trace_id"))
+                .sequenceKey(rs.getString("sequence_key"))
                 .build();
     }
 
