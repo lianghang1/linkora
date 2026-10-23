@@ -14,6 +14,7 @@ public final class ServerConfig {
     private final long pushPacingBaseMs;
     private final long pushPacingMaxMs;
     private final long messageSizeLimitBytes;
+    private final long maxOutboundBytesPerConnection;
 
     private ServerConfig(Builder b) {
         this.pushBatchSize = b.pushBatchSize;
@@ -24,6 +25,7 @@ public final class ServerConfig {
         this.pushPacingBaseMs = b.pushPacingBaseMs;
         this.pushPacingMaxMs = b.pushPacingMaxMs;
         this.messageSizeLimitBytes = b.messageSizeLimitBytes;
+        this.maxOutboundBytesPerConnection = b.maxOutboundBytesPerConnection;
     }
 
     public static Builder builder() {
@@ -66,6 +68,11 @@ public final class ServerConfig {
     }
 
     /** 上行消息体大小上限（字节）。 */
+    /** 每连接出站队列字节水位：超限断开慢客户端（非阻塞写模型的背压参数）。 */
+    public long getMaxOutboundBytesPerConnection() {
+        return maxOutboundBytesPerConnection;
+    }
+
     public long getMessageSizeLimitBytes() {
         return messageSizeLimitBytes;
     }
@@ -91,6 +98,7 @@ public final class ServerConfig {
         private long pushPacingBaseMs = 5_000L;
         private long pushPacingMaxMs = 60_000L;
         private long messageSizeLimitBytes = 1024 * 1024L;
+        private long maxOutboundBytesPerConnection = 8L * 1024 * 1024;
 
         public Builder pushBatchSize(int pushBatchSize) {
             if (pushBatchSize < 1 || pushBatchSize > 10_000) {
@@ -145,6 +153,14 @@ public final class ServerConfig {
                 throw new IllegalArgumentException("pushPacingMaxMs 必须为正数");
             }
             this.pushPacingMaxMs = pushPacingMaxMs;
+            return this;
+        }
+
+        public Builder maxOutboundBytesPerConnection(long maxOutboundBytesPerConnection) {
+            if (maxOutboundBytesPerConnection <= 0) {
+                throw new IllegalArgumentException("maxOutboundBytesPerConnection 必须 > 0");
+            }
+            this.maxOutboundBytesPerConnection = maxOutboundBytesPerConnection;
             return this;
         }
 

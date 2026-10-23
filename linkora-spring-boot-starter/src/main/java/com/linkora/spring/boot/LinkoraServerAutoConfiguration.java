@@ -172,7 +172,8 @@ public class LinkoraServerAutoConfiguration {
                         properties.getHeartbeatIntervalMs() == null ? 15_000L
                                 : properties.getHeartbeatIntervalMs(),
                         properties.getReconnectHintMs() == null ? 3_000L
-                                : properties.getReconnectHintMs()),
+                                : properties.getReconnectHintMs(),
+                        server.getMaxOutboundBytesPerConnection()),
                 properties.getEventsPath());
         bean.setName("linkoraSsePushServlet");
         bean.setAsyncSupported(true);

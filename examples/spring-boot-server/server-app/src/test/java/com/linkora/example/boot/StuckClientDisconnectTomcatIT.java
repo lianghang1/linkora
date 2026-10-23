@@ -1,8 +1,11 @@
 package com.linkora.example.boot;
 
-import com.linkora.core.message.MessageState;
+import com.linkora.client.ClientConfig;
+import com.linkora.client.LinkoraClient;
+import com.linkora.client.storage.sqlite.SqliteClientStore;
 import com.linkora.server.LinkoraServer;
-import com.linkora.server.MessageDeliveryStatus;
+import com.linkora.testkit.RecordingMessageListener;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -12,19 +15,19 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 验收基线 IT（Tomcat 容器；SSE 写模型修复后本测试必须秒级自愈）：验证"假在线"客户端（订阅后不读数据）塞满服务端缓冲区导致
- * 编排线程写阻塞后的行为——踢连接（disconnectClient）能否中断阻塞写、不干预时容器自愈耗时。
- *
- * 判定信号：阻塞写失败后消息离开 ACCEPTED 进入 RETRYING（编排线程恢复的铁证，
- * 比 SSE 握手可靠——初始帧由 Servlet 线程写，不走编排线程）。
- * 与 testkit 的 Jetty 版（StuckClientDisconnectSpikeTest）同一场景——两个容器独立实现，行为不能假设一致。
+ * 验收测试 IT（Tomcat 容器，docs/design/sse-async-write.md §6）：
+ * 慢客户端（订阅后不读数据）被大消息灌满出站队列后——
+ * ① 服务端不停摆（正常客户端接收秒级，修复前：永远收不到）
+ * ② 水位策略主动断开慢客户端 ③ 重连后消息补发完整。
+ * 基线数据：修复前本场景在 Tomcat 下写阻塞无任何自愈手段（实测 120s+ 不恢复）。
  *
  * @author lianghang
  */
@@ -32,9 +35,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "linkora.server.register-clients.stuck-store=true",
-                "linkora.server.register-clients.stuck-ctrl=true"
+                "linkora.server.register-clients.normal-store=true"
         })
 class StuckClientDisconnectTomcatIT {
+
+    private static final int FLOOD_COUNT = 8;
 
     @LocalServerPort
     private int port;
@@ -42,86 +47,117 @@ class StuckClientDisconnectTomcatIT {
     @Autowired
     private LinkoraServer linkoraServer;
 
-    @Test
-    void kickVersusNoKickTiming() throws Exception {
-        // ===== 场景 A：卡住后踢连接 =====
-        Socket stuck = openStuckAndFill("stuck-store");
-        String msgId = lastPublishedMessageId("stuck-store");
-        assertEquals(MessageState.ACCEPTED, currentState(msgId, 5000),
-                "灌缓冲区后消息应停在 ACCEPTED（写阻塞中）");
+    private Socket stuckSocket;
+    private LinkoraClient normalClient;
+    private SqliteClientStore normalStore;
 
-        long kickStart = System.currentTimeMillis();
-        int closed = linkoraServer.disconnectClient("stuck-store");
-        long unblock = awaitLeaveAccepted(msgId, 90_000);
-        System.out.println("[tomcat] 场景A（kick): disconnectClient=" + closed
-                + "，写阻塞解除耗时 " + unblock + "ms（含 kick 调用本身）");
-        stuck.close();
-        Thread.sleep(1500); // 让队列里第二发大消息也失败出队
-
-        // ===== 场景 B：卡住后不干预（对照组）=====
-        Socket ctrl = openStuckAndFill("stuck-ctrl");
-        String ctrlMsg = lastPublishedMessageId("stuck-ctrl");
-        assertEquals(MessageState.ACCEPTED, currentState(ctrlMsg, 5000));
-        long bStart = System.currentTimeMillis();
-        long autoRecover = awaitLeaveAccepted(ctrlMsg, 120_000);
-        System.out.println("[tomcat] 场景B（不干预）: 自愈耗时 " + autoRecover + "ms");
-        ctrl.close();
-
-        System.out.println("[tomcat] ===== 结论 =====");
-        System.out.println("[tomcat] kick 解除: " + unblock + "ms | 不干预自愈: " + autoRecover + "ms");
-        assertTrue(autoRecover > 0 && autoRecover < 120_000, "不干预场景也必须自愈（容器异步超时应兜底）");
+    @AfterEach
+    void tearDown() throws Exception {
+        if (stuckSocket != null && !stuckSocket.isClosed()) {
+            stuckSocket.close();
+        }
+        if (normalClient != null) {
+            normalClient.close();
+        }
+        if (normalStore != null) {
+            normalStore.close();
+        }
     }
 
-    /** 裸 socket 订阅后停止读取，并灌两条 1MB 大消息塞满缓冲区。 */
-    private Socket openStuckAndFill(String clientId) throws Exception {
-        Socket s = new Socket("127.0.0.1", port);
-        s.setReceiveBufferSize(8 * 1024);
-        OutputStream out = s.getOutputStream();
-        out.write(("GET /events?clientId=" + clientId + " HTTP/1.1\r\nHost: localhost\r\n"
+    @Test
+    void slowClientMustNotStallOthers() throws Exception {
+        // 1. 正常客户端（真实 SSE + SQLite）
+        Path db = Files.createTempDirectory("linkora-it").resolve("normal.db");
+        normalStore = new SqliteClientStore(db);
+        normalClient = LinkoraClient.builder()
+                .serverUrl("http://127.0.0.1:" + port)
+                .clientId("normal-store")
+                .clientStore(normalStore)
+                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300).build())
+                .build();
+        RecordingMessageListener listener = new RecordingMessageListener();
+        normalClient.addListener("greeting", listener);
+        normalClient.start();
+        boolean normalOnline = awaitOnline("normal-store", 20_000);
+        assertTrue(normalOnline, "正常客户端应在线");
+
+        // 2. 慢客户端：裸 socket 订阅后永久停止读取
+        stuckSocket = new Socket("127.0.0.1", port);
+        stuckSocket.setReceiveBufferSize(8 * 1024);
+        OutputStream out = stuckSocket.getOutputStream();
+        out.write(("GET /events?clientId=stuck-store HTTP/1.1\r\nHost: localhost\r\n"
                 + "Accept: text/event-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8));
         out.flush();
-        InputStream in = s.getInputStream();
+        InputStream in = stuckSocket.getInputStream();
         byte[] head = new byte[2048];
         int n = in.read(head);
         String headStr = new String(head, 0, Math.max(0, n), StandardCharsets.UTF_8);
         assertFalse(headStr.contains("404"), "订阅应成功: " + headStr.lines().findFirst().orElse(""));
+        boolean stuckOnline = awaitOnline("stuck-store", 15_000);
+        assertTrue(stuckOnline, "慢客户端应已在服务端注册");
 
+        // 3. 大消息灌满出站队列 → 水位策略应主动断开慢客户端
         byte[] big = new byte[1024 * 1024];
         java.util.Arrays.fill(big, (byte) 'A');
-        linkoraServer.publish(clientId, "greeting", big);
-        linkoraServer.publish(clientId, "greeting", big);
-        Thread.sleep(2500); // 给推送线程时间真正阻塞在 flush 上
-        return s;
+        for (int i = 0; i < FLOOD_COUNT; i++) {
+            linkoraServer.publish("stuck-store", "greeting", big);
+        }
+        boolean disconnected = awaitOffline("stuck-store", 20_000);
+        assertTrue(disconnected, "慢客户端应被水位策略主动断开");
+
+        // 4. 隔离性（核心断言）：洪水期间正常客户端接收必须秒级
+        long probeStart = System.currentTimeMillis();
+        linkoraServer.publish("normal-store", "greeting", "probe".getBytes(StandardCharsets.UTF_8));
+        boolean received = listener.awaitCount(1, 10_000);
+        assertTrue(received, "隔离性：正常客户端必须正常收到消息");
+        long latency = System.currentTimeMillis() - probeStart;
+        assertTrue(latency < 5_000, "正常客户端接收延迟必须秒级（实测 " + latency + "ms）");
+        System.out.println("[tomcat-it] 正常客户端在洪水期间接收延迟: " + latency + "ms");
+
+        // 5. 补发完整：慢客户端重连后应收到积压的大消息
+        Path stuckDb = Files.createTempDirectory("linkora-it").resolve("stuck.db");
+        SqliteClientStore stuckStore = new SqliteClientStore(stuckDb);
+        LinkoraClient stuckClient = null;
+        try {
+            stuckClient = LinkoraClient.builder()
+                    .serverUrl("http://127.0.0.1:" + port)
+                    .clientId("stuck-store")
+                    .clientStore(stuckStore)
+                    .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300).build())
+                    .build();
+            RecordingMessageListener stuckListener = new RecordingMessageListener();
+            stuckClient.addListener("greeting", stuckListener);
+            stuckClient.start();
+            boolean backfilled = stuckListener.awaitCount(1, 30_000);
+            assertTrue(backfilled, "重连的慢客户端应通过补发收到积压消息");
+            assertEquals(1024 * 1024, stuckListener.messages().get(0).getPayload().length);
+        } finally {
+            if (stuckClient != null) {
+                stuckClient.close();
+            }
+            stuckStore.close();
+        }
     }
 
-    private String lastPublishedMessageId(String clientId) {
-        // publish 返回 PublishResult；为拿到 messageId 简化：直接查该客户端消息列表
-        return linkoraServer.listMessages(clientId, null, null, null, 0, 1).get(0).getMessageId();
-    }
-
-    private MessageState currentState(String messageId, long timeoutMs) throws InterruptedException {
+    private boolean awaitOnline(String clientId, long timeoutMs) throws InterruptedException {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
-            Optional<MessageDeliveryStatus> status = linkoraServer.getMessageStatus(messageId);
-            if (status.isPresent() && !status.get().getDeliveryRecords().isEmpty()) {
-                return status.get().getDeliveryRecords().get(0).getState();
+            if (linkoraServer.getBacklog(clientId).isConnected()) {
+                return true;
             }
             Thread.sleep(100);
         }
-        return null;
+        return false;
     }
 
-    /** 等待消息离开 ACCEPTED（写失败进 RETRYING = 编排线程恢复）。返回耗时；超时返回 -1。 */
-    private long awaitLeaveAccepted(String messageId, long timeoutMs) throws InterruptedException {
-        long start = System.currentTimeMillis();
-        long deadline = start + timeoutMs;
+    private boolean awaitOffline(String clientId, long timeoutMs) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
-            MessageState state = currentState(messageId, 200);
-            if (state != null && state != MessageState.ACCEPTED) {
-                return System.currentTimeMillis() - start;
+            if (!linkoraServer.getBacklog(clientId).isConnected()) {
+                return true;
             }
-            Thread.sleep(200);
+            Thread.sleep(100);
         }
-        return -1;
+        return false;
     }
 }

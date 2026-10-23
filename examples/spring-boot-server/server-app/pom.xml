@@ -63,6 +63,12 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.github.lianghang1</groupId>
+            <artifactId>linkora-testkit</artifactId>
+            <version>${linkora.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
