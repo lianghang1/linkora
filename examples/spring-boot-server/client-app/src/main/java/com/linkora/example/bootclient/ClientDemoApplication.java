@@ -103,8 +103,18 @@ public class ClientDemoApplication {
                     + "，确认 server-app 已启动且端口未被占用）");
 
             System.out.println("========================================");
-            System.out.println("演示完成，客户端长驻运行（Ctrl+C 优雅关闭）");
+            System.out.println("内置四向闭环演示完成，客户端长驻运行");
             System.out.println("========================================");
+
+            // 7. 顺序键演示（上行侧）：同一订单连发三条状态 + 另一订单并行。
+            //    期望线上按 PAID → SHIPPED → SIGNED 顺序处理（SO-9002 并行不受影响）；
+            //    服务端日志与 GET /api/uplink/order-status-updates 可核对到达顺序。
+            orderStatusService.updateStatus("SO-9001", "PAID");
+            orderStatusService.updateStatus("SO-9002", "PAID");
+            orderStatusService.updateStatus("SO-9001", "SHIPPED");
+            orderStatusService.updateStatus("SO-9001", "SIGNED");
+            System.out.println("[顺序键演示] 已连发上行：SO-9001 PAID→SHIPPED→SIGNED"
+                    + "（同键必须按序到达），SO-9002 PAID（不同键并行）");
         };
     }
 

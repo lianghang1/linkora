@@ -25,12 +25,16 @@ public class OrderStatusService {
         this.publisher = publisher;
     }
 
-    /** 更新订单状态并通知线上，返回消息 ID。 */
+    /**
+     * 更新订单状态并通知线上，返回消息 ID。
+     * sequenceKey = orderNo：同一订单的状态变更严格按发布顺序被线上接收，
+     * 不会出现"已签收"先于"已发货"到达导致状态回退。
+     */
     public String updateStatus(String orderNo, String status) {
         ObjectNode payload = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         payload.put("orderNo", orderNo);
         payload.put("status", status);
-        return publisher.publish(TOPIC, payload);
+        return publisher.publish(TOPIC, payload, orderNo);
     }
 
     /** 等待该消息被服务端确认（转发 {@link UplinkPublisher#awaitServerAccepted}）。 */
