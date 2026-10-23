@@ -27,6 +27,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -484,6 +485,54 @@ public class SqliteClientStoreTest {
             store.saveOutbox(keyedOutbox("k-1", OutboxStatus.DEAD_LETTER, "order-1"));
             store.saveOutbox(keyedOutbox("k-2", OutboxStatus.PENDING, "order-1"));
             assertFalse(store.hasEarlierActiveInKey("order-1", "k-2"));
+        } finally {
+            store.close();
+        }
+    }
+
+    @Test
+    public void legacyV1DatabaseUpgradesToV2PreservingRows() throws Exception {
+        // 模拟旧版本客户端的 v1 库（无 sequence_key 列）且已有历史数据：
+        // 升级 = 打开即自动 ALTER 加列，历史行键为 NULL（无键），新功能立即可用
+        Path db = dbPath();
+        try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db.toAbsolutePath());
+             Statement st = c.createStatement()) {
+            st.execute("CREATE TABLE lk_outbox ("
+                    + " message_id TEXT PRIMARY KEY, message_type TEXT NOT NULL,"
+                    + " payload BLOB NOT NULL, status TEXT NOT NULL,"
+                    + " created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,"
+                    + " retry_count INTEGER NOT NULL DEFAULT 0, next_retry_at INTEGER,"
+                    + " expires_at INTEGER, last_error TEXT)");
+            st.execute("CREATE TABLE lk_inbox ("
+                    + " message_id TEXT PRIMARY KEY, message_type TEXT NOT NULL,"
+                    + " payload BLOB NOT NULL, receive_status TEXT NOT NULL,"
+                    + " process_status TEXT NOT NULL, received_at INTEGER NOT NULL,"
+                    + " processed_at INTEGER, retry_count INTEGER NOT NULL DEFAULT 0,"
+                    + " next_retry_at INTEGER, last_error TEXT)");
+            st.execute("CREATE TABLE lk_meta (meta_key TEXT PRIMARY KEY, meta_value TEXT NOT NULL)");
+            st.execute("CREATE TABLE lk_schema_version ("
+                    + " version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)");
+            st.execute("INSERT INTO lk_schema_version VALUES (1, 1)");
+            st.execute("INSERT INTO lk_outbox (message_id, message_type, payload, status,"
+                    + " created_at, updated_at) VALUES ('old-1', 'ORDER', X'70',"
+                    + " 'SERVER_ACCEPTED', 1, 1)");
+            st.execute("INSERT INTO lk_inbox (message_id, message_type, payload,"
+                    + " receive_status, process_status, received_at) VALUES"
+                    + " ('old-2', 'ORDER', X'70', 'RECEIVED_ACK_SENT', 'PROCESSED', 1)");
+        }
+        SqliteClientStore store = new SqliteClientStore(db);
+        try {
+            OutboxEntry oldOut = store.findOutbox("old-1").orElse(null);
+            assertNotNull("历史 outbox 行必须保留", oldOut);
+            assertNull("历史行 sequence_key 为 NULL（= 无键）", oldOut.getSequenceKey());
+
+            InboxEntry oldIn = store.findInbox("old-2").orElse(null);
+            assertNotNull("历史 inbox 行必须保留", oldIn);
+            assertNull(oldIn.getSequenceKey());
+
+            // 升级后新能力立即可用
+            store.saveOutbox(keyedOutbox("new-1", OutboxStatus.PENDING, "order-1"));
+            assertEquals("order-1", store.findOutbox("new-1").get().getSequenceKey());
         } finally {
             store.close();
         }

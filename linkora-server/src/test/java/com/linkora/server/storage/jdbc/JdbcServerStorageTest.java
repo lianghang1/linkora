@@ -427,6 +427,38 @@ public class JdbcServerStorageTest {
     }
 
     @Test
+    public void sequenceKeyExpiredReleasesLane() {
+        // 方案 A 的另一分支：队头过期（EXPIRED 终态）同样放行同键后续
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-expired"));
+        repo.init(keyedRecord("m-1", "c-1", 1, MessageState.EXPIRED, "order-1"));
+        repo.init(keyedRecord("m-2", "c-1", 2, MessageState.ACCEPTED, "order-1"));
+
+        List<DeliveryRecord> batch =
+                repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
+        assertEquals(1, batch.size());
+        assertEquals("m-2", batch.get(0).getMessageId());
+        assertFalse(repo.hasEarlierUnsettled("c-1", "order-1", 2));
+    }
+
+    @Test
+    public void sequenceKeyIsIsolatedAcrossClients() {
+        // 同一个 key 在不同客户端之间互不影响：c-2 的未终结前序不能挡住 c-1 的消息
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-clients"));
+        repo.init(keyedRecord("m-1", "c-2", 1, MessageState.CREATED, "order-1"));
+        repo.init(keyedRecord("m-2", "c-1", 1, MessageState.PROCESSED, "order-1"));
+        repo.init(keyedRecord("m-3", "c-1", 2, MessageState.ACCEPTED, "order-1"));
+
+        List<DeliveryRecord> batch =
+                repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
+        assertEquals("c-2 的同键未终结消息不得阻塞 c-1（c-1 自己的前序已终结）",
+                1, batch.size());
+        assertEquals("m-3", batch.get(0).getMessageId());
+        assertFalse(repo.hasEarlierUnsettled("c-1", "order-1", 2));
+        assertTrue("c-2 自己的同键前序未终结 → 该挡还得挡",
+                repo.hasEarlierUnsettled("c-2", "order-1", 2));
+    }
+
+    @Test
     public void hasEarlierUnsettledSemantics() {
         JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-earlier"));
         repo.init(keyedRecord("a-1", "c-1", 1, MessageState.RETRYING, "order-1"));
