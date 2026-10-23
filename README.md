@@ -265,7 +265,7 @@ linkora.client.db-path=data/client.db
 | 客户端积压与在线查询 | `linkora.getBacklog(clientId)` | 未完成投递数 + 是否有活跃 SSE 连接，适合监控告警 |
 | 带过期与链路追踪的发布 | `linkora.publish(clientId, type, payload, expiresAt, traceId)` | 到期未送达自动作废；traceId 透传到客户端便于全链路排查 |
 | 顺序投递（sequenceKey） | `linkora.publish(clientId, type, payload, orderId)` | 同键消息严格按发布顺序投递（如订单状态 1→2 不会倒序到达）；key 为空则与普通消息无异。详见 [docs/reliability.md](docs/reliability.md) |
-| 客户端启用/禁用 | Boot：`register-clients` 配置；MVC：启动时 `clientRegistry.register(new ClientRegistration(id, enabled, System.currentTimeMillis()))` 或预置 SQL | 禁用的客户端拒收新消息、拒绝接入 |
+| **管理接口（监控与人工处置）** | 见下方 [管理接口](#管理接口监控与人工处置) 章节 | 客户端概览、消息列表/详情、死信重放、跳过、踢连接、运行时启停、每日统计——全部人类可读视图，出状况不用翻库 |
 | 手动触发补发扫描 | `linkora.sweepOnce()` | 运维/测试用，正常运行不需要 |
 
 上行侧同样有保障：`UplinkHandler` 按 `messageType()` 自动分发，服务端按 messageId 幂等去重
@@ -273,6 +273,73 @@ linkora.client.db-path=data/client.db
 
 客户端侧注入 `LinkoraClient` 后：`getSseState()` 查询连接状态；所有上行先落本地 SQLite
 再后台发送，进程崩溃/断电后自动补传。
+
+---
+
+## 管理接口：监控与人工处置
+
+出状况时不用翻库。注入 `LinkoraServer` 后即可调用，全部返回**人类可读视图**：
+时间一律 `yyyy-MM-dd HH:mm:ss`（无裸时间戳），payload 一律 UTF-8 文本预览（超长截断、
+二进制只标注字节数，**绝不输出 Base64**），状态附中文描述（"重试中"、"死信，等待人工介入"…）。
+
+### 查询：看清楚现在压着什么
+
+| 方法 | 输出 |
+|---|---|
+| `getClientOverviews()` | 每个客户端：是否在线、连接数、未完成数、死信数、注册时间 |
+| `listUnfinishedDeliveries(clientId, limit)` | 未终结投递明细（含死信）：messageId、seq、中文状态、重试次数、下次重试时间、最后错误、payload 预览 |
+| `listDeadLetters(clientId, limit)` | 死信列表（进入死信的原因在 lastError） |
+| `listMessages(clientId?, messageType?, beginTime?, endTime?, page, size)` | 消息列表多条件筛选 + 分页，每条附各目标投递状态中文摘要 |
+| `getMessageDetail(messageId)` | 完整 payload 明文 + 全部投递记录 |
+| `getDailyStats(days)` | 每日发布量 + 全部投递记录的状态分布 |
+
+```java
+// 例：一眼看清每个客户端的情况
+for (ClientOverviewView c : linkora.getClientOverviews()) {
+    if (c.isOnline() && c.getDeadLetterCount() > 0) {
+        log.warn("客户端 {} 在线但有 {} 条死信待处理", c.getClientId(), c.getDeadLetterCount());
+    }
+}
+
+// 例：某客户端积压了什么（时间/内容直接可读）
+linkora.listUnfinishedDeliveries("store-001", 50)
+       .forEach(d -> log.info("[{}] seq={} 重试{}次 错误={} payload={}",
+               d.getStateText(), d.getSeq(), d.getRetryCount(),
+               d.getLastError(), d.getPayloadPreview()));
+```
+
+### 处置：人工干预的手段
+
+| 方法 | 行为 |
+|---|---|
+| `disconnectClient(clientId)` | **踢掉假在线连接**：强制断开该客户端全部 SSE 连接，客户端自动重连并按 Last-Event-ID 补发，不丢数据 |
+| `retryDeadLetter(clientId, messageId)` | 死信重放：DEAD_LETTER → RETRYING 并立即重推 |
+| `skipMessage(clientId, messageId)` | 跳过卡住的消息（→ EXPIRED 终态，lastError 留痕），顺序键场景下同键后续立即放行 |
+| `retryAllDeadLetters(clientId, limit)` / `skipAllDeadLetters(clientId, limit)` | 死信批量重放 / 批量跳过 |
+| `forceTransition(clientId, messageId, targetState, reason)` | 通用人工状态变更：状态机校验合法性，reason 写入 lastError 留痕；非法转移显式报错（上面两个方法是它的便捷特例） |
+| `enableClient(clientId)` / `disableClient(clientId)` | 运行时启停客户端（禁用后拒收新消息、拒绝接入，恢复即用） |
+
+```java
+// 例：假在线客户端（断网/断电没被发现）拖着重试——踢掉它，让它重连补发
+linkora.disconnectClient("store-001");
+
+// 例：线下已手工把数据修好，死信不再需要推送——批量跳过并留痕
+linkora.skipAllDeadLetters("store-001", 100);
+
+// 例：通用人工状态变更（reason 必填，用于操作审计）
+linkora.forceTransition("store-001", messageId,
+        MessageState.PROCESSED, "线下已手工导入该数据");
+```
+
+**设计边界（必读）**
+
+- SDK 只提供方法、不做鉴权；HTTP 暴露由宿主自行实现并**必须加访问控制**
+  （参考 `examples/spring-boot-server/server-app` 的 `AdminController`，仅演示用）。
+  所有处置方法的 `reason` 会写入 `lastError` 留痕，建议接入操作审计。
+- 这些方法全部是旁路实现（纯查询 + 单条 CAS，复用投递状态机已有的合法转移），
+  不触碰推送/重试/补发主链路，不引入任何后台线程。
+- `skipMessage` / `skipAllDeadLetters` 语义是"主动放弃该条"——跳过前确认业务上可以放弃。
+- 自动化程度更高（指标面板、Grafana）不在 SDK 范围内，需要时在宿主侧接入 metrics。
 
 ---
 
@@ -603,6 +670,15 @@ mvn install -DskipTests
 # Spring Boot：终端 1 起服务端（8082），终端 2 起客户端（自动跑四向闭环输出 [PASS]）
 mvn -pl examples/spring-boot-server/server-app spring-boot:run
 mvn -pl examples/spring-boot-server/client-app spring-boot:run
+
+# 服务端起来后，管理接口演示端点可直接体验（见"管理接口"章节）：
+#   GET  http://127.0.0.1:8082/api/admin/clients          客户端概览
+#   GET  http://127.0.0.1:8082/api/admin/unfinished?clientId=demo-client
+#   GET  http://127.0.0.1:8082/api/admin/dead-letters?clientId=demo-client
+#   GET  http://127.0.0.1:8082/api/admin/messages?clientId=demo-client
+#   GET  http://127.0.0.1:8082/api/admin/stats?days=7
+#   POST http://127.0.0.1:8082/api/admin/disconnect?clientId=demo-client
+#   POST http://127.0.0.1:8082/api/admin/skip?clientId=demo-client&messageId=...
 
 # Spring MVC：终端 1 起服务端（8081），终端 2 起客户端
 mvn -pl examples/spring-mvc-server/server-app compile exec:java "-Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain" "-Dexec.args=8081"
