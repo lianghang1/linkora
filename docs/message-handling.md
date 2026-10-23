@@ -90,6 +90,9 @@
 - 上行：`client.publish(topic, payload)` 写入 SQLite outbox（进程崩溃不丢），
   后台线程自动 POST；用 `client.addOutboxListener(...)` 监听 outbox 状态变更，
   收到 `SERVER_ACCEPTED` 回调即确认服务端已接受（替代轮询本地队列）。
+- 需要顺序时：`client.publish(topic, payload, sequenceKey)`——同键消息严格按发布顺序
+  被服务端接收（前一条未被确认前，后一条不会发出）；下行用服务端带 key 的 publish
+  重载。键的取法与边界见 [docs/reliability.md](reliability.md) 的"顺序保证"章节。
 
 ## payload 格式约定
 
