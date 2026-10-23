@@ -63,9 +63,7 @@ public class SqliteClientStoreTest {
                 receive, process, receivedAt, processedAt, retryCount, nextRetryAt, lastError);
     }
 
-    // ---------------- schema 与打开/关闭 ----------------
-
-    @Test
+    // ---------------- schema 与打开/关闭 ----------------    @Test
     public void journalModeIsWalAfterOpen() throws Exception {
         Path db = dbPath();
         SqliteClientStore store = new SqliteClientStore(db);
@@ -415,6 +413,79 @@ public class SqliteClientStoreTest {
             assertEquals("42", second.getMeta("last_event_id").get());
         } finally {
             second.close();
+        }
+    }
+
+    // ---------------- 顺序键（sequenceKey） ----------------
+
+    private static OutboxEntry keyedOutbox(String messageId, OutboxStatus status, String sequenceKey) {
+        return new OutboxEntry(messageId, "ORDER_CREATED",
+                ("payload-" + messageId).getBytes(StandardCharsets.UTF_8),
+                status, NOW, NOW, 0, null, null, null, sequenceKey);
+    }
+
+    @Test
+    public void outboxSequenceKeyRoundtripAndNormalization() {
+        Path db = dbPath();
+        SqliteClientStore store = new SqliteClientStore(db);
+        try {
+            store.saveOutbox(keyedOutbox("k-1", OutboxStatus.PENDING, " order-1 "));
+            store.saveOutbox(keyedOutbox("k-2", OutboxStatus.PENDING, "   "));
+            assertEquals("order-1", store.findOutbox("k-1").get().getSequenceKey());
+            assertEquals("空白归一化为 null（无键）", null,
+                    store.findOutbox("k-2").get().getSequenceKey());
+        } finally {
+            store.close();
+        }
+    }
+
+    @Test
+    public void outboxSequenceKeyRejectsOverMaxLength() {
+        StringBuilder key = new StringBuilder();
+        for (int i = 0; i < 129; i++) {
+            key.append('k');
+        }
+        try {
+            keyedOutbox("k-long", OutboxStatus.PENDING, key.toString());
+            fail("超过 128 字符的 sequenceKey 必须在入队时拒绝");
+        } catch (IllegalArgumentException expected) {
+        }
+    }
+
+    @Test
+    public void hasEarlierActiveInKeyGatesOnlySameKeyUnsettled() {
+        Path db = dbPath();
+        SqliteClientStore store = new SqliteClientStore(db);
+        try {
+            // 同键更早的消息仍在途（PENDING）→ 让路
+            store.saveOutbox(keyedOutbox("k-1", OutboxStatus.PENDING, "order-1"));
+            store.saveOutbox(keyedOutbox("k-2", OutboxStatus.PENDING, "order-1"));
+            assertTrue(store.hasEarlierActiveInKey("order-1", "k-2"));
+            assertFalse("本条之前没有更早的同键消息", store.hasEarlierActiveInKey("order-1", "k-1"));
+            assertFalse("不同键互不影响", store.hasEarlierActiveInKey("order-2", "k-2"));
+            assertFalse("无键不参与约束", store.hasEarlierActiveInKey(null, "k-2"));
+
+            // 前一条被服务端接受 → 放行
+            OutboxEntry accepted = store.findOutbox("k-1").get()
+                    .with(OutboxStatus.SERVER_ACCEPTED, 0, null, null, NOW);
+            assertTrue(store.updateOutboxStatus(accepted, OutboxStatus.PENDING));
+            assertFalse(store.hasEarlierActiveInKey("order-1", "k-2"));
+        } finally {
+            store.close();
+        }
+    }
+
+    @Test
+    public void outboxSequenceKeyDeadLetterDoesNotBlock() {
+        Path db = dbPath();
+        SqliteClientStore store = new SqliteClientStore(db);
+        try {
+            // 方案 A：同键队头进死信 = 放弃该条，后续照常发送
+            store.saveOutbox(keyedOutbox("k-1", OutboxStatus.DEAD_LETTER, "order-1"));
+            store.saveOutbox(keyedOutbox("k-2", OutboxStatus.PENDING, "order-1"));
+            assertFalse(store.hasEarlierActiveInKey("order-1", "k-2"));
+        } finally {
+            store.close();
         }
     }
 }
