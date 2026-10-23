@@ -206,7 +206,9 @@ public final class SseClientConnection {
             if (output.isReady()) {
                 output.flush(); // 推出已交给容器的剩余字节
             }
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
+            // RuntimeException 必须就地消化（如 close 后容器回调 write 抛 IllegalStateException），
+            // 否则会穿透 tryPump 炸到调用线程（编排/心跳/容器）
             log.debug("SSE 非阻塞写出失败，关闭连接: clientId={}", clientId, e);
             close(e);
         }

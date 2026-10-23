@@ -44,7 +44,8 @@ public final class LinkoraServlets {
         }
         String prefix = normalize(pathPrefix);
         add(servletContext, "linkoraSsePushServlet",
-                new SsePushServlet(server.sseSubscribeHandler(), server.sseConnectionRegistry()),
+                new SsePushServlet(server.sseSubscribeHandler(), server.sseConnectionRegistry(),
+                        15_000L, 3_000L, server.getMaxOutboundBytesPerConnection()),
                 prefix + "/events");
         add(servletContext, "linkoraIngestServlet",
                 new LinkoraEndpointServlet(server.ingestHttpHandler(), server.getMaxBodyBytes()),

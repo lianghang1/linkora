@@ -19,7 +19,7 @@
 
 ```
 com.linkora.example.springmvc
-├── SpringMvcServerMain           # 注解容器 + Jetty + LinkoraServlets 三端点注册
+├── SpringMvcServerMain           # 注解容器 + 内嵌 Tomcat + Linkora 三端点注册
 ├── AppConfig                     # @ComponentScan + 数据源 + LinkoraServerConfiguration
 ├── controller
 │   └── PlatformController        # HTTP 层：参数接收、调 service、组装响应

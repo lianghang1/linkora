@@ -12,7 +12,7 @@
 | 环境 | 要求 | 状态 |
 |---|---|---|
 | 客户端运行时 | JDK 8+，纯 Java，无 Spring 依赖 | 已验证 |
-| 服务端容器 | Servlet 3.1+（需要 async 能力）：Tomcat 8+/9+、Jetty 9.3+、WildFly 等 | Jetty 9.4 测试/示例验证通过 |
+| 服务端容器 | Servlet 3.1+（需要 async 能力）：Tomcat 8+/9+、Jetty 9.3+、WildFly 等 | Tomcat 9（Boot/MVC 示例）与 Jetty 9.4（testkit）双容器验收通过 |
 | `javax.servlet-api` | 3.1.0，宿主容器 provided | 3.1 API 面（无 Servlet 4.0 常量依赖） |
 | 生产数据库 | 任一 ANSI SQL 兼容 JDBC 库 | 见下文数据库矩阵 |
 | 消息中间件 | **不要求**，服务端零新增中间件 | 设计保证 |

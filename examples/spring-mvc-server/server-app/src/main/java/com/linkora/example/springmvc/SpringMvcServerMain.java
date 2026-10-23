@@ -4,16 +4,17 @@ import com.linkora.core.storage.server.ClientRegistration;
 import com.linkora.core.storage.server.ClientRegistry;
 import com.linkora.server.LinkoraServer;
 import com.linkora.spring.LinkoraServlets;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.apache.catalina.Context;
+import org.apache.catalina.startup.Tomcat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.web.servlet.DispatcherServlet;
 
+import java.io.File;
+
 /**
- * Spring MVC 宿主示例：注解驱动容器 + linkora-spring 装配 LinkoraServer + Jetty 承载。
+ * Spring MVC 宿主示例：注解驱动容器 + linkora-spring 装配 LinkoraServer + 内嵌 Tomcat 承载。
  *
  * <p>端点布局：</p>
  * <pre>
@@ -30,9 +31,9 @@ import org.springframework.web.servlet.DispatcherServlet;
  *       -Dexec.args="8081"
  * </pre>
  *
- * <p>生产提示：本示例用内嵌 Jetty 演示；真实 Spring MVC 部署在
- * WebApplicationInitializer / web.xml 中对 ServletContext 调用
- * {@link LinkoraServlets#register} 即可，无其他差别。</p>
+ * <p>生产提示：本示例用内嵌 Tomcat 演示（与 Spring Boot 默认容器同源，行为一致）；
+ * 真实 Spring MVC 部署在 WebApplicationInitializer / web.xml 中对 ServletContext
+ * 调用 {@link LinkoraServlets#register} 即可，无其他差别。</p>
  *
  * @author lianghang
  */
@@ -47,16 +48,17 @@ public final class SpringMvcServerMain {
     public static void main(String[] args) throws Exception {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 8081;
 
-        // 1. 先搭 Jetty 容器结构，拿到 ServletContext 后再刷新 Spring 容器
+        // 1. 搭建内嵌 Tomcat，拿到 ServletContext 后再刷新 Spring 容器
         //    （@EnableWebMvc 的 MVC 基础设施在 refresh 期就需要 ServletContext）
-        Server jetty = new Server(port);
-        ServletContextHandler handler = new ServletContextHandler(ServletContextHandler.NO_SECURITY);
-        handler.setContextPath("/");
-        jetty.setHandler(handler);
+        Tomcat tomcat = new Tomcat();
+        tomcat.setPort(port);
+        tomcat.getConnector(); // 必须显式创建连接器，否则内嵌 Tomcat 不监听端口
+        tomcat.setBaseDir(new File("data/tomcat-mvc").getAbsolutePath());
+        Context tomcatCtx = tomcat.addContext("", new File(".").getAbsolutePath());
 
         AnnotationConfigWebApplicationContext context = new AnnotationConfigWebApplicationContext();
         context.register(AppConfig.class);
-        context.setServletContext(handler.getServletContext());
+        context.setServletContext(tomcatCtx.getServletContext());
         context.refresh();
 
         LinkoraServer server = context.getBean(LinkoraServer.class);
@@ -71,16 +73,30 @@ public final class SpringMvcServerMain {
                     DEMO_CLIENT_ID, true, System.currentTimeMillis()));
         }
 
-        // 3. Spring MVC 分发器 + Linkora 三端点（LinkoraServlets 统一注册）
-        ServletHolder dispatcher = new ServletHolder("spring-mvc",
-                new DispatcherServlet(context));
-        dispatcher.setInitOrder(1);
-        handler.addServlet(dispatcher, "/");
-        LinkoraServlets.register(server, handler.getServletContext());
-        jetty.start();
+        // 3. Spring MVC 分发器 + Linkora 三端点。
+        //    注意：Spring 刷新期会触发 Tomcat 上下文初始化，之后 ServletContext.addServlet
+        //    （规范 API，含状态检查）会被拒——内嵌场景须用 Tomcat 原生 Wrapper API 注册
+        //    （war 包宿主在 WebApplicationInitializer 阶段注册则不受影响，仍用 LinkoraServlets）
+        DispatcherServlet dispatcher = new DispatcherServlet(context);
+        Tomcat.addServlet(tomcatCtx, "spring-mvc", dispatcher).setLoadOnStartup(1);
+        tomcatCtx.addServletMappingDecoded("/*", "spring-mvc");
+        addServlet(tomcatCtx, "linkoraSsePushServlet",
+                new com.linkora.server.servlet.SsePushServlet(
+                        server.sseSubscribeHandler(), server.sseConnectionRegistry(),
+                        15_000L, 3_000L, server.getMaxOutboundBytesPerConnection()),
+                "/events");
+        addServlet(tomcatCtx, "linkoraIngestServlet",
+                new com.linkora.server.servlet.LinkoraEndpointServlet(
+                        server.ingestHttpHandler(), server.getMaxBodyBytes()),
+                "/messages");
+        addServlet(tomcatCtx, "linkoraAckServlet",
+                new com.linkora.server.servlet.LinkoraEndpointServlet(
+                        server.ackHttpHandler(), server.getMaxBodyBytes()),
+                "/acks");
+        tomcat.start();
 
         System.out.println("========================================");
-        System.out.println("Linkora Spring MVC 示例已启动");
+        System.out.println("Linkora Spring MVC 示例已启动（内嵌 Tomcat）");
         System.out.println("  业务接口 : http://127.0.0.1:" + port + "/api/orders /api/reviews");
         System.out.println("  上行查询 : http://127.0.0.1:" + port + "/api/uplink/order-status-updates");
         System.out.println("  SSE 下行 : http://127.0.0.1:" + port + "/events");
@@ -93,7 +109,7 @@ public final class SpringMvcServerMain {
             @Override
             public void run() {
                 try {
-                    jetty.stop();
+                    tomcat.stop();
                 } catch (Exception ignore) {
                     // 关闭阶段异常不影响退出
                 }
@@ -103,5 +119,13 @@ public final class SpringMvcServerMain {
         }, "spring-mvc-demo-shutdown"));
 
         Thread.currentThread().join();
+    }
+
+    /** Tomcat 原生注册（asyncSupported 必须显式开，SSE 依赖异步）。 */
+    private static void addServlet(Context ctx, String name,
+                                   javax.servlet.Servlet servlet, String mapping) {
+        org.apache.catalina.Wrapper wrapper = Tomcat.addServlet(ctx, name, servlet);
+        wrapper.setAsyncSupported(true);
+        ctx.addServletMappingDecoded(mapping, name);
     }
 }
