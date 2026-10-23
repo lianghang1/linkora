@@ -91,8 +91,11 @@ client.publish("order-status-updated", payload, orderId);
 | 同键队头进死信或过期 | **放行后续**（方案 A）：该条视为放弃，同键后续照常投递；死信有 WARN 日志与状态查询可感知 |
 | 同键处理慢 | 该实体的后续消息排队等待——这是顺序的固有代价，键的粒度由业务权衡（粗粒度如"店铺 id"串行强但吞吐低，细粒度如"订单 id"并行好） |
 
-**键的取法（反模式）**：key 完全由业务传入，SDK 不做自动拼接。
-- ❌ 拼 clientId——所有消息共用一条车道，全局串行；
+**多项目共用同一服务端**：门禁天然按 `(client_id, sequence_key)` 隔离——不同
+clientId 的同名 key 互不影响，无需在 key 里拼 clientId。若多个业务线共用同一个
+clientId，要么给每个项目独立 clientId（推荐），要么业务侧自行约定前缀
+（如 `wms:order-1`）。key 完全由业务传入，SDK 不做自动拼接。
+- ❌ 拼 clientId——门禁已按 `(client_id, sequence_key)` 隔离，不同客户端的同名 key 本就互不影响，再拼纯属冗余还浪费 128 列宽；
 - ❌ 拼 messageType——同类型不同实体互相阻塞；
 - ❌ 空键随机兜底——每条消息一个新键，等于永远无序还占存储。
 
