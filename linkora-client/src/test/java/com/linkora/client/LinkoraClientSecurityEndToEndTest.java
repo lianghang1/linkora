@@ -80,9 +80,9 @@ public class LinkoraClientSecurityEndToEndTest {
         context.addServlet(new ServletHolder(new SsePushServlet(
                 server.sseSubscribeHandler(), server.sseConnectionRegistry())), "/sec/events");
         context.addServlet(new ServletHolder(
-                new LinkoraEndpointServlet(server.ingestHttpHandler())), "/sec/messages");
+                new LinkoraEndpointServlet(server.ingestHttpHandler(), server.getMaxBodyBytes())), "/sec/messages");
         context.addServlet(new ServletHolder(
-                new LinkoraEndpointServlet(server.ackHttpHandler())), "/sec/acks");
+                new LinkoraEndpointServlet(server.ackHttpHandler(), server.getMaxBodyBytes())), "/sec/acks");
         jetty.start();
         int port = ((ServerConnector) jetty.getConnectors()[0]).getLocalPort();
 

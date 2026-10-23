@@ -47,7 +47,19 @@ public interface DeliveryRepository {
      * 查询指定客户端 seq 大于 afterSeqExclusive 的未完成消息（未到终态），
      * 按 seq 升序返回，用于重连补发。
      */
-    List<DeliveryRecord> findUnfinishedAfterSeq(String clientId, long afterSeqExclusive, int limit);
+    /**
+     * 查询指定客户端 seq 大于 afterSeqExclusive 的"当前可投递"记录，按 seq 升序。
+     *
+     * <p>"可投递"= 未到终态、非死信、未到重试时间。死信停止投递但不占批次名额；
+     * 未到 {@code next_retry_at} 的记录同样不占名额——两者都通过"查出来再在
+     * Java 侧 return"实现的话，会把本批名额白白吃掉，让同客户端后面的可投消息
+     * 永远排不进来。</p>
+     *
+     * @param now 当前时间（毫秒），用于"未到重试时间"的判断；由调用方传入而非
+     *            SQL 内取时，保证可测试
+     */
+    List<DeliveryRecord> findUnfinishedAfterSeq(String clientId, long afterSeqExclusive,
+                                                long now, int limit);
 
     /** 查询一条消息的全部投递记录（通常单目标一条），用于状态查询。 */
     List<DeliveryRecord> findAllByMessageId(String messageId);

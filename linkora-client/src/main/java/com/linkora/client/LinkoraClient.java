@@ -78,6 +78,13 @@ public final class LinkoraClient implements AutoCloseable {
     private final boolean ownsTransport;
     private final ScheduledExecutorService scheduler;
     private final boolean ownsScheduler;
+    /**
+     * 容错提取 messageId 用。messageId 是线路 JSON 的第一个字段，
+     * 所以即使后续字段损坏/被截断也能取到。
+     */
+    private static final java.util.regex.Pattern MESSAGE_ID_PATTERN =
+            java.util.regex.Pattern.compile("\"messageId\"\\s*:\\s*\"([^\"]{1,128})\"");
+
     private final ExecutorService ioExecutor;
     private final ExecutorService workerExecutor;
     private final AtomicBoolean drainQueued = new AtomicBoolean(false);
@@ -380,7 +387,26 @@ public final class LinkoraClient implements AutoCloseable {
         try {
             message = codec.decodeMessage(json);
         } catch (LinkoraException e) {
-            log.warn("下行消息解析失败，忽略（服务端将重投）: {}", e.getMessage());
+            // 解不开也必须给服务端一个明确答复：否则它会按 pacing（最长 60s 一次）
+            // 无限重推。messageId 是 JSON 的第一个字段，坏消息通常仍能抠出来。
+            String failedId = extractMessageIdLenient(json);
+            if (failedId == null) {
+                log.warn("下行消息解析失败且无法提取 messageId，只能依赖消息过期兜底: {}",
+                        e.getMessage());
+                return;
+            }
+            log.warn("下行消息解析失败，回 FAILED 让服务端计数: messageId={}, 原因={}",
+                    failedId, e.getMessage());
+            final String ackId = failedId;
+            final String reason = e.getMessage();
+            ioExecutor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    sendAck(ackId, AckType.FAILED,
+                            LinkoraErrorCode.INVALID_MESSAGE.getCode(),
+                            "下行解码失败: " + reason);
+                }
+            });
             return;
         }
         long now = System.currentTimeMillis();
@@ -438,6 +464,22 @@ public final class LinkoraClient implements AutoCloseable {
                 processInbox(messageId);
             }
         });
+    }
+
+    /**
+     * 从原始 JSON 文本里容错提取 messageId。
+     *
+     * <p>用于"解码失败但仍要回 FAILED"的场景：{@code messageId} 是编码时的第一个字段，
+     * 所以 payload 损坏、JSON 被截断时通常仍能取到。取不到返回 null（只能靠过期兜底）。</p>
+     *
+     * <p>只做字面匹配，不做完整解析——此时 JSON 本身已经不合法，交给解析器只会再抛一次。</p>
+     */
+    static String extractMessageIdLenient(String json) {
+        if (json == null) {
+            return null;
+        }
+        java.util.regex.Matcher matcher = MESSAGE_ID_PATTERN.matcher(json);
+        return matcher.find() ? matcher.group(1) : null;
     }
 
     private void processInbox(String messageId) {

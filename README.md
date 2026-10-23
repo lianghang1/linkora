@@ -298,6 +298,9 @@ linkora.client.db-path=data/client.db
 | `lk_meta` | SDK 元数据（本地游标等） |
 | `lk_schema_version` | 客户端本地结构版本号 |
 
+**payload 存储与大小上限**：payload 列已按 LONGTEXT 建表（v2 迁移自动完成），
+存储不再是瓶颈；真正的上限是 `message-size-limit-bytes`（HTTP body，默认 1MB，
+对应原始 payload 约 786KB），Servlet 读取闸门与业务校验共用这一个值。
 **升级与维护**：后续版本的结构变更由 SDK 自动顺序迁移（按 `lk_schema_version` 记录逐版本
 执行，中途崩溃重启自动续跑），宿主**无需手动执行任何 SQL**。所有时间字段统一存 epoch
 毫秒（整数），跨时区、跨数据库一致。
@@ -565,8 +568,9 @@ try (Connection c = dataSource.getConnection()) {
 1. **投递语义是至少一次**：同一条消息可能被重复送达，业务处理必须幂等（用消息 ID 去重）。
 2. **下行消息必须显式 ACK**：处理完调用 `message.ackProcessed()`（失败调 `ackFailed(...)`），
    不 ACK 服务端会按策略无限重试。
-3. **生产必须配 HMAC 认证**：不提供 `ClientAuthenticator` 时服务端回退为**放行全部请求**
-   并打告警（仅限本地开发）。客户端侧把 `credentialProvider` 换成
+3. **生产必须配 HMAC 认证**：不提供 `ClientAuthenticator` 时服务端**直接启动失败**
+   （不会静默放行）。本地开发/演示需显式设置 `linkora.server.allow-anonymous=true`，
+   启动日志会留痕；该开关绝不应出现在生产配置里。客户端侧把 `credentialProvider` 换成
    `HmacCredentialProvider(clientId, accessToken, secretBytes)`、服务端配
    `HmacClientAuthenticator` 即启用（两端凭据一致），失败锁定与防重放内置。
 

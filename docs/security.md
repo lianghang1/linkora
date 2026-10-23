@@ -9,6 +9,22 @@
 - 内网 HTTP 环境可运行，风险由接入方评估（文档标注）。
 - IP 级封禁、WAF、fail2ban 交给宿主已有反向代理层，SDK 提供配合配置说明。
 
+## 缺省即拒绝（fail-fast）
+
+缺少 `ClientAuthenticator` 时，装配层（`LinkoraServerAssembler`）**直接抛异常终止启动**，
+而不是回退成"放行全部请求"。理由：SSE 端点通常直接暴露在网络上，一个配置漏项
+就等于任何人都能订阅任意 clientId 的下行数据，而"启动成功"会让人误以为一切正常。
+
+本地开发/演示需要匿名访问时显式打开：
+
+```yaml
+linkora:
+  server:
+    allow-anonymous: true   # 仅限本地；启动日志会打印醒目的 WARN
+```
+
+Spring MVC 宿主同样读取 `linkora.server.allow-anonymous`（默认 false）。
+
 ## 已实现的认证机制（阶段 5 交付）
 
 ### 请求签名算法

@@ -112,7 +112,8 @@ public class LinkoraServerAutoConfiguration {
         return LinkoraServerAssembler.build(
                 authenticatorProvider.getIfAvailable(),
                 clientRegistry, messageRepository, deliveryRepository, cursorRepository,
-                toServerConfig(properties), null, ingestListeners, uplinkHandlers);
+                toServerConfig(properties), null, ingestListeners, uplinkHandlers,
+                properties.isAllowAnonymous());
     }
 
     private static ServerConfig toServerConfig(LinkoraServerProperties p) {
@@ -183,7 +184,7 @@ public class LinkoraServerAutoConfiguration {
             LinkoraServer server, LinkoraServerProperties properties) {
         ServletRegistrationBean<LinkoraEndpointServlet> bean =
                 new ServletRegistrationBean<LinkoraEndpointServlet>(
-                        new LinkoraEndpointServlet(server.ingestHttpHandler()),
+                        new LinkoraEndpointServlet(server.ingestHttpHandler(), server.getMaxBodyBytes()),
                         properties.getMessagesPath());
         bean.setName("linkoraIngestServlet");
         return bean;
@@ -194,7 +195,7 @@ public class LinkoraServerAutoConfiguration {
             LinkoraServer server, LinkoraServerProperties properties) {
         ServletRegistrationBean<LinkoraEndpointServlet> bean =
                 new ServletRegistrationBean<LinkoraEndpointServlet>(
-                        new LinkoraEndpointServlet(server.ackHttpHandler()),
+                        new LinkoraEndpointServlet(server.ackHttpHandler(), server.getMaxBodyBytes()),
                         properties.getAcksPath());
         bean.setName("linkoraAckServlet");
         return bean;

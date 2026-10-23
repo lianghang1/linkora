@@ -58,6 +58,22 @@ public class JdbcServerStorageTest {
         });
     }
 
+    @Test
+    public void largePayloadRoundtrip() {
+        // v2 迁移后 payload 列必须能装下接近 body 上限的载荷
+        //（1MB body − 信封 ≈ 786KB 原始 payload，Base64 后约 1.05MB）
+        DataSource ds = freshH2("schema-large-payload");
+        byte[] payload = new byte[768 * 1024];
+        for (int i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i * 31);
+        }
+        JdbcMessageRepository repo = new JdbcMessageRepository(ds);
+        repo.save(com.linkora.core.message.LinkoraMessage.builder()
+                .messageId("big-1").clientId("store-001").messageType("BIG")
+                .payload(payload).createdAt(System.currentTimeMillis()).build());
+        assertEquals(payload.length, repo.findByMessageId("big-1").get().getPayload().length);
+    }
+
     // ---------------- MessageRepository ----------------
 
     @Test
@@ -319,23 +335,48 @@ public class JdbcServerStorageTest {
         repo.init(record("m-1", "c-1", 1, MessageState.PROCESSED));
         repo.init(record("m-2", "c-1", 2, MessageState.CREATED));
         repo.init(record("m-3", "c-1", 3, MessageState.RETRYING));
-        repo.init(record("m-4", "c-1", 4, MessageState.DEAD_LETTER)); // 非终态，需补发
+        // 死信：停止投递且不占批次名额（修复前它会占满 LIMIT）
+        repo.init(record("m-4", "c-1", 4, MessageState.DEAD_LETTER));
         repo.init(record("m-5", "c-1", 5, MessageState.EXPIRED));
         repo.init(record("m-6", "c-2", 1, MessageState.CREATED)); // 其他客户端隔离
+        // 未到重试时间：本轮跳过，同样不占名额
+        repo.init(new DeliveryRecord("m-7", "c-1", 7, MessageState.FAILED, 1,
+                System.currentTimeMillis() + 60_000L, "wait", 0, 0));
+        // 已到期：取
+        repo.init(new DeliveryRecord("m-8", "c-1", 8, MessageState.FAILED, 1,
+                System.currentTimeMillis() - 1_000L, "retry", 0, 0));
 
-        List<DeliveryRecord> all = repo.findUnfinishedAfterSeq("c-1", 0, 100);
+        List<DeliveryRecord> all = repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
         assertEquals(3, all.size());
         assertEquals("m-2", all.get(0).getMessageId());
         assertEquals("m-3", all.get(1).getMessageId());
-        assertEquals("m-4", all.get(2).getMessageId());
+        assertEquals("m-8", all.get(2).getMessageId());
 
-        List<DeliveryRecord> afterSeq2 = repo.findUnfinishedAfterSeq("c-1", 2, 100);
+        List<DeliveryRecord> afterSeq2 =
+                repo.findUnfinishedAfterSeq("c-1", 2, System.currentTimeMillis(), 100);
         assertEquals(2, afterSeq2.size());
         assertEquals("m-3", afterSeq2.get(0).getMessageId());
-        assertEquals("m-4", afterSeq2.get(1).getMessageId());
+        assertEquals("m-8", afterSeq2.get(1).getMessageId());
 
-        List<DeliveryRecord> limited = repo.findUnfinishedAfterSeq("c-1", 0, 2);
+        List<DeliveryRecord> limited =
+                repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 2);
         assertEquals(2, limited.size());
+    }
+
+    @Test
+    public void deadLettersDoNotStarveLaterMessages() {
+        // 前 200 条全进死信（seq 1–200），第 201 条是可投消息。
+        // 修复前：死信被查出来占满 LIMIT 名额后逐条 return，活消息返回 0 条。
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-no-starve"));
+        for (int seq = 1; seq <= 200; seq++) {
+            repo.init(record("dead-" + seq, "c-1", seq, MessageState.DEAD_LETTER));
+        }
+        repo.init(record("live-1", "c-1", 201, MessageState.ACCEPTED));
+
+        List<DeliveryRecord> batch =
+                repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
+        assertEquals("活消息必须能进入批次", 1, batch.size());
+        assertEquals("live-1", batch.get(0).getMessageId());
     }
 
     // ---------------- ClientRegistry ----------------

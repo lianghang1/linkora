@@ -110,9 +110,9 @@ public final class EmbeddedLinkoraServer implements AutoCloseable {
         context.addServlet(new ServletHolder(
                 new SsePushServlet(server.sseSubscribeHandler(), server.sseConnectionRegistry())), "/events");
         context.addServlet(new ServletHolder(
-                new LinkoraEndpointServlet(server.ingestHttpHandler())), "/messages");
+                new LinkoraEndpointServlet(server.ingestHttpHandler(), server.getMaxBodyBytes())), "/messages");
         context.addServlet(new ServletHolder(
-                new LinkoraEndpointServlet(server.ackHttpHandler())), "/acks");
+                new LinkoraEndpointServlet(server.ackHttpHandler(), server.getMaxBodyBytes())), "/acks");
         jetty.start();
         port = ((ServerConnector) jetty.getConnectors()[0]).getLocalPort();
         started = true;
