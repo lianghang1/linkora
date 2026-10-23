@@ -33,6 +33,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 /**
  * linkora-server 编排测试：真实 H2 JDBC 存储 + 记录型推送网关。
@@ -313,6 +314,151 @@ public class LinkoraServerTest {
         gateway.connectedClients.set(1);
         assertEquals(1, server.disconnectClient(CLIENT));
         assertEquals(1, gateway.disconnectCalls.get());
+    }
+
+    // ---------------- 管理/观测接口（第二批） ----------------
+
+    @Test
+    public void listMessagesFiltersPaginatesAndSummarizesDeliveries() throws Exception {
+        server.publish(CLIENT, "order-created", "订单A".getBytes(StandardCharsets.UTF_8), "SO-A");
+        server.publish(CLIENT, "review-created", "评价B".getBytes(StandardCharsets.UTF_8));
+
+        // 按类型过滤
+        List<com.linkora.server.admin.MessageView> orders = server.listMessages(
+                CLIENT, "order-created", null, null, 1, 20);
+        assertEquals(1, orders.size());
+        assertEquals("订单A", orders.get(0).getPayloadPreview());
+        assertEquals("SO-A", orders.get(0).getSequenceKey());
+
+        // 投递状态摘要为中文
+        assertTrue("摘要应包含中文状态", orders.get(0).getDeliverySummary().contains("等待推送"));
+
+        // 分页：size=1 第 1 页只回 1 条
+        List<com.linkora.server.admin.MessageView> page1 = server.listMessages(
+                CLIENT, null, null, null, 1, 1);
+        assertEquals(1, page1.size());
+
+        // 时间过滤（未来时间 = 无结果）
+        assertEquals(0, server.listMessages(CLIENT, null,
+                System.currentTimeMillis() + 3600_000L, null, 1, 20).size());
+    }
+
+    @Test
+    public void messageDetailReturnsFullPayloadAndDeliveries() throws Exception {
+        StringBuilder big = new StringBuilder("{\"note\":\"");
+        for (int i = 0; i < 300; i++) {
+            big.append("字");
+        }
+        big.append("\"}");
+        PublishResult result = server.publish(CLIENT, "ORDER",
+                big.toString().getBytes(StandardCharsets.UTF_8));
+        awaitDeliveryState(result.getMessageId(), MessageState.ACCEPTED);
+
+        com.linkora.server.admin.MessageDetailView detail =
+                server.getMessageDetail(result.getMessageId());
+        assertNotNull(detail);
+        assertEquals("详情 payload 必须完整（不截断）", big.length(), detail.getPayload().length());
+        assertEquals(1, detail.getDeliveries().size());
+        assertEquals(CLIENT, detail.getDeliveries().get(0).getClientId());
+        assertNull(server.getMessageDetail("不存在"));
+    }
+
+    @Test
+    public void forceTransitionValidatesAndApplies() throws Exception {
+        PublishResult result = server.publish(CLIENT, "ORDER", "p".getBytes(StandardCharsets.UTF_8));
+        awaitDeliveryState(result.getMessageId(), MessageState.ACCEPTED);
+
+        // 合法转移 1：ACCEPTED → RECEIVED
+        assertTrue(server.forceTransition(CLIENT, result.getMessageId(),
+                MessageState.RECEIVED, "线下已确认接收"));
+        assertEquals(MessageState.RECEIVED, currentState(result.getMessageId()));
+
+        // 合法转移 2：RECEIVED → PROCESSED（线下已手工处理）
+        assertTrue(server.forceTransition(CLIENT, result.getMessageId(),
+                MessageState.PROCESSED, "线下已手工处理"));
+        assertEquals(MessageState.PROCESSED, currentState(result.getMessageId()));
+        assertTrue("reason 必须留痕",
+                currentRecordOn(server, result.getMessageId()).getLastError().contains("人工变更"));
+
+        // 同状态 → false；终态再转移 → 非法异常；不存在的消息 → false
+        assertFalse(server.forceTransition(CLIENT, result.getMessageId(),
+                MessageState.PROCESSED, "重复"));
+        try {
+            server.forceTransition(CLIENT, result.getMessageId(),
+                    MessageState.RETRYING, "想回退");
+            fail("终态不允许再转移");
+        } catch (IllegalArgumentException expected) {
+        }
+        assertFalse(server.forceTransition(CLIENT, "ghost", MessageState.PROCESSED, "r"));
+    }
+
+    @Test
+    public void enableDisableClientRoundTrip() {
+        assertTrue(server.disableClient(CLIENT));
+        assertFalse(clientRegistry().findByClientId(CLIENT).get().isEnabled());
+        assertTrue(server.enableClient(CLIENT));
+        assertTrue(clientRegistry().findByClientId(CLIENT).get().isEnabled());
+        assertFalse(server.disableClient("ghost"));
+    }
+
+    private com.linkora.core.storage.server.ClientRegistry clientRegistry() {
+        return new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource);
+    }
+
+    @Test
+    public void batchDeadLetterOperations() throws Exception {
+        LinkoraServer retrier = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .config(ServerConfig.builder().maxDeliveryRetries(1).build())
+                .build();
+        retrier.start();
+        try {
+            for (int i = 1; i <= 2; i++) {
+                PublishResult result = retrier.publish(CLIENT, "ORDER",
+                        ("p" + i).getBytes(StandardCharsets.UTF_8));
+                awaitPush(result.getMessageId());
+                assertEquals(200, postAckOn(retrier, result.getMessageId(), "FAILED",
+                        "BIZ-1", "boom").getStatus());
+            }
+            assertEquals(2, retrier.listDeadLetters(CLIENT, 100).size());
+
+            // 批量重放：全部 → RETRYING
+            assertEquals(2, retrier.retryAllDeadLetters(CLIENT, 100));
+            assertEquals(0, retrier.listDeadLetters(CLIENT, 100).size());
+
+            // 再造 2 条死信 → 批量跳过：全部 → EXPIRED
+            for (int i = 3; i <= 4; i++) {
+                PublishResult result = retrier.publish(CLIENT, "ORDER",
+                        ("p" + i).getBytes(StandardCharsets.UTF_8));
+                awaitPush(result.getMessageId());
+                assertEquals(200, postAckOn(retrier, result.getMessageId(), "FAILED",
+                        "BIZ-1", "boom").getStatus());
+            }
+            assertEquals(2, retrier.skipAllDeadLetters(CLIENT, 100));
+            assertEquals(0, retrier.listDeadLetters(CLIENT, 100).size());
+        } finally {
+            retrier.close();
+        }
+    }
+
+    @Test
+    public void dailyStatsAreHumanReadable() throws Exception {
+        PublishResult result = server.publish(CLIENT, "ORDER", "p".getBytes(StandardCharsets.UTF_8));
+        awaitPush(result.getMessageId());
+        assertEquals(200, postAck(result.getMessageId(), "PROCESSED", null, null).getStatus());
+
+        com.linkora.server.admin.DailyStatsView stats = server.getDailyStats(7);
+        assertEquals("今日发布量必须被统计到", 1L,
+                stats.getPublishedPerDay().get(stats.getPublishedPerDay().size() - 1).getCount());
+        assertTrue("状态分布必须含处理成功",
+                stats.getDeliveryStateDistribution().containsKey("处理成功（终态）"));
+        assertTrue("日期必须是 yyyy-MM-dd 格式",
+                stats.getPublishedPerDay().get(0).getDate().matches("\\d{4}-\\d{2}-\\d{2}"));
     }
 
     // ---------------- ACK 状态机 ----------------

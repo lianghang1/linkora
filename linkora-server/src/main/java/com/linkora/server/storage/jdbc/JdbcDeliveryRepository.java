@@ -378,6 +378,23 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
         }
     }
 
+    @Override
+    public java.util.Map<String, Long> countByState() {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT state, COUNT(*) FROM lk_delivery GROUP BY state");
+             ResultSet rs = ps.executeQuery()) {
+            java.util.Map<String, Long> result = new java.util.LinkedHashMap<>();
+            while (rs.next()) {
+                result.put(rs.getString(1), rs.getLong(2));
+            }
+            return result;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "统计投递状态分布失败", e);
+        }
+    }
+
     private static DeliveryRecord mapRecord(ResultSet rs) throws SQLException {
         return new DeliveryRecord(
                 rs.getString("message_id"),

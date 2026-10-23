@@ -93,6 +93,20 @@ public final class JdbcClientRegistry implements ClientRegistry {
     }
 
     @Override
+    public boolean setEnabled(String clientId, boolean enabled) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "UPDATE lk_client SET enabled = ? WHERE client_id = ?")) {
+            ps.setBoolean(1, enabled);
+            ps.setString(2, clientId);
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "更新客户端启停状态失败: " + clientId, e);
+        }
+    }
+
+    @Override
     public void updateConnectionState(String clientId, ConnectionState state, long lastActiveAt) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
