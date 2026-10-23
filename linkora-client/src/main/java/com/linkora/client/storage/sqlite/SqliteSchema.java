@@ -23,7 +23,7 @@ final class SqliteSchema {
     private static final Logger log = LoggerFactory.getLogger(SqliteSchema.class);
 
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    static final int LATEST_VERSION = 1;
+    static final int LATEST_VERSION = 2;
 
     private static final String CREATE_VERSION_TABLE =
             "CREATE TABLE IF NOT EXISTS lk_schema_version ("
@@ -64,8 +64,19 @@ final class SqliteSchema {
                     + " meta_value TEXT NOT NULL)",
     };
 
+    /**
+     * v2：顺序键。outbox 存键用于上行发送门禁（同键前一条未确认不发后一条）；
+     * inbox 存键仅为还原消息元数据（业务监听器可读取，客户端侧不做顺序门禁）。
+     * 历史行该列为 NULL = 无键 = 不参与顺序约束。SQLite DDL 可事务化，
+     * 版本号与建列同事务提交，崩溃重放安全。
+     */
+    private static final String[] V2_STATEMENTS = {
+            "ALTER TABLE lk_outbox ADD COLUMN sequence_key TEXT",
+            "ALTER TABLE lk_inbox ADD COLUMN sequence_key TEXT",
+    };
+
     /** 每个迁移版本 = 语句数组。 */
-    private static final String[][] MIGRATIONS = {V1_STATEMENTS};
+    private static final String[][] MIGRATIONS = {V1_STATEMENTS, V2_STATEMENTS};
 
     private SqliteSchema() {
     }

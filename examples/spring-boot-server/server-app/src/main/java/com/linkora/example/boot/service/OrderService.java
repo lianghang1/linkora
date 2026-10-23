@@ -28,12 +28,14 @@ public class OrderService {
 
     /**
      * 线上下单并通知线下门店：先持久化（门店离线则上线补投），在线时经 SSE 实时送达。
+     * sequenceKey = orderNo：同一订单的后续通知严格按发布顺序送达，
+     * 重试/补发不会让"订单已发货"越过"订单已创建"先到。
      */
     public PublishResult placeOrder(String clientId, String orderNo, String item) {
         ObjectNode payload = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         payload.put("orderNo", orderNo);
         payload.put("item", item);
         return linkoraServer.publish(clientId, TOPIC_ORDER_CREATED,
-                payload.toString().getBytes(StandardCharsets.UTF_8));
+                payload.toString().getBytes(StandardCharsets.UTF_8), orderNo);
     }
 }

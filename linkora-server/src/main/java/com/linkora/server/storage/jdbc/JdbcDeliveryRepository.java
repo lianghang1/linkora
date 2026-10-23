@@ -33,7 +33,8 @@ import java.util.Optional;
 public final class JdbcDeliveryRepository implements DeliveryRepository {
 
     private static final String COLUMNS =
-            "message_id, client_id, seq, state, retry_count, next_retry_at, last_error, created_at, updated_at";
+            "message_id, client_id, seq, state, retry_count, next_retry_at, last_error, "
+                    + "created_at, updated_at, sequence_key";
 
     /** 终态集合（与 MessageState.isTerminal() 一致，用于补发查询过滤）。 */
     private static final String TERMINAL_STATE_LIST = buildTerminalStateList();
@@ -64,7 +65,7 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
     public void init(DeliveryRecord record) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
-                     "INSERT INTO lk_delivery (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?)")) {
+                     "INSERT INTO lk_delivery (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?)")) {
             ps.setString(1, record.getMessageId());
             ps.setString(2, record.getClientId());
             ps.setLong(3, record.getSeq());
@@ -74,6 +75,7 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
             setNullableString(ps, 7, record.getLastError());
             ps.setLong(8, record.getCreatedAt());
             ps.setLong(9, record.getUpdatedAt());
+            setNullableString(ps, 10, record.getSequenceKey());
             ps.executeUpdate();
         } catch (SQLIntegrityConstraintViolationException duplicate) {
             // 幂等语义：重复初始化忽略
@@ -137,6 +139,19 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
                              + "AND state <> '" + MessageState.DEAD_LETTER.name() + "' "
                              // 未到重试时间的记录同样不占名额，本轮跳过
                              + "AND (next_retry_at IS NULL OR next_retry_at <= ?) "
+                             // 顺序键门禁：同 key 更早的记录还没终结（且非死信）时让路，
+                             // 保证同一业务实体（订单/账户/设备…）严格按发布顺序到达。
+                             // 放在 SQL 而不是查出来再在 Java 侧 return，
+                             // 否则被挡的消息会占批次名额（重演"死信占位"那类队头阻塞）
+                             + "AND NOT EXISTS ("
+                             + "SELECT 1 FROM lk_delivery p"
+                             + " WHERE p.client_id = lk_delivery.client_id"
+                             + " AND p.sequence_key = lk_delivery.sequence_key"
+                             + " AND p.sequence_key IS NOT NULL"
+                             + " AND p.seq < lk_delivery.seq"
+                             + " AND p.state NOT IN (" + TERMINAL_STATE_LIST + ")"
+                             + " AND p.state <> '" + MessageState.DEAD_LETTER.name() + "'"
+                             + ") "
                              + "ORDER BY seq ASC LIMIT ?")) {
             ps.setString(1, clientId);
             ps.setLong(2, afterSeqExclusive);
@@ -276,6 +291,32 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
         }
     }
 
+    @Override
+    public boolean hasEarlierUnsettled(String clientId, String sequenceKey, long seq) {
+        if (sequenceKey == null || sequenceKey.trim().isEmpty()) {
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT 1 FROM lk_delivery "
+                             + "WHERE client_id = ? AND sequence_key = ? AND seq < ? "
+                             + "AND state NOT IN (" + TERMINAL_STATE_LIST + ") "
+                             + "AND state <> '" + MessageState.DEAD_LETTER.name() + "' "
+                             + "LIMIT 1")) {
+            ps.setString(1, clientId);
+            ps.setString(2, sequenceKey);
+            ps.setLong(3, seq);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            // 顺序判断失败按存储错误抛出：调用方（attemptPush）捕获后跳过本条，
+            // 下一轮扫描重来——实际行为是"暂不投递"，不是"降级放行"
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "查询顺序键前序记录失败: " + clientId + "/" + sequenceKey, e);
+        }
+    }
+
     private static DeliveryRecord mapRecord(ResultSet rs) throws SQLException {
         return new DeliveryRecord(
                 rs.getString("message_id"),
@@ -286,7 +327,8 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
                 getNullableLong(rs, "next_retry_at"),
                 rs.getString("last_error"),
                 rs.getLong("created_at"),
-                rs.getLong("updated_at"));
+                rs.getLong("updated_at"),
+                rs.getString("sequence_key"));
     }
 
     private static Long getNullableLong(ResultSet rs, String column) throws SQLException {

@@ -23,6 +23,10 @@ public final class LinkoraMessage {
     private final Long expiresAt;
     private final int schemaVersion;
     private final String traceId;
+    private final String sequenceKey;
+
+    /** 顺序键长度上限（与库表列宽一致）。 */
+    public static final int MAX_SEQUENCE_KEY_LENGTH = 128;
 
     private LinkoraMessage(Builder builder) {
         this.messageId = requireNonBlank(builder.messageId, "messageId");
@@ -45,6 +49,10 @@ public final class LinkoraMessage {
         }
         this.schemaVersion = builder.schemaVersion;
         this.traceId = builder.traceId;
+        if (builder.sequenceKey != null && builder.sequenceKey.length() > MAX_SEQUENCE_KEY_LENGTH) {
+            throw new IllegalArgumentException("sequenceKey 长度不得超过 " + MAX_SEQUENCE_KEY_LENGTH);
+        }
+        this.sequenceKey = builder.sequenceKey;
     }
 
     public static Builder builder() {
@@ -95,6 +103,19 @@ public final class LinkoraMessage {
         return traceId;
     }
 
+    /**
+     * 顺序键（可选），为 null 表示不参与顺序约束。
+     *
+     * <p>同一个 clientId 下，{@code sequenceKey} 相同的消息严格按发布顺序（seq 单调）
+     * 投递：前一条到达终态之前，后一条不会被推送。订单号只是其中一种用法，
+     * 任何"必须按顺序处理"的实体（账户、设备、单据）都可以作为键。</p>
+     *
+     * <p>键为 null 时保持原有的"尽力投递、允许乱序"语义，与其他消息互不影响。</p>
+     */
+    public String getSequenceKey() {
+        return sequenceKey;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -111,7 +132,8 @@ public final class LinkoraMessage {
                 && messageType.equals(that.messageType)
                 && Arrays.equals(payload, that.payload)
                 && java.util.Objects.equals(expiresAt, that.expiresAt)
-                && java.util.Objects.equals(traceId, that.traceId);
+                && java.util.Objects.equals(traceId, that.traceId)
+                && java.util.Objects.equals(sequenceKey, that.sequenceKey);
     }
 
     @Override
@@ -124,6 +146,7 @@ public final class LinkoraMessage {
         result = 31 * result + java.util.Objects.hashCode(expiresAt);
         result = 31 * result + schemaVersion;
         result = 31 * result + java.util.Objects.hashCode(traceId);
+        result = 31 * result + java.util.Objects.hashCode(sequenceKey);
         return result;
     }
 
@@ -137,7 +160,8 @@ public final class LinkoraMessage {
                 + ", createdAt=" + createdAt
                 + ", expiresAt=" + expiresAt
                 + ", schemaVersion=" + schemaVersion
-                + ", traceId='" + traceId + "'}";
+                + ", traceId='" + traceId + '\''
+                + ", sequenceKey='" + sequenceKey + "'}";
     }
 
     private static String requireNonBlank(String value, String field) {
@@ -156,6 +180,7 @@ public final class LinkoraMessage {
         private Long expiresAt;
         private int schemaVersion = 1;
         private String traceId;
+        private String sequenceKey;
 
         public Builder messageId(String messageId) {
             this.messageId = messageId;
@@ -201,6 +226,16 @@ public final class LinkoraMessage {
 
         public Builder traceId(String traceId) {
             this.traceId = traceId;
+            return this;
+        }
+
+        /**
+         * 可选：顺序键，null / 空串 / 空白统一归一化为 null（= 无键，不参与顺序约束）。
+         * SDK 不做任何自动拼接，键的粒度完全由业务决定（如订单号）。
+         */
+        public Builder sequenceKey(String sequenceKey) {
+            this.sequenceKey = sequenceKey == null || sequenceKey.trim().isEmpty()
+                    ? null : sequenceKey.trim();
             return this;
         }
 

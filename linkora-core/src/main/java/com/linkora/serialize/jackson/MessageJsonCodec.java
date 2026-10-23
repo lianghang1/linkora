@@ -53,6 +53,11 @@ public final class MessageJsonCodec {
         } else {
             node.putNull("traceId");
         }
+        // 顺序键为可选字段：只在有值时输出；解码按字段名读、未知字段忽略，
+        // 老版本收到带 sequenceKey 的消息不会报错（滚动升级安全）
+        if (message.getSequenceKey() != null) {
+            node.put("sequenceKey", message.getSequenceKey());
+        }
         return node.toString();
     }
 
@@ -73,6 +78,10 @@ public final class MessageJsonCodec {
         JsonNode traceId = node.get("traceId");
         if (traceId != null && !traceId.isNull()) {
             builder.traceId(traceId.asText());
+        }
+        JsonNode sequenceKey = node.get("sequenceKey");
+        if (sequenceKey != null && !sequenceKey.isNull()) {
+            builder.sequenceKey(sequenceKey.asText());
         }
         try {
             return builder.build();

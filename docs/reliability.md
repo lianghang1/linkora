@@ -64,6 +64,44 @@ ProcessStatus:  PENDING → PROCESSING → PROCESSED(终态)
 - 429/5xx/连接超时/读取超时分类处理；遵守 `Retry-After`。
 - 过期规则服从业务语义，不为清理队列删除未完成消息。
 
+## 顺序保证（sequenceKey）
+
+默认投递只保证"至少一次"，**不保证顺序**。同一业务实体的状态消息（如订单状态 1 → 2）
+如果 2 先到、1 后到，业务状态会被覆盖回退。messageId 幂等去重对此无效——那是两条不同的消息。
+
+需要顺序时，发布方给同实体的消息传同一个 `sequenceKey`（如订单号）：
+
+```java
+// 服务端下行
+linkora.publish(clientId, "order-status", payload, orderId);
+// 客户端上行
+client.publish("order-status-updated", payload, orderId);
+```
+
+**保证语义**：同一 `clientId` + 同一 `sequenceKey` 下，消息严格按发布顺序投递与处理——
+前一条到达终态（PROCESSED / EXPIRED / DEAD_LETTER）之前，后一条不会被推送。
+实现为投递查询里的 NOT EXISTS 门禁（SQL 条件，无额外线程/队列），推送路径另有兜底检查。
+
+**边界（必须向业务方明确）**：
+
+| 场景 | 行为 |
+|---|---|
+| key 为 null / 空串 / 空白 | 归一化为"无键"，完全不参与顺序约束，行为与无键消息一致，不受其他消息阻塞 |
+| 不同 key / 不同客户端 | 完全并行，互不影响 |
+| 同键队头进死信或过期 | **放行后续**（方案 A）：该条视为放弃，同键后续照常投递；死信有 WARN 日志与状态查询可感知 |
+| 同键处理慢 | 该实体的后续消息排队等待——这是顺序的固有代价，键的粒度由业务权衡（粗粒度如"店铺 id"串行强但吞吐低，细粒度如"订单 id"并行好） |
+
+**多项目共用同一服务端**：门禁天然按 `(client_id, sequence_key)` 隔离——不同
+clientId 的同名 key 互不影响，无需在 key 里拼 clientId。若多个业务线共用同一个
+clientId，要么给每个项目独立 clientId（推荐），要么业务侧自行约定前缀
+（如 `wms:order-1`）。key 完全由业务传入，SDK 不做自动拼接。
+- ❌ 拼 clientId——门禁已按 `(client_id, sequence_key)` 隔离，不同客户端的同名 key 本就互不影响，再拼纯属冗余还浪费 128 列宽；
+- ❌ 拼 messageType——同类型不同实体互相阻塞；
+- ❌ 空键随机兜底——每条消息一个新键，等于永远无序还占存储。
+
+**滚动升级安全**：`sequenceKey` 是线路 JSON 可选字段，老版本按"未知字段忽略"处理；
+表结构由 schema 迁移自动加列（服务端 v3、客户端 v2），历史数据为 NULL = 无键。
+
 ## 断线恢复
 
 - 重连：指数退避 + 随机抖动；心跳超时（默认 2 倍心跳间隔）触发。

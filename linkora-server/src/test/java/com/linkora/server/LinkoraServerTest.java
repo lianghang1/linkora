@@ -150,6 +150,69 @@ public class LinkoraServerTest {
         awaitPush("orphan-id");
     }
 
+    // ---------------- 顺序键（sequenceKey） ----------------
+
+    @Test
+    public void sequenceKeyBlocksSecondPushUntilFirstProcessed() throws Exception {
+        // 同键两条：第一条推送后不 ACK，第二条不得被推送（首推与周期扫描都拦下）
+        gateway.connectedClients.set(1); // 模拟客户端在线：周期扫描才会跑
+        PublishResult first = server.publish(CLIENT, "ORDER",
+                "state=1".getBytes(StandardCharsets.UTF_8), "order-1");
+        RecordingGateway.Pushed firstPush = awaitPush(first.getMessageId());
+        awaitDeliveryState(first.getMessageId(), MessageState.ACCEPTED);
+
+        // 推送的线路 JSON 必须携带 sequenceKey（客户端才能读到）
+        assertEquals("order-1", new com.linkora.serialize.jackson.MessageJsonCodec()
+                .decodeMessage(firstPush.data).getSequenceKey());
+
+        PublishResult second = server.publish(CLIENT, "ORDER",
+                "state=2".getBytes(StandardCharsets.UTF_8), "order-1");
+        // 覆盖多轮周期扫描（sweepIntervalMs=100）
+        Thread.sleep(400);
+        assertEquals("同键第二条在前一条终结前不得推送（含扫描路径）",
+                0, gateway.pushedFor(second.getMessageId()));
+
+        // RECEIVED 不放行，只有 PROCESSED（终态）放行
+        assertEquals(200, postAck(first.getMessageId(), "RECEIVED", null, null).getStatus());
+        Thread.sleep(200);
+        assertEquals("RECEIVED 不是终态，不应放行", 0, gateway.pushedFor(second.getMessageId()));
+
+        assertEquals(200, postAck(first.getMessageId(), "PROCESSED", null, null).getStatus());
+        RecordingGateway.Pushed secondPush = awaitPush(second.getMessageId());
+        assertEquals("state=2", new com.linkora.serialize.jackson.MessageJsonCodec()
+                .decodeMessage(secondPush.data).getPayloadAsUtf8String());
+    }
+
+    @Test
+    public void sequenceKeyDeadLetterReleasesLane() throws Exception {
+        // 方案 A：队头进死信 = 放弃该条，同键后续照常投递
+        LinkoraServer retrier = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .config(ServerConfig.builder().maxDeliveryRetries(1).build())
+                .build();
+        retrier.start();
+        try {
+            PublishResult first = retrier.publish(CLIENT, "ORDER",
+                    "state=1".getBytes(StandardCharsets.UTF_8), "order-1");
+            awaitPush(first.getMessageId());
+            assertEquals(200, postAckOn(retrier, first.getMessageId(), "FAILED",
+                    "BIZ-1", "boom").getStatus());
+            assertEquals(MessageState.DEAD_LETTER,
+                    currentStateOn(retrier, first.getMessageId()));
+
+            PublishResult second = retrier.publish(CLIENT, "ORDER",
+                    "state=2".getBytes(StandardCharsets.UTF_8), "order-1");
+            awaitPush(second.getMessageId());
+        } finally {
+            retrier.close();
+        }
+    }
+
     // ---------------- ACK 状态机 ----------------
 
     @Test

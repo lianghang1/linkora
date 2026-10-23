@@ -21,11 +21,21 @@ public final class InboxEntry {
     private final int retryCount;
     private final Long nextRetryAt;
     private final String lastError;
+    /** 顺序键，可为 null（仅用于业务读取消息元数据，客户端侧不做顺序门禁）。 */
+    private final String sequenceKey;
 
     public InboxEntry(String messageId, String messageType, byte[] payload,
                       ReceiveStatus receiveStatus, ProcessStatus processStatus,
                       long receivedAt, Long processedAt, int retryCount,
                       Long nextRetryAt, String lastError) {
+        this(messageId, messageType, payload, receiveStatus, processStatus, receivedAt,
+                processedAt, retryCount, nextRetryAt, lastError, null);
+    }
+
+    public InboxEntry(String messageId, String messageType, byte[] payload,
+                      ReceiveStatus receiveStatus, ProcessStatus processStatus,
+                      long receivedAt, Long processedAt, int retryCount,
+                      Long nextRetryAt, String lastError, String sequenceKey) {
         requireNonBlank(messageId, "messageId");
         requireNonBlank(messageType, "messageType");
         if (payload == null) {
@@ -47,6 +57,8 @@ public final class InboxEntry {
         this.retryCount = retryCount;
         this.nextRetryAt = nextRetryAt;
         this.lastError = lastError;
+        this.sequenceKey = sequenceKey == null || sequenceKey.trim().isEmpty()
+                ? null : sequenceKey.trim();
     }
 
     public String getMessageId() {
@@ -89,13 +101,18 @@ public final class InboxEntry {
         return lastError;
     }
 
+    /** 顺序键，可为 null。 */
+    public String getSequenceKey() {
+        return sequenceKey;
+    }
+
     /** 返回接收状态与处理状态均更新后的新实例（不可变对象的变更语义）。 */
     public InboxEntry with(ReceiveStatus newReceiveStatus, ProcessStatus newProcessStatus,
                            int newRetryCount, Long newNextRetryAt,
                            String newLastError, Long newProcessedAt) {
         return new InboxEntry(messageId, messageType, payload, newReceiveStatus,
                 newProcessStatus, receivedAt, newProcessedAt != null ? newProcessedAt : processedAt,
-                newRetryCount, newNextRetryAt, newLastError);
+                newRetryCount, newNextRetryAt, newLastError, sequenceKey);
     }
 
     @Override

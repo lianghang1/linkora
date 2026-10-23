@@ -64,6 +64,19 @@ public interface ClientStore {
     /** 清理已处理完成且 updated/received 时间早于 deadline 的记录，返回删除行数。 */
     int deleteInboxProcessedBefore(long deadline);
 
+    // ---------------- 顺序键（可选能力） ----------------
+
+    /**
+     * outbox 中是否还有同一顺序键、更早入队且未终结（非 SERVER_ACCEPTED / DEAD_LETTER）的消息。
+     * 返回 true 时本条应等待，避免"重试中的旧消息"被同键新消息超车先发出去。
+     *
+     * <p>默认返回 false（不阻塞）：自实现存储不覆盖该方法即退化为"不保证上行顺序"，
+     * 不会破坏既有实现。</p>
+     */
+    default boolean hasEarlierActiveInKey(String sequenceKey, String messageId) {
+        return false;
+    }
+
     // ---------------- meta：游标与本地元数据 ----------------
 
     void saveMeta(String key, String value);

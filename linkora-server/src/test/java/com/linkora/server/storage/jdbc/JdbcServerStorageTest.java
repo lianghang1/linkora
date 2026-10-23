@@ -379,6 +379,124 @@ public class JdbcServerStorageTest {
         assertEquals("live-1", batch.get(0).getMessageId());
     }
 
+    // ---------------- 顺序键门禁 ----------------
+
+    private static DeliveryRecord keyedRecord(String messageId, String clientId, long seq,
+                                              MessageState state, String sequenceKey) {
+        return new DeliveryRecord(messageId, clientId, seq, state, 0, null, null,
+                NOW, NOW, sequenceKey);
+    }
+
+    @Test
+    public void sequenceKeyGatesLaterRecordsUntilSettled() {
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-gate"));
+        // 同键（order-1）两条，相隔 199 条：门禁必须与距离无关
+        repo.init(keyedRecord("m-1", "c-1", 1, MessageState.ACCEPTED, "order-1"));
+        repo.init(keyedRecord("m-200", "c-1", 200, MessageState.ACCEPTED, "order-1"));
+        // 无键与其他键的消息不受影响
+        repo.init(keyedRecord("m-2", "c-1", 2, MessageState.ACCEPTED, null));
+        repo.init(keyedRecord("m-3", "c-1", 3, MessageState.ACCEPTED, "order-2"));
+
+        List<DeliveryRecord> batch =
+                repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
+        assertEquals(3, batch.size());
+        assertEquals("m-1", batch.get(0).getMessageId());
+        assertEquals("m-2", batch.get(1).getMessageId());
+        assertEquals("m-3", batch.get(2).getMessageId());
+
+        // 前一条终结（PROCESSED）后放行：m-1 出局（终态），m-200 进批次
+        assertTrue(repo.compareAndSetState("m-1", "c-1",
+                MessageState.ACCEPTED, MessageState.PROCESSED, null, null, 0, 0));
+        batch = repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
+        assertEquals(3, batch.size());
+        assertEquals("m-200", batch.get(2).getMessageId());
+    }
+
+    @Test
+    public void sequenceKeyDeadLetterReleasesLane() {
+        // 方案 A：队头进死信 = 放弃该条，同键后续照常投递，不永久阻塞
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-dead"));
+        repo.init(keyedRecord("m-1", "c-1", 1, MessageState.DEAD_LETTER, "order-1"));
+        repo.init(keyedRecord("m-2", "c-1", 2, MessageState.ACCEPTED, "order-1"));
+
+        List<DeliveryRecord> batch =
+                repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
+        assertEquals(1, batch.size());
+        assertEquals("m-2", batch.get(0).getMessageId());
+        assertFalse(repo.hasEarlierUnsettled("c-1", "order-1", 2));
+    }
+
+    @Test
+    public void sequenceKeyExpiredReleasesLane() {
+        // 方案 A 的另一分支：队头过期（EXPIRED 终态）同样放行同键后续
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-expired"));
+        repo.init(keyedRecord("m-1", "c-1", 1, MessageState.EXPIRED, "order-1"));
+        repo.init(keyedRecord("m-2", "c-1", 2, MessageState.ACCEPTED, "order-1"));
+
+        List<DeliveryRecord> batch =
+                repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
+        assertEquals(1, batch.size());
+        assertEquals("m-2", batch.get(0).getMessageId());
+        assertFalse(repo.hasEarlierUnsettled("c-1", "order-1", 2));
+    }
+
+    @Test
+    public void sequenceKeyIsIsolatedAcrossClients() {
+        // 同一个 key 在不同客户端之间互不影响：c-2 的未终结前序不能挡住 c-1 的消息
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-clients"));
+        repo.init(keyedRecord("m-1", "c-2", 1, MessageState.CREATED, "order-1"));
+        repo.init(keyedRecord("m-2", "c-1", 1, MessageState.PROCESSED, "order-1"));
+        repo.init(keyedRecord("m-3", "c-1", 2, MessageState.ACCEPTED, "order-1"));
+
+        List<DeliveryRecord> batch =
+                repo.findUnfinishedAfterSeq("c-1", 0, System.currentTimeMillis(), 100);
+        assertEquals("c-2 的同键未终结消息不得阻塞 c-1（c-1 自己的前序已终结）",
+                1, batch.size());
+        assertEquals("m-3", batch.get(0).getMessageId());
+        assertFalse(repo.hasEarlierUnsettled("c-1", "order-1", 2));
+        assertTrue("c-2 自己的同键前序未终结 → 该挡还得挡",
+                repo.hasEarlierUnsettled("c-2", "order-1", 2));
+    }
+
+    @Test
+    public void hasEarlierUnsettledSemantics() {
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-earlier"));
+        repo.init(keyedRecord("a-1", "c-1", 1, MessageState.RETRYING, "order-1"));
+        repo.init(keyedRecord("a-2", "c-1", 2, MessageState.ACCEPTED, "order-1"));
+        repo.init(keyedRecord("b-1", "c-1", 3, MessageState.CREATED, "order-2"));
+        repo.init(keyedRecord("n-1", "c-1", 4, MessageState.CREATED, null));
+
+        assertTrue("同键前序未终结 → 让路", repo.hasEarlierUnsettled("c-1", "order-1", 2));
+        assertTrue(repo.hasEarlierUnsettled("c-1", "order-1", 200));
+        assertTrue(repo.compareAndSetState("a-1", "c-1",
+                MessageState.RETRYING, MessageState.PROCESSED, null, null, 0, 0));
+        assertFalse("同键前序已终结 → 放行", repo.hasEarlierUnsettled("c-1", "order-1", 2));
+        assertFalse("order-2 无更早记录（b-1 自身即 seq 3）",
+                repo.hasEarlierUnsettled("c-1", "order-2", 3));
+        assertFalse("不存在的键 → 放行", repo.hasEarlierUnsettled("c-1", "order-9", 200));
+        assertFalse("无键不参与顺序约束", repo.hasEarlierUnsettled("c-1", null, 200));
+        assertFalse(repo.hasEarlierUnsettled("c-1", "  ", 200));
+    }
+
+    @Test
+    public void messageRoundtripPreservesSequenceKey() {
+        JdbcMessageRepository repo = new JdbcMessageRepository(freshH2("msg-seq-key"));
+        com.linkora.core.message.LinkoraMessage keyed =
+                com.linkora.core.message.LinkoraMessage.builder()
+                        .messageId("msg-k1").clientId("store-001").messageType("ORDER")
+                        .payload("p").createdAt(NOW).sequenceKey("order-1").build();
+        repo.save(keyed);
+        assertEquals("order-1", repo.findByMessageId("msg-k1").get().getSequenceKey());
+
+        // 空白归一化为 null（推送时线路 JSON 不输出该字段）
+        com.linkora.core.message.LinkoraMessage blank =
+                com.linkora.core.message.LinkoraMessage.builder()
+                        .messageId("msg-k2").clientId("store-001").messageType("ORDER")
+                        .payload("p").createdAt(NOW).sequenceKey("   ").build();
+        repo.save(blank);
+        assertEquals(null, repo.findByMessageId("msg-k2").get().getSequenceKey());
+    }
+
     // ---------------- ClientRegistry ----------------
 
     @Test

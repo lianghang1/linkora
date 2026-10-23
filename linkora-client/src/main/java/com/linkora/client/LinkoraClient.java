@@ -287,11 +287,16 @@ public final class LinkoraClient implements AutoCloseable {
 
     /** 发布对象负载（需要构建时提供 payloadSerializer）。返回 messageId。 */
     public String publish(String messageType, Object payload) {
+        return publish(messageType, payload, null);
+    }
+
+    /** 发布对象负载 + 顺序键：同一 sequenceKey 的消息严格按发布顺序被服务端接收。 */
+    public String publish(String messageType, Object payload, String sequenceKey) {
         if (payloadSerializer == null) {
             throw new LinkoraException(LinkoraErrorCode.SERIALIZATION_ERROR,
                     "未配置 payloadSerializer，无法序列化对象负载");
         }
-        return publish(messageType, payloadSerializer.serialize(payload));
+        return publish(messageType, payloadSerializer.serialize(payload), sequenceKey);
     }
 
     /**
@@ -299,6 +304,14 @@ public final class LinkoraClient implements AutoCloseable {
      * 客户端未启动时也允许入队（start 后自动补传）。
      */
     public String publish(String messageType, byte[] payload) {
+        return publish(messageType, payload, null);
+    }
+
+    /**
+     * 发布字节负载 + 顺序键：同一 sequenceKey 的消息严格按发布顺序被服务端接收
+     * （前一条未被服务端确认前，后一条不会发出）。key 为 null 时行为与无序发布一致。
+     */
+    public String publish(String messageType, byte[] payload, String sequenceKey) {
         if (state == ClientState.CLOSED) {
             throw new LinkoraException(LinkoraErrorCode.INTERNAL_ERROR, "客户端已关闭");
         }
@@ -307,7 +320,7 @@ public final class LinkoraClient implements AutoCloseable {
         OutboxEntry entry;
         try {
             entry = new OutboxEntry(messageId, messageType, payload,
-                    OutboxStatus.PENDING, now, now, 0, null, null, null);
+                    OutboxStatus.PENDING, now, now, 0, null, null, null, sequenceKey);
         } catch (IllegalArgumentException e) {
             throw new LinkoraException(LinkoraErrorCode.INVALID_MESSAGE, e.getMessage(), e);
         }
@@ -412,7 +425,7 @@ public final class LinkoraClient implements AutoCloseable {
         long now = System.currentTimeMillis();
         boolean isNew = store.saveInbox(new InboxEntry(message.getMessageId(), message.getMessageType(),
                 message.getPayload(), ReceiveStatus.PERSISTED, ProcessStatus.PENDING,
-                now, null, 0, null, null));
+                now, null, 0, null, null, message.getSequenceKey()));
         if (isNew) {
             // SQLite 已提交 → 立即发送 RECEIVED ACK（失败由恢复扫描补发）
             if (sendAck(message.getMessageId(), AckType.RECEIVED, null, null)) {
@@ -618,6 +631,12 @@ public final class LinkoraClient implements AutoCloseable {
                     null, "消息已过期", now), entry.getStatus());
             return;
         }
+        // 上行顺序门禁：同键更早的消息还没终结（未确认/未死信）时让路，
+        // 防止"重试中的旧消息"被同键新消息超车先发出去；留到下轮发送
+        if (entry.getSequenceKey() != null
+                && store.hasEarlierActiveInKey(entry.getSequenceKey(), entry.getMessageId())) {
+            return;
+        }
         OutboxEntry claimed = entry.with(OutboxStatus.SENDING, entry.getRetryCount(),
                 null, null, System.currentTimeMillis());
         if (!transitionOutbox(claimed, entry.getStatus())) {
@@ -637,6 +656,7 @@ public final class LinkoraClient implements AutoCloseable {
                     .createdAt(entry.getCreatedAt())
                     .expiresAt(entry.getExpiresAt())
                     .schemaVersion(Protocol.PROTOCOL_VERSION)
+                    .sequenceKey(entry.getSequenceKey())
                     .build();
         } catch (IllegalArgumentException e) {
             transitionOutbox(entry.with(OutboxStatus.DEAD_LETTER, entry.getRetryCount(),
@@ -807,6 +827,7 @@ public final class LinkoraClient implements AutoCloseable {
                 .payload(entry.getPayload())
                 .createdAt(entry.getReceivedAt())
                 .schemaVersion(Protocol.PROTOCOL_VERSION)
+                .sequenceKey(entry.getSequenceKey())
                 .build();
     }
 

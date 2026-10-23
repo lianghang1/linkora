@@ -44,7 +44,8 @@ public class OrderStatusHandler extends JsonUplinkHandler<OrderStatusHandler.Sta
         log.info("线下订单状态变更: clientId={}, orderNo={}, status={}, messageId={}",
                 message.getClientId(), payload.orderNo, payload.status, message.getMessageId());
         System.out.println("[上行-订单状态] clientId=" + message.getClientId()
-                + " 订单 " + payload.orderNo + " → " + payload.status);
+                + " 订单 " + payload.orderNo + " → " + payload.status
+                + " 顺序键=" + message.getSequenceKey());
     }
 
     /** 订单状态 payload DTO。 */

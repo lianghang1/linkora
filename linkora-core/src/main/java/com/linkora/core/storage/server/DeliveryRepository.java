@@ -44,10 +44,6 @@ public interface DeliveryRepository {
                                int expectedRetryCount, int newRetryCount);
 
     /**
-     * 查询指定客户端 seq 大于 afterSeqExclusive 的未完成消息（未到终态），
-     * 按 seq 升序返回，用于重连补发。
-     */
-    /**
      * 查询指定客户端 seq 大于 afterSeqExclusive 的"当前可投递"记录，按 seq 升序。
      *
      * <p>"可投递"= 未到终态、非死信、未到重试时间。死信停止投递但不占批次名额；
@@ -69,4 +65,18 @@ public interface DeliveryRepository {
 
     /** 为客户端原子分配下一个投递序号（从 1 开始）。 */
     long nextDeliverySeq(String clientId);
+
+    /**
+     * 同一 clientId、同一 sequenceKey 下，是否存在 seq 更小且未到终态（且非死信）的记录。
+     *
+     * <p>用于顺序保证：返回 true 时本条必须让路，等前一条终结后再投。
+     * 默认返回 false（不阻塞），自实现仓储不覆盖该方法则退化为"不保证顺序"，
+     * 不会破坏兼容。</p>
+     *
+     * @param sequenceKey 顺序键，null 表示不参与顺序约束（实现应直接返回 false）
+     * @param seq         当前记录的投递序号
+     */
+    default boolean hasEarlierUnsettled(String clientId, String sequenceKey, long seq) {
+        return false;
+    }
 }
