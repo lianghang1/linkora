@@ -39,6 +39,13 @@ public final class RegistryPushGateway implements SsePushGateway {
     }
 
     @Override
+    public int sendControl(String clientId, String data) {
+        // ctrl 事件不参与 Last-Event-ID/游标（指令不持久化、不补发）
+        return registry.broadcast(clientId, null,
+                com.linkora.core.admin.ClientCommands.EVENT_TYPE, data);
+    }
+
+    @Override
     public int connectionCount(String clientId) {
         return registry.getConnections(clientId).size();
     }

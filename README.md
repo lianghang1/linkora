@@ -341,6 +341,42 @@ linkora.forceTransition("store-001", messageId,
 - `skipMessage` / `skipAllDeadLetters` 语义是"主动放弃该条"——跳过前确认业务上可以放弃。
 - 自动化程度更高（指标面板、Grafana）不在 SDK 范围内，需要时在宿主侧接入 metrics。
 
+### 客户端侧：本地队列查询与上行死信处置
+
+上行的"死信" = 发送耗尽重试 / 被服务端不可重试拒绝（如认证配置错误）/ 消息过期。
+死信不会自动复活（数据不丢，留在本地 SQLite），注入 `LinkoraClient` 后可本地处置：
+
+| 方法 | 输出/行为 |
+|---|---|
+| `listOutbox(status?, limit)` | 上行队列明细（全部状态，中文状态描述 + payload 文本预览） |
+| `listInbox(processStatus?, limit)` | 下行收件明细（接收/处理两级中文状态） |
+| `listOutboxDeadLetters(limit)` | 上行死信列表 |
+| `retryOutboxDeadLetter(messageId)` | 重发：DEAD_LETTER → PENDING（重试计数清零）并立即触发发送 |
+| `discardOutboxDeadLetter(messageId, reason)` | 放弃留痕 |
+
+### 服务端远程触发客户端运营操作（管理指令通道）
+
+客户端往往无人值守——服务端提供**远程指令通道**：通过现有 SSE 连接下发 `ctrl` 事件，
+**不落库、不混业务消息、仅对在线设备实时生效**（离线返回未送达，运维再次触发即可；
+设备离线时重发类指令本来也无法执行）。
+
+```java
+// 例：远程触发门店设备重发它的上行死信（典型场景：凭据配错修复后）
+linkora.retryClientOutboxDeadLetter("store-001", messageId);   // delivered=0 表示设备离线
+
+// 例：探测设备指令通道连通性
+linkora.pingClient("store-001");
+
+// 例：远程查询设备本地队列（结果经上行回传，按 queryId 读取）
+String queryId = linkora.queryClientOutbox("store-001", null, 50);
+String result = linkora.getCommandResult(queryId);   // 尚未返回时为 null，稍后重查
+```
+
+指令白名单（`com.linkora.core.admin.ClientCommands`）：`RETRY_OUTBOX_DEAD_LETTER`、
+`DISCARD_OUTBOX_DEAD_LETTER`、`QUERY_OUTBOX`、`PING`——管理通道不是通用执行通道，
+每条指令显式定义，未知指令客户端忽略并告警。指令本身不持久化不重试（收不到就再触发一次），
+指令执行结果经上行回传并在服务端内存暂存（按 queryId 读取，最多保留 100 条）。
+
 ---
 
 ## 数据库表（会建哪些表、动你什么数据）
