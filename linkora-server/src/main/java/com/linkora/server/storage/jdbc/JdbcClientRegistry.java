@@ -73,6 +73,26 @@ public final class JdbcClientRegistry implements ClientRegistry {
     }
 
     @Override
+    public java.util.List<ClientRegistration> findAll() {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT client_id, enabled, created_at FROM lk_client ORDER BY client_id ASC");
+             ResultSet rs = ps.executeQuery()) {
+            java.util.List<ClientRegistration> result = new java.util.ArrayList<>();
+            while (rs.next()) {
+                result.add(new ClientRegistration(
+                        rs.getString("client_id"),
+                        rs.getBoolean("enabled"),
+                        rs.getLong("created_at")));
+            }
+            return result;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "查询全部客户端注册失败", e);
+        }
+    }
+
+    @Override
     public void updateConnectionState(String clientId, ConnectionState state, long lastActiveAt) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(

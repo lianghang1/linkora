@@ -85,6 +85,61 @@ public class EmbeddedLinkoraServerTest {
         assertTrue(awaitMessageState(testServer, downlinkId, MessageState.PROCESSED, 10000));
     }
 
+    @Test
+    public void disconnectClientKillsConnectionAndClientRecovers() throws Exception {
+        // 管理 API 真实断连演示：踢掉假在线连接 → 客户端自动重连 → 后续消息照常收到
+        Path dbFile = Files.createTempDirectory("linkora-testkit").resolve("client.db");
+        clientStore = new SqliteClientStore(dbFile);
+        client = LinkoraClient.builder()
+                .serverUrl(testServer.baseUrl())
+                .clientId(CLIENT_ID)
+                .clientStore(clientStore)
+                .config(ClientConfig.builder()
+                        .senderIntervalMs(100)
+                        .recoveryIntervalMs(300)
+                        .build())
+                .build();
+        RecordingMessageListener listener = new RecordingMessageListener();
+        client.addListener(TOPIC, listener);
+        client.start();
+
+        // 等待真实 SSE 连接建立
+        assertTrue("客户端应在线", awaitOnline(testServer, 15000));
+
+        // 管理 API 踢连接：必须真实断开至少一条
+        int closed = testServer.server().disconnectClient(CLIENT_ID);
+        assertTrue("应至少断开一条真实 SSE 连接", closed >= 1);
+        assertTrue("踢完应离线", awaitOffline(testServer, 5000));
+
+        // 客户端自动重连（指数退避）后，后续消息照常收到
+        assertTrue("客户端应自动重连上线", awaitOnline(testServer, 20000));
+        testServer.publish(CLIENT_ID, TOPIC, "after-disconnect".getBytes(StandardCharsets.UTF_8));
+        assertTrue("重连后应照常收到消息", listener.awaitCount(1, 15000));
+        assertEquals("after-disconnect", listener.messages().get(0).getPayloadAsUtf8String());
+    }
+
+    private static boolean awaitOnline(EmbeddedLinkoraServer server, long timeoutMs) throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (server.server().getBacklog(CLIENT_ID).isConnected()) {
+                return true;
+            }
+            Thread.sleep(100);
+        }
+        return false;
+    }
+
+    private static boolean awaitOffline(EmbeddedLinkoraServer server, long timeoutMs) throws Exception {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (!server.server().getBacklog(CLIENT_ID).isConnected()) {
+                return true;
+            }
+            Thread.sleep(100);
+        }
+        return false;
+    }
+
     private static boolean awaitOutboxStatus(SqliteClientStore store, String messageId,
                                              OutboxStatus expected, long timeoutMs) throws Exception {
         long deadline = System.currentTimeMillis() + timeoutMs;

@@ -34,6 +34,11 @@ public final class RegistryPushGateway implements SsePushGateway {
     }
 
     @Override
+    public int disconnectClient(String clientId) {
+        return registry.disconnectClient(clientId);
+    }
+
+    @Override
     public int connectionCount(String clientId) {
         return registry.getConnections(clientId).size();
     }

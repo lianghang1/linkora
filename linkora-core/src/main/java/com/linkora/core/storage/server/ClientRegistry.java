@@ -1,5 +1,7 @@
 package com.linkora.core.storage.server;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -14,4 +16,12 @@ public interface ClientRegistry {
     Optional<ClientRegistration> findByClientId(String clientId);
 
     void updateConnectionState(String clientId, ConnectionState state, long lastActiveAt);
+
+    /**
+     * 全部已注册客户端（管理/观测接口使用）。
+     * 默认返回空列表：自实现仓储不覆盖不会破坏编译。
+     */
+    default List<ClientRegistration> findAll() {
+        return Collections.emptyList();
+    }
 }

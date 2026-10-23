@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
@@ -211,6 +212,107 @@ public class LinkoraServerTest {
         } finally {
             retrier.close();
         }
+    }
+
+    // ---------------- 管理/观测接口 ----------------
+
+    @Test
+    public void adminViewsAreHumanReadable() throws Exception {
+        PublishResult result = server.publish(CLIENT, "ORDER",
+                "{\"orderNo\":\"SO-1\",\"item\":\"机械键盘 x1\"}".getBytes(StandardCharsets.UTF_8),
+                "SO-1");
+        awaitDeliveryState(result.getMessageId(), MessageState.ACCEPTED);
+
+        List<com.linkora.server.admin.DeliveryView> views =
+                server.listUnfinishedDeliveries(CLIENT, 100);
+        assertEquals(1, views.size());
+        com.linkora.server.admin.DeliveryView view = views.get(0);
+        assertEquals(result.getMessageId(), view.getMessageId());
+        assertEquals(CLIENT, view.getClientId());
+        assertEquals("已接受，等待推送", view.getStateText());
+        assertTrue("时间必须是 yyyy-MM-dd HH:mm:ss 格式",
+                view.getCreatedAt().matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}"));
+        assertTrue("payload 必须是解码后的原文（不得是 Base64）",
+                view.getPayloadPreview().contains("机械键盘 x1"));
+        assertEquals("无重试调度时显示占位符", "—", view.getNextRetryAt());
+        assertEquals("—", view.getLastError());
+    }
+
+    @Test
+    public void retryDeadLetterViaAdminApi() throws Exception {
+        LinkoraServer retrier = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .config(ServerConfig.builder().maxDeliveryRetries(1).build())
+                .build();
+        retrier.start();
+        try {
+            PublishResult result = retrier.publish(CLIENT, "ORDER",
+                    "payload".getBytes(StandardCharsets.UTF_8));
+            awaitPush(result.getMessageId());
+            assertEquals(200, postAckOn(retrier, result.getMessageId(), "FAILED",
+                    "BIZ-1", "boom").getStatus());
+            assertEquals(MessageState.DEAD_LETTER, currentStateOn(retrier, result.getMessageId()));
+
+            // 死信列表：人类可读，原因在 lastError
+            List<com.linkora.server.admin.DeliveryView> deadLetters =
+                    retrier.listDeadLetters(CLIENT, 100);
+            assertEquals(1, deadLetters.size());
+            assertEquals("死信，等待人工介入", deadLetters.get(0).getStateText());
+            assertEquals("BIZ-1: boom", deadLetters.get(0).getLastError());
+
+            // 人工重放 → RETRYING → 立即重推
+            assertTrue(retrier.retryDeadLetter(CLIENT, result.getMessageId()));
+            awaitDeliveryStateOn(retrier, result.getMessageId(), MessageState.RETRYING, 5000);
+            awaitPushCount(result.getMessageId(), 2);
+
+            // 已不在死信状态，重复重放返回 false
+            assertFalse(retrier.retryDeadLetter(CLIENT, result.getMessageId()));
+        } finally {
+            retrier.close();
+        }
+    }
+
+    @Test
+    public void skipMessageMarksExpiredAndReleases() throws Exception {
+        PublishResult result = server.publish(CLIENT, "ORDER", "p".getBytes(StandardCharsets.UTF_8));
+        awaitDeliveryState(result.getMessageId(), MessageState.ACCEPTED);
+
+        assertTrue(server.skipMessage(CLIENT, result.getMessageId()));
+        assertEquals(MessageState.EXPIRED, currentState(result.getMessageId()));
+        assertTrue("人工跳过必须留下可读标记",
+                currentRecordOn(server, result.getMessageId()).getLastError().contains("人工跳过"));
+
+        // 终态后不再出现在未完成列表，重复跳过返回 false
+        assertEquals(0, server.listUnfinishedDeliveries(CLIENT, 100).size());
+        assertFalse(server.skipMessage(CLIENT, result.getMessageId()));
+    }
+
+    @Test
+    public void clientOverviewsContainRegisteredClient() {
+        List<com.linkora.server.admin.ClientOverviewView> overviews = server.getClientOverviews();
+        assertFalse(overviews.isEmpty());
+        com.linkora.server.admin.ClientOverviewView self = null;
+        for (com.linkora.server.admin.ClientOverviewView view : overviews) {
+            if (CLIENT.equals(view.getClientId())) {
+                self = view;
+            }
+        }
+        assertNotNull("概览必须包含已注册客户端", self);
+        assertTrue(self.isEnabled());
+        assertTrue("注册时间必须是人类可读格式",
+                self.getCreatedAt().matches("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}"));
+    }
+
+    @Test
+    public void disconnectClientDelegatesToGateway() {
+        gateway.connectedClients.set(1);
+        assertEquals(1, server.disconnectClient(CLIENT));
+        assertEquals(1, gateway.disconnectCalls.get());
     }
 
     // ---------------- ACK 状态机 ----------------
@@ -695,6 +797,14 @@ public class LinkoraServerTest {
         @Override
         public void closeAll() {
             // no-op
+        }
+
+        final AtomicInteger disconnectCalls = new AtomicInteger(0);
+
+        @Override
+        public int disconnectClient(String clientId) {
+            disconnectCalls.incrementAndGet();
+            return isConnected(clientId) ? 1 : 0;
         }
 
         int pushedFor(String messageId) {

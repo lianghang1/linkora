@@ -317,6 +317,67 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
         }
     }
 
+    @Override
+    public List<DeliveryRecord> findUnsettled(String clientId, int limit) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT " + COLUMNS + " FROM lk_delivery "
+                             + "WHERE client_id = ? AND state NOT IN (" + TERMINAL_STATE_LIST + ") "
+                             + "ORDER BY seq ASC LIMIT ?")) {
+            ps.setString(1, clientId);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DeliveryRecord> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapRecord(rs));
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "查询未终结投递失败: " + clientId, e);
+        }
+    }
+
+    @Override
+    public List<DeliveryRecord> findDeadLetters(String clientId, int limit) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT " + COLUMNS + " FROM lk_delivery "
+                             + "WHERE client_id = ? AND state = '" + MessageState.DEAD_LETTER.name() + "' "
+                             + "ORDER BY updated_at DESC LIMIT ?")) {
+            ps.setString(1, clientId);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DeliveryRecord> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapRecord(rs));
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "查询死信失败: " + clientId, e);
+        }
+    }
+
+    @Override
+    public long countDeadLetters(String clientId) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT COUNT(*) FROM lk_delivery "
+                             + "WHERE client_id = ? AND state = '" + MessageState.DEAD_LETTER.name() + "'")) {
+            ps.setString(1, clientId);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "统计死信失败: " + clientId, e);
+        }
+    }
+
     private static DeliveryRecord mapRecord(ResultSet rs) throws SQLException {
         return new DeliveryRecord(
                 rs.getString("message_id"),

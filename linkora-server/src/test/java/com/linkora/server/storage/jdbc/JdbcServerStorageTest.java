@@ -459,6 +459,35 @@ public class JdbcServerStorageTest {
     }
 
     @Test
+    public void unsettledAndDeadLetterQueriesForAdmin() {
+        // 管理视角：未终结列表要包含死信（人工介入对象），只排除真终态
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-admin"));
+        repo.init(keyedRecord("m-1", "c-1", 1, MessageState.PROCESSED, null));
+        repo.init(keyedRecord("m-2", "c-1", 2, MessageState.EXPIRED, null));
+        repo.init(keyedRecord("m-3", "c-1", 3, MessageState.ACCEPTED, null));
+        repo.init(keyedRecord("m-4", "c-1", 4, MessageState.RETRYING, null));
+        repo.init(keyedRecord("m-5", "c-1", 5, MessageState.DEAD_LETTER, null));
+        repo.init(keyedRecord("m-6", "c-1", 6, MessageState.DEAD_LETTER, null));
+        repo.init(keyedRecord("m-7", "c-2", 1, MessageState.ACCEPTED, null));
+
+        List<DeliveryRecord> unsettled = repo.findUnsettled("c-1", 100);
+        assertEquals("未终结 = 全部非终态（含死信），且与 c-2 隔离", 4, unsettled.size());
+        assertEquals("m-3", unsettled.get(0).getMessageId());
+        assertEquals("m-4", unsettled.get(1).getMessageId());
+        assertEquals("m-5", unsettled.get(2).getMessageId());
+        assertEquals("m-6", unsettled.get(3).getMessageId());
+
+        List<DeliveryRecord> deadLetters = repo.findDeadLetters("c-1", 100);
+        assertEquals(2, deadLetters.size());
+        assertTrue(deadLetters.get(0).getMessageId().startsWith("m-"));
+        assertTrue(deadLetters.get(1).getMessageId().startsWith("m-"));
+
+        assertEquals(2, repo.countDeadLetters("c-1"));
+        assertEquals(0, repo.countDeadLetters("c-2"));
+        assertEquals(0, repo.findDeadLetters("c-2", 100).size());
+    }
+
+    @Test
     public void hasEarlierUnsettledSemantics() {
         JdbcDeliveryRepository repo = new JdbcDeliveryRepository(freshH2("dlv-seq-earlier"));
         repo.init(keyedRecord("a-1", "c-1", 1, MessageState.RETRYING, "order-1"));

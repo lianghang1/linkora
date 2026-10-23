@@ -79,4 +79,30 @@ public interface DeliveryRepository {
     default boolean hasEarlierUnsettled(String clientId, String sequenceKey, long seq) {
         return false;
     }
+
+    // ---------------- 管理/观测查询（可选能力） ----------------
+    //
+    // 三个方法均为 default 实现（空结果），自实现仓储不覆盖不会破坏编译；
+    // 仅供管理接口使用，不参与投递主链路。
+
+    /**
+     * 查询指定客户端的全部未终结投递记录（含死信，供人工介入），按 seq 升序。
+     *
+     * <p>与 {@link #findUnfinishedAfterSeq(String, long, long, int)} 不同：
+     * 本方法不做"可投递"过滤（不含顺序键门禁与重试时间判断），也不排除死信——
+     * 它服务于"看清楚现在压着什么"的管理视角。</p>
+     */
+    default List<DeliveryRecord> findUnsettled(String clientId, int limit) {
+        return java.util.Collections.emptyList();
+    }
+
+    /** 查询指定客户端的死信记录（仅人工重试可复活），按更新时间倒序。 */
+    default List<DeliveryRecord> findDeadLetters(String clientId, int limit) {
+        return java.util.Collections.emptyList();
+    }
+
+    /** 统计指定客户端的死信数量。 */
+    default long countDeadLetters(String clientId) {
+        return 0;
+    }
 }
