@@ -90,6 +90,21 @@ public final class SseConnectionRegistry {
     }
 
     /** 关闭全部连接（服务端优雅停机时使用）。 */
+    /**
+     * 强制断开指定客户端的全部连接（管理接口）：逐条 close 触发断开回调，
+     * 客户端将自动重连并按 Last-Event-ID 补发，不丢数据。
+     *
+     * @return 断开的连接数
+     */
+    public int disconnectClient(String clientId) {
+        int closed = 0;
+        for (SseClientConnection connection : getConnections(clientId)) {
+            connection.close();
+            closed++;
+        }
+        return closed;
+    }
+
     public void closeAll() {
         for (List<SseClientConnection> list : connections.values()) {
             for (SseClientConnection connection : list) {

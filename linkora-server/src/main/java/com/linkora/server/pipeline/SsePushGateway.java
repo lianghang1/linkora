@@ -27,4 +27,11 @@ public interface SsePushGateway {
 
     /** 关闭全部连接（服务端优雅停机）。 */
     void closeAll();
+
+    /**
+     * 强制断开指定客户端的全部 SSE 连接（管理接口：处置"假在线"连接）。
+     *
+     * @return 断开的连接数（0 表示该客户端本就不在线）
+     */
+    int disconnectClient(String clientId);
 }

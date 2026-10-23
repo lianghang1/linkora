@@ -6,6 +6,7 @@ import com.linkora.core.message.LinkoraMessage;
 import com.linkora.core.serialize.PayloadSerializer;
 import com.linkora.core.storage.server.ClientRegistry;
 import com.linkora.core.storage.server.ClientCursorRepository;
+import com.linkora.core.storage.server.ClientRegistration;
 import com.linkora.core.storage.server.DeliveryRecord;
 import com.linkora.core.storage.server.DeliveryRepository;
 import com.linkora.core.storage.server.MessageRepository;
@@ -293,6 +294,139 @@ public final class LinkoraServer {
         return new BacklogInfo(clientId,
                 deliveryRepository.countUnfinished(clientId),
                 gateway.isConnected(clientId));
+
+    }
+
+    // ---------------- 管理/观测接口（人类可读视图） ----------------
+
+    /**
+     * 全部客户端概览：谁在线、谁压着消息、谁有死信。
+     *
+     * <p>时间已格式化为 {@code yyyy-MM-dd HH:mm:ss}，不含裸时间戳。</p>
+     */
+    public List<com.linkora.server.admin.ClientOverviewView> getClientOverviews() {
+        List<com.linkora.server.admin.ClientOverviewView> result = new ArrayList<>();
+        for (ClientRegistration registration : clientRegistry.findAll()) {
+            result.add(new com.linkora.server.admin.ClientOverviewView(
+                    registration.getClientId(),
+                    registration.isEnabled(),
+                    gateway.connectionCount(registration.getClientId()),
+                    (int) deliveryRepository.countUnfinished(registration.getClientId()),
+                    deliveryRepository.countDeadLetters(registration.getClientId()),
+                    registration.getCreatedAt()));
+        }
+        return result;
+    }
+
+    /**
+     * 指定客户端的未终结投递明细（含死信，供人工介入），按 seq 升序。
+     *
+     * <p>时间已格式化、payload 为 UTF-8 文本预览（二进制只标注字节数）。</p>
+     *
+     * @param limit 上限（1~500，越界自动收敛）
+     */
+    public List<com.linkora.server.admin.DeliveryView> listUnfinishedDeliveries(
+            String clientId, int limit) {
+        requireNotBlank(clientId, "clientId");
+        List<com.linkora.server.admin.DeliveryView> result = new ArrayList<>();
+        for (DeliveryRecord record : deliveryRepository.findUnsettled(clientId, clampLimit(limit))) {
+            result.add(toView(record));
+        }
+        return result;
+    }
+
+    /**
+     * 指定客户端的死信列表（进入死信的原因在 lastError 中），按最近更新倒序。
+     */
+    public List<com.linkora.server.admin.DeliveryView> listDeadLetters(String clientId, int limit) {
+        requireNotBlank(clientId, "clientId");
+        List<com.linkora.server.admin.DeliveryView> result = new ArrayList<>();
+        for (DeliveryRecord record : deliveryRepository.findDeadLetters(clientId, clampLimit(limit))) {
+            result.add(toView(record));
+        }
+        return result;
+    }
+
+    /**
+     * 强制断开指定客户端的全部 SSE 连接（处置"假在线"连接）。
+     * 客户端会自动重连并按 Last-Event-ID 补发，不丢数据。
+     *
+     * @return 断开的连接数（0 表示该客户端本就不在线）
+     */
+    public int disconnectClient(String clientId) {
+        requireNotBlank(clientId, "clientId");
+        int closed = gateway.disconnectClient(clientId);
+        log.info("管理接口断开客户端连接: clientId={}, closed={}", clientId, closed);
+        return closed;
+    }
+
+    /**
+     * 人工重放死信：DEAD_LETTER → RETRYING，并立即尝试推送。
+     *
+     * @return true 表示重放成功；false 表示记录不存在或不在死信状态
+     */
+    public boolean retryDeadLetter(String clientId, String messageId) {
+        requireNotBlank(clientId, "clientId");
+        requireNotBlank(messageId, "messageId");
+        DeliveryRecord record = deliveryRepository.find(messageId, clientId).orElse(null);
+        if (record == null || record.getState() != com.linkora.core.message.MessageState.DEAD_LETTER) {
+            return false;
+        }
+        boolean moved = deliveryRepository.compareAndSetState(messageId, clientId,
+                com.linkora.core.message.MessageState.DEAD_LETTER,
+                com.linkora.core.message.MessageState.RETRYING,
+                "人工重放（管理接口）", null,
+                record.getRetryCount(), record.getRetryCount());
+        if (moved) {
+            log.info("管理接口重放死信: messageId={}, clientId={}", messageId, clientId);
+            coordinator.pushNow(clientId, messageId, record.getSeq());
+        }
+        return moved;
+    }
+
+    /**
+     * 人工跳过一条卡住的消息：当前状态 → EXPIRED（终态），同键后续消息立即放行。
+     *
+     * @return true 表示跳过成功；false 表示记录不存在或已是终态
+     */
+    public boolean skipMessage(String clientId, String messageId) {
+        requireNotBlank(clientId, "clientId");
+        requireNotBlank(messageId, "messageId");
+        DeliveryRecord record = deliveryRepository.find(messageId, clientId).orElse(null);
+        if (record == null || record.getState().isTerminal()) {
+            return false;
+        }
+        boolean moved = deliveryRepository.compareAndSetState(messageId, clientId,
+                record.getState(), com.linkora.core.message.MessageState.EXPIRED,
+                "人工跳过（管理接口）", null,
+                record.getRetryCount(), record.getRetryCount());
+        if (moved) {
+            log.info("管理接口跳过消息: messageId={}, clientId={}, 原状态={}",
+                    messageId, clientId, record.getState());
+            coordinator.notifyDelivered(messageId, clientId);
+        }
+        return moved;
+    }
+
+    private com.linkora.server.admin.DeliveryView toView(DeliveryRecord record) {
+        com.linkora.core.message.LinkoraMessage message =
+                messageRepository.findByMessageId(record.getMessageId()).orElse(null);
+        byte[] payload = message == null ? null : message.getPayload();
+        String messageType = message == null ? "（正文缺失）" : message.getMessageType();
+        return new com.linkora.server.admin.DeliveryView(
+                record.getMessageId(), record.getClientId(), messageType, record.getSeq(),
+                record.getState(), record.getRetryCount(), record.getNextRetryAt(),
+                record.getLastError(), payload, record.getCreatedAt(), record.getUpdatedAt());
+    }
+
+    private static int clampLimit(int limit) {
+        return Math.max(1, Math.min(500, limit));
+    }
+
+    private static void requireNotBlank(String value, String field) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException(field + " 不能为空");
+        }
     }
 
     // ---------------- 宿主接入 ----------------
