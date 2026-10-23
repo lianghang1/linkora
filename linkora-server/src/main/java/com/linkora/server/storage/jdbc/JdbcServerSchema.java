@@ -32,7 +32,7 @@ public final class JdbcServerSchema {
     private static final Logger log = LoggerFactory.getLogger(JdbcServerSchema.class);
 
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    public static final int LATEST_VERSION = 1;
+    public static final int LATEST_VERSION = 2;
 
     private static final String CREATE_VERSION_TABLE =
             "CREATE TABLE IF NOT EXISTS lk_schema_version ("
@@ -93,8 +93,23 @@ public final class JdbcServerSchema {
      * 每个迁移版本 = 语句数组（一条语句一个元素，语句边界显式声明，不依赖
      * 字符串切割，规避 SQL 内分号字面量/注释被误切的问题）；方言差异仅替换索引语句。
      */
-    private static final String[][] MIGRATIONS = {concat(V1_TABLES, V1_INDEXES_H2)};
-    private static final String[][] MIGRATIONS_MYSQL = {concat(V1_TABLES, V1_INDEXES_MYSQL)};
+    /**
+     * v2：payload 列扩容。v1 的 TEXT 在 MySQL 上限 64KB，而 payload 走 Base64
+     * （膨胀 4/3）且 body 上限 1MB——原始 payload 超约 48KB 就写库失败。
+     * MySQL 用 LONGTEXT（4GB）；H2 用 CLOB。MODIFY / SET DATA TYPE 重复执行
+     * 均幂等，崩溃重放安全。
+     */
+    private static final String[] V2_H2 = {
+            "ALTER TABLE lk_message ALTER COLUMN payload_base64 CLOB NOT NULL",
+    };
+    private static final String[] V2_MYSQL = {
+            "ALTER TABLE lk_message MODIFY COLUMN payload_base64 LONGTEXT NOT NULL",
+    };
+
+    private static final String[][] MIGRATIONS =
+            {concat(V1_TABLES, V1_INDEXES_H2), V2_H2};
+    private static final String[][] MIGRATIONS_MYSQL =
+            {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL};
 
     private static String[] concat(String[] tables, String[] indexes) {
         String[] all = new String[tables.length + indexes.length];

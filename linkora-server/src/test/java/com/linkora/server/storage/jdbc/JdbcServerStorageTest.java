@@ -58,6 +58,22 @@ public class JdbcServerStorageTest {
         });
     }
 
+    @Test
+    public void largePayloadRoundtrip() {
+        // v2 迁移后 payload 列必须能装下接近 body 上限的载荷
+        //（1MB body − 信封 ≈ 786KB 原始 payload，Base64 后约 1.05MB）
+        DataSource ds = freshH2("schema-large-payload");
+        byte[] payload = new byte[768 * 1024];
+        for (int i = 0; i < payload.length; i++) {
+            payload[i] = (byte) (i * 31);
+        }
+        JdbcMessageRepository repo = new JdbcMessageRepository(ds);
+        repo.save(com.linkora.core.message.LinkoraMessage.builder()
+                .messageId("big-1").clientId("store-001").messageType("BIG")
+                .payload(payload).createdAt(System.currentTimeMillis()).build());
+        assertEquals(payload.length, repo.findByMessageId("big-1").get().getPayload().length);
+    }
+
     // ---------------- MessageRepository ----------------
 
     @Test
