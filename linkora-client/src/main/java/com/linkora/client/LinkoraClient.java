@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -343,6 +344,17 @@ public final class LinkoraClient implements AutoCloseable {
 
         @Override
         public void onEvent(String id, String type, String data) {
+            // 管理指令走独立事件类型（不落库、不混业务消息，仅在线实时生效）
+            if (com.linkora.core.admin.ClientCommands.EVENT_TYPE.equals(type)) {
+                final String payload = data;
+                ioExecutor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        handleControlCommand(payload);
+                    }
+                });
+                return;
+            }
             if (!SERVER_MESSAGE_EVENT_TYPE.equals(type)) {
                 return; // 心跳与未知类型忽略（服务端业务事件固定为 "msg"）
             }
@@ -578,6 +590,175 @@ public final class LinkoraClient implements AutoCloseable {
             if (terminal) {
                 log.warn("业务处理失败次数耗尽，等待服务端重投驱动续试: messageId={}", messageId);
             }
+        }
+    }
+
+    // ---------------- 管理接口：本地队列查询与上行死信处置 ----------------
+
+    /**
+     * 上行队列明细（管理视图，人类可读）。
+     *
+     * @param status 目标状态，null 表示全部状态
+     * @param limit  上限（1~200，越界自动收敛）
+     */
+    public List<com.linkora.client.admin.OutboxView> listOutbox(OutboxStatus status, int limit) {
+        int safeLimit = Math.max(1, Math.min(200, limit));
+        List<OutboxEntry> entries = new ArrayList<>();
+        if (status != null) {
+            entries.addAll(store.findOutbox(status, Long.MAX_VALUE, safeLimit));
+        } else {
+            for (OutboxStatus s : OutboxStatus.values()) {
+                entries.addAll(store.findOutbox(s, Long.MAX_VALUE, safeLimit));
+            }
+            entries.sort((a, b) -> Long.compare(b.getUpdatedAt(), a.getUpdatedAt()));
+        }
+        List<com.linkora.client.admin.OutboxView> result = new ArrayList<>();
+        for (OutboxEntry entry : entries) {
+            result.add(new com.linkora.client.admin.OutboxView(entry));
+        }
+        return result;
+    }
+
+    /** 上行死信列表（{@code listOutbox(DEAD_LETTER, limit)} 的便捷形式）。 */
+    public List<com.linkora.client.admin.OutboxView> listOutboxDeadLetters(int limit) {
+        return listOutbox(OutboxStatus.DEAD_LETTER, limit);
+    }
+
+    /**
+     * 下行收件明细（管理视图，人类可读）。
+     *
+     * @param processStatus 处理状态，null 表示全部状态
+     * @param limit         上限（1~200，越界自动收敛）
+     */
+    public List<com.linkora.client.admin.InboxView> listInbox(ProcessStatus processStatus,
+                                                              int limit) {
+        int safeLimit = Math.max(1, Math.min(200, limit));
+        List<InboxEntry> entries = new ArrayList<>();
+        if (processStatus != null) {
+            entries.addAll(store.findInboxByProcessStatus(processStatus, Long.MAX_VALUE, safeLimit));
+        } else {
+            for (ProcessStatus s : ProcessStatus.values()) {
+                entries.addAll(store.findInboxByProcessStatus(s, Long.MAX_VALUE, safeLimit));
+            }
+            entries.sort((a, b) -> Long.compare(b.getReceivedAt(), a.getReceivedAt()));
+        }
+        List<com.linkora.client.admin.InboxView> result = new ArrayList<>();
+        for (InboxEntry entry : entries) {
+            result.add(new com.linkora.client.admin.InboxView(entry));
+        }
+        return result;
+    }
+
+    /**
+     * 重发一条上行死信：DEAD_LETTER → PENDING（重试计数清零），并立即触发发送。
+     *
+     * @return true 表示已复活进入发送队列；false 表示记录不存在或不是死信
+     */
+    public boolean retryOutboxDeadLetter(String messageId) {
+        if (messageId == null || messageId.trim().isEmpty()) {
+            throw new IllegalArgumentException("messageId 不能为空");
+        }
+        OutboxEntry entry = store.findOutbox(messageId).orElse(null);
+        if (entry == null || entry.getStatus() != OutboxStatus.DEAD_LETTER) {
+            return false;
+        }
+        OutboxEntry reset = entry.with(OutboxStatus.PENDING, 0, null,
+                "人工重发（管理指令）", System.currentTimeMillis());
+        if (!transitionOutbox(reset, OutboxStatus.DEAD_LETTER)) {
+            return false;
+        }
+        log.info("管理操作重发上行死信: messageId={}", messageId);
+        submitDrain();
+        return true;
+    }
+
+    /**
+     * 放弃一条上行死信（保持死信状态，lastError 留痕区分"已人工放弃"）。
+     *
+     * @return true 表示标记成功；false 表示记录不存在或不是死信
+     */
+    public boolean discardOutboxDeadLetter(String messageId, String reason) {
+        if (messageId == null || messageId.trim().isEmpty()) {
+            throw new IllegalArgumentException("messageId 不能为空");
+        }
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new IllegalArgumentException("reason 不能为空");
+        }
+        OutboxEntry entry = store.findOutbox(messageId).orElse(null);
+        if (entry == null || entry.getStatus() != OutboxStatus.DEAD_LETTER) {
+            return false;
+        }
+        OutboxEntry marked = entry.with(OutboxStatus.DEAD_LETTER, entry.getRetryCount(),
+                null, "人工放弃: " + reason, System.currentTimeMillis());
+        boolean ok = transitionOutbox(marked, OutboxStatus.DEAD_LETTER);
+        if (ok) {
+            log.info("管理操作放弃上行死信: messageId={}, 原因: {}", messageId, reason);
+        }
+        return ok;
+    }
+
+    // ---------------- 管理指令（服务端 ctrl 事件下发，白名单分发） ----------------
+
+    /**
+     * 处理服务端下发的管理指令。任何异常都就地消化并告警——
+     * 指令通道的故障绝不能影响业务消息处理。
+     */
+    private void handleControlCommand(String json) {
+        if (state != ClientState.RUNNING || json == null || json.isEmpty()) {
+            return;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode node = com.linkora.serialize.jackson.LinkoraJsonUtil.readTree(json);
+            String command = node.path("cmd").asText("");
+            if (!com.linkora.core.admin.ClientCommands.isKnown(command)) {
+                log.warn("收到未知管理指令，忽略: {}", command);
+                return;
+            }
+            com.fasterxml.jackson.databind.JsonNode params = node.path("params");
+            switch (command) {
+                case com.linkora.core.admin.ClientCommands.PING:
+                    log.info("管理指令 PING：指令通道连通（clientId={}）", clientId);
+                    break;
+                case com.linkora.core.admin.ClientCommands.RETRY_OUTBOX_DEAD_LETTER: {
+                    String messageId = params.path("messageId").asText(null);
+                    boolean ok = retryOutboxDeadLetter(messageId);
+                    log.info("管理指令重发上行死信: messageId={}, 结果={}", messageId, ok);
+                    break;
+                }
+                case com.linkora.core.admin.ClientCommands.DISCARD_OUTBOX_DEAD_LETTER: {
+                    String messageId = params.path("messageId").asText(null);
+                    String reason = params.path("reason").asText("");
+                    boolean ok = discardOutboxDeadLetter(messageId, reason);
+                    log.info("管理指令放弃上行死信: messageId={}, 结果={}", messageId, ok);
+                    break;
+                }
+                case com.linkora.core.admin.ClientCommands.QUERY_OUTBOX: {
+                    String queryId = params.path("queryId").asText(null);
+                    String statusName = params.path("status").asText(null);
+                    int limit = Math.max(1, Math.min(50, params.path("limit").asInt(50)));
+                    OutboxStatus status = statusName == null ? null : OutboxStatus.valueOf(statusName);
+                    List<com.linkora.client.admin.OutboxView> rows = listOutbox(status, limit);
+                    StringBuilder rowsJson = new StringBuilder("[");
+                    for (int i = 0; i < rows.size(); i++) {
+                        com.linkora.client.admin.OutboxView row = rows.get(i);
+                        if (i > 0) {
+                            rowsJson.append(',');
+                        }
+                        rowsJson.append(com.linkora.serialize.jackson.LinkoraJsonUtil.toJson(row));
+                    }
+                    rowsJson.append(']');
+                    String resultPayload = "{\"queryId\":\"" + queryId + "\",\"clientId\":\""
+                            + clientId + "\",\"rows\":" + rowsJson + "}";
+                    publish(com.linkora.core.admin.ClientCommands.RESULT_MESSAGE_TYPE,
+                            resultPayload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    log.info("管理指令远程查询完成: queryId={}, 返回 {} 行", queryId, rows.size());
+                    break;
+                }
+                default:
+                    log.warn("收到未实现的管理指令，忽略: {}", command);
+            }
+        } catch (RuntimeException e) {
+            log.warn("管理指令处理失败（不影响业务消息）: {}", e.getMessage());
         }
     }
 

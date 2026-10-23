@@ -461,6 +461,30 @@ public class LinkoraServerTest {
                 stats.getPublishedPerDay().get(0).getDate().matches("\\d{4}-\\d{2}-\\d{2}"));
     }
 
+    // ---------------- 管理指令通道（ctrl 事件，不落库） ----------------
+
+    @Test
+    public void sendClientCommandValidatesAndDeliversOnlyWhenOnline() {
+        // 离线：返回 0，不抛异常
+        gateway.connectedClients.set(0);
+        assertEquals(0, server.pingClient(CLIENT));
+
+        // 未知指令 → 拒绝
+        try {
+            server.sendClientCommand(CLIENT, "EXEC_ARBITRARY_CODE", null);
+            fail("未知指令必须拒绝");
+        } catch (IllegalArgumentException expected) {
+        }
+
+        // 在线：指令 JSON 送达网关
+        gateway.connectedClients.set(1);
+        assertEquals(1, server.retryClientOutboxDeadLetter(CLIENT, "msg-1"));
+        assertEquals(1, gateway.controlPayloads.size());
+        assertTrue("指令负载必须包含 cmd 与参数",
+                gateway.controlPayloads.get(0).contains("RETRY_OUTBOX_DEAD_LETTER")
+                        && gateway.controlPayloads.get(0).contains("msg-1"));
+    }
+
     // ---------------- ACK 状态机 ----------------
 
     @Test
@@ -946,11 +970,22 @@ public class LinkoraServerTest {
         }
 
         final AtomicInteger disconnectCalls = new AtomicInteger(0);
+        final java.util.List<String> controlPayloads =
+                new java.util.concurrent.CopyOnWriteArrayList<String>();
 
         @Override
         public int disconnectClient(String clientId) {
             disconnectCalls.incrementAndGet();
             return isConnected(clientId) ? 1 : 0;
+        }
+
+        @Override
+        public int sendControl(String clientId, String data) {
+            if (isConnected(clientId)) {
+                controlPayloads.add(data);
+                return 1;
+            }
+            return 0;
         }
 
         int pushedFor(String messageId) {

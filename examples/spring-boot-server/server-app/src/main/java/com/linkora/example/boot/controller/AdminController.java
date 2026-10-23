@@ -144,6 +144,56 @@ public class AdminController {
         return linkoraServer.getDailyStats(days);
     }
 
+    // ---------------- 管理指令：远程触发客户端运营操作（ctrl 事件，不落库） ----------------
+
+    /**
+     * 向客户端下发管理指令（仅在线实时生效，离线返回 delivered=0，可再次触发）。
+     * command 白名单：RETRY_OUTBOX_DEAD_LETTER / DISCARD_OUTBOX_DEAD_LETTER /
+     * PING / QUERY_OUTBOX。
+     */
+    @PostMapping("/client-command")
+    public Map<String, Object> clientCommand(@RequestParam String clientId,
+                                             @RequestParam String command,
+                                             @RequestParam(required = false) String messageId,
+                                             @RequestParam(required = false) String reason,
+                                             @RequestParam(required = false) String status,
+                                             @RequestParam(required = false) Integer limit) {
+        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        if (messageId != null) {
+            params.put("messageId", messageId);
+        }
+        if (reason != null) {
+            params.put("reason", reason);
+        }
+        if (status != null) {
+            params.put("status", status);
+        }
+        if (limit != null) {
+            params.put("limit", limit);
+        }
+        Map<String, Object> body = new LinkedHashMap<String, Object>();
+        body.put("delivered", linkoraServer.sendClientCommand(clientId, command, params));
+        return body;
+    }
+
+    /** 远程查询客户端本地 outbox（结果经上行回传），返回 queryId。 */
+    @PostMapping("/query-client-outbox")
+    public Map<String, Object> queryClientOutbox(@RequestParam String clientId,
+                                                 @RequestParam(required = false) String status,
+                                                 @RequestParam(defaultValue = "50") int limit) {
+        String queryId = linkoraServer.queryClientOutbox(clientId, status, limit);
+        Map<String, Object> body = new LinkedHashMap<String, Object>();
+        body.put("queryId", queryId);
+        body.put("hint", "稍后用 GET /api/admin/command-result?queryId=... 读取结果");
+        return body;
+    }
+
+    /** 读取远程查询结果（客户端执行后经上行回传；尚未返回时为 null）。 */
+    @GetMapping("/command-result")
+    public Map<String, Object> commandResult(@RequestParam String queryId) {
+        return result("result", linkoraServer.getCommandResult(queryId));
+    }
+
     private static Map<String, Object> result(String key, Object value) {
         Map<String, Object> body = new LinkedHashMap<String, Object>();
         body.put(key, value);

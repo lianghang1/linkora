@@ -40,6 +40,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -73,6 +74,10 @@ public final class LinkoraServer {
     private final SseConnectionRegistry sseRegistry;
     private final ScheduledExecutorService scheduler;
     private final boolean ownsScheduler;
+
+    /** 管理指令执行结果暂存（queryId → payload JSON），有界（最多 100 条，防内存增长）。 */
+    private final ConcurrentHashMap<String, String> adminCommandResults =
+            new ConcurrentHashMap<String, String>();
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -116,8 +121,42 @@ public final class LinkoraServer {
         this.coordinator = new DeliveryCoordinator(authenticator, clientRegistry, messageRepository,
                 deliveryRepository, cursorRepository, codec, gateway, config, scheduler);
         this.ingestService = new IngestService(authenticator, messageRepository, codec, config,
-                builder.ingestListeners);
+                withAdminResultCollector(builder.ingestListeners));
         this.ackService = new AckService(authenticator, deliveryRepository, coordinator, config);
+    }
+
+    /**
+     * 管理指令结果收集器：客户端执行远程查询后经上行回传的结果
+     * （messageType = linkora.admin.result）暂存于有界内存区，供 getCommandResult 读取。
+     * 纯旁路：只多识别一类上行消息，不影响任何既有摄入行为。
+     */
+    private List<IngestListener> withAdminResultCollector(List<IngestListener> listeners) {
+        List<IngestListener> all = new ArrayList<>(listeners == null
+                ? java.util.Collections.<IngestListener>emptyList() : listeners);
+        all.add(message -> {
+            if (com.linkora.core.admin.ClientCommands.RESULT_MESSAGE_TYPE
+                    .equals(message.getMessageType())) {
+                String payload = message.getPayloadAsUtf8String();
+                adminCommandResults.put(messageIdOfResult(payload), payload);
+                // 有界：最多保留 100 条，防内存无限增长
+                while (adminCommandResults.size() > 100) {
+                    String eldest = adminCommandResults.keySet().iterator().next();
+                    adminCommandResults.remove(eldest);
+                }
+                log.info("收到管理指令执行结果: queryId={}", messageIdOfResult(payload));
+            }
+        });
+        return all;
+    }
+
+    /** 从结果 payload 中取 queryId（格式约定：{"queryId":"...","clientId":"...","rows":[...]}）。 */
+    private static String messageIdOfResult(String payload) {
+        try {
+            return com.linkora.serialize.jackson.LinkoraJsonUtil.readTree(payload)
+                    .path("queryId").asText("unknown");
+        } catch (RuntimeException e) {
+            return "unknown";
+        }
     }
 
     public static Builder builder() {
@@ -620,6 +659,90 @@ public final class LinkoraServer {
             return null;
         }
         return value.trim();
+    }
+
+    // ---------------- 管理指令：远程触发客户端运营操作（ctrl 事件，不落库） ----------------
+
+    /**
+     * 向客户端下发管理指令（仅在线实时生效；不落库、不重试、不混业务消息，
+     * 未送达即返回 0，由运维再次触发）。指令白名单见
+     * {@link com.linkora.core.admin.ClientCommands}。
+     *
+     * @param params 指令参数（messageId / reason / queryId 等），可为 null
+     * @return 成功送达的连接数（0 表示客户端当前不在线）
+     */
+    public int sendClientCommand(String clientId, String command,
+                                 Map<String, Object> params) {
+        requireNotBlank(clientId, "clientId");
+        requireNotBlank(command, "command");
+        if (!com.linkora.core.admin.ClientCommands.isKnown(command)) {
+            throw new IllegalArgumentException("未知管理指令: " + command);
+        }
+        com.fasterxml.jackson.databind.node.ObjectNode node =
+                com.linkora.serialize.jackson.LinkoraJsonUtil.getObjectMapper().createObjectNode();
+        node.put("cmd", command);
+        node.set("params", com.linkora.serialize.jackson.LinkoraJsonUtil.getObjectMapper()
+                .valueToTree(params == null
+                        ? java.util.Collections.<String, Object>emptyMap() : params));
+        String json = node.toString();
+        int delivered = gateway.sendControl(clientId, json);
+        if (delivered == 0) {
+            log.warn("管理指令未送达（客户端离线）: clientId={}, command={}", clientId, command);
+        } else {
+            log.info("管理指令已下发: clientId={}, command={}, delivered={}", clientId, command, delivered);
+        }
+        return delivered;
+    }
+
+    /** 远程触发客户端重发指定上行死信。 */
+    public int retryClientOutboxDeadLetter(String clientId, String messageId) {
+        Map<String, Object> params = new java.util.LinkedHashMap<>();
+        params.put("messageId", messageId);
+        return sendClientCommand(clientId,
+                com.linkora.core.admin.ClientCommands.RETRY_OUTBOX_DEAD_LETTER, params);
+    }
+
+    /** 远程触发客户端放弃指定上行死信（reason 留痕于客户端）。 */
+    public int discardClientOutboxDeadLetter(String clientId, String messageId, String reason) {
+        Map<String, Object> params = new java.util.LinkedHashMap<>();
+        params.put("messageId", messageId);
+        params.put("reason", reason == null ? "—" : reason);
+        return sendClientCommand(clientId,
+                com.linkora.core.admin.ClientCommands.DISCARD_OUTBOX_DEAD_LETTER, params);
+    }
+
+    /** 探测客户端指令通道连通性。 */
+    public int pingClient(String clientId) {
+        return sendClientCommand(clientId,
+                com.linkora.core.admin.ClientCommands.PING, null);
+    }
+
+    /**
+     * 远程查询客户端本地 outbox：下发 QUERY_OUTBOX 指令，客户端执行后经上行回传结果。
+     *
+     * @param status 目标状态名（OutboxStatus，null = 全部）
+     * @return queryId（用 {@link #getCommandResult(String)} 读取结果；客户端离线时结果不会产生）
+     */
+    public String queryClientOutbox(String clientId, String status, int limit) {
+        requireNotBlank(clientId, "clientId");
+        String queryId = UUID.randomUUID().toString();
+        Map<String, Object> params = new java.util.LinkedHashMap<>();
+        params.put("queryId", queryId);
+        params.put("status", status);
+        params.put("limit", limit);
+        sendClientCommand(clientId,
+                com.linkora.core.admin.ClientCommands.QUERY_OUTBOX, params);
+        return queryId;
+    }
+
+    /**
+     * 读取远程查询结果（queryId 对应的完整 JSON）。
+     *
+     * @return 结果 JSON；null 表示尚未收到（客户端未执行/仍在途/已淘汰）
+     */
+    public String getCommandResult(String queryId) {
+        requireNotBlank(queryId, "queryId");
+        return adminCommandResults.get(queryId);
     }
 
     // ---------------- 宿主接入 ----------------

@@ -34,4 +34,15 @@ public interface SsePushGateway {
      * @return 断开的连接数（0 表示该客户端本就不在线）
      */
     int disconnectClient(String clientId);
+
+    /**
+     * 向客户端所有活动连接发送管理指令（SSE {@code ctrl} 事件）。
+     *
+     * <p>与业务消息的本质区别：不落库、不重试、不进客户端业务队列——
+     * 仅对在线客户端实时生效，未送达即返回 0，由运维再次触发。</p>
+     *
+     * @param data 指令 JSON（{"cmd":..., "params":{...}}）
+     * @return 成功写出的连接数（0 表示客户端当前不在线）
+     */
+    int sendControl(String clientId, String data);
 }
