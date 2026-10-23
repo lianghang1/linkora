@@ -153,7 +153,8 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
         for (String clientId : gateway.activeClientIds()) {
             try {
                 List<DeliveryRecord> records =
-                        deliveryRepository.findUnfinishedAfterSeq(clientId, 0, config.getPushBatchSize());
+                        deliveryRepository.findUnfinishedAfterSeq(clientId, 0, System.currentTimeMillis(),
+                                config.getPushBatchSize());
                 for (DeliveryRecord record : records) {
                     attemptPush(record, false);
                 }
@@ -167,7 +168,8 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
     public void backfill(String clientId, long afterSeqExclusive) {
         try {
             List<DeliveryRecord> records = deliveryRepository.findUnfinishedAfterSeq(
-                    clientId, afterSeqExclusive, config.getPushBatchSize());
+                    clientId, afterSeqExclusive, System.currentTimeMillis(),
+                    config.getPushBatchSize());
             log.debug("重连补发: clientId={}, afterSeq={}, 待补发 {} 条",
                     clientId, afterSeqExclusive, records.size());
             for (DeliveryRecord record : records) {
