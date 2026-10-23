@@ -60,6 +60,43 @@ public class MessageJsonCodecTest {
     }
 
     @Test
+    public void sequenceKeyRoundTripNormalizationAndLegacyCompat() {
+        // 带键往返；入参空白被归一化
+        LinkoraMessage keyed = sample(2000L, "trace-1");
+        keyed = LinkoraMessage.builder()
+                .messageId("m-key").clientId("store-001").messageType("ORDER")
+                .payload("p").createdAt(1000L).sequenceKey(" order-1 ").build();
+        LinkoraMessage decoded = codec.decodeMessage(codec.encodeMessage(keyed));
+        assertEquals("order-1", decoded.getSequenceKey());
+
+        // 空键归一化为 null，线路 JSON 不输出该字段
+        LinkoraMessage blank = LinkoraMessage.builder()
+                .messageId("m-blank").clientId("store-001").messageType("ORDER")
+                .payload("p").createdAt(1000L).sequenceKey("   ").build();
+        String blankJson = codec.encodeMessage(blank);
+        assertFalse("空键不应出现在线路 JSON 中", blankJson.contains("sequenceKey"));
+        assertNull(codec.decodeMessage(blankJson).getSequenceKey());
+
+        // 老版本 JSON（无 sequenceKey 字段）解码兼容：不报错、键为 null
+        assertNull(codec.decodeMessage(codec.encodeMessage(sample(2000L, "t"))).getSequenceKey());
+    }
+
+    @Test
+    public void sequenceKeyOverMaxLengthRejected() {
+        StringBuilder key = new StringBuilder();
+        for (int i = 0; i < 129; i++) {
+            key.append('k');
+        }
+        try {
+            LinkoraMessage.builder()
+                    .messageId("m-long").clientId("store-001").messageType("ORDER")
+                    .payload("p").createdAt(1000L).sequenceKey(key.toString()).build();
+            fail("超过 128 字符的 sequenceKey 必须拒绝");
+        } catch (IllegalArgumentException expected) {
+        }
+    }
+
+    @Test
     public void binaryPayloadSurvivesRoundTrip() {
         byte[] binary = new byte[256];
         for (int i = 0; i < binary.length; i++) {

@@ -10,6 +10,9 @@ import com.linkora.core.message.OutboxStatus;
  */
 public final class OutboxEntry {
 
+    /** 与 {@code LinkoraMessage.MAX_SEQUENCE_KEY_LENGTH} 对齐。 */
+    public static final int MAX_SEQUENCE_KEY_LENGTH = 128;
+
     private final String messageId;
     private final String messageType;
     private final byte[] payload;
@@ -20,10 +23,20 @@ public final class OutboxEntry {
     private final Long nextRetryAt;
     private final Long expiresAt;
     private final String lastError;
+    /** 顺序键，可为 null（不参与顺序约束）。 */
+    private final String sequenceKey;
 
     public OutboxEntry(String messageId, String messageType, byte[] payload,
                        OutboxStatus status, long createdAt, long updatedAt,
                        int retryCount, Long nextRetryAt, Long expiresAt, String lastError) {
+        this(messageId, messageType, payload, status, createdAt, updatedAt,
+                retryCount, nextRetryAt, expiresAt, lastError, null);
+    }
+
+    public OutboxEntry(String messageId, String messageType, byte[] payload,
+                       OutboxStatus status, long createdAt, long updatedAt,
+                       int retryCount, Long nextRetryAt, Long expiresAt, String lastError,
+                       String sequenceKey) {
         requireNonBlank(messageId, "messageId");
         requireNonBlank(messageType, "messageType");
         if (payload == null) {
@@ -42,6 +55,16 @@ public final class OutboxEntry {
         this.nextRetryAt = nextRetryAt;
         this.expiresAt = expiresAt;
         this.lastError = lastError;
+        // 与 LinkoraMessage 保持一致：null 与空白都归一为 null（= 不参与顺序约束），
+        // 否则空串会变成一条"所有空串共用"的假车道，把无关消息串行起来
+        String key = sequenceKey == null || sequenceKey.trim().isEmpty()
+                ? null : sequenceKey.trim();
+        if (key != null && key.length() > MAX_SEQUENCE_KEY_LENGTH) {
+            // 入队即失败：否则要等到发送阶段才由 LinkoraMessage 抛异常，那时消息已进死信
+            throw new IllegalArgumentException("sequenceKey 长度不得超过 "
+                    + MAX_SEQUENCE_KEY_LENGTH + "（实际 " + key.length() + "）");
+        }
+        this.sequenceKey = key;
     }
 
     public String getMessageId() {
@@ -84,11 +107,17 @@ public final class OutboxEntry {
         return lastError;
     }
 
+    /** 顺序键，可为 null。 */
+    public String getSequenceKey() {
+        return sequenceKey;
+    }
+
     /** 返回携带更新字段的新实例（不可变对象的变更语义）。 */
     public OutboxEntry with(OutboxStatus newStatus, int newRetryCount,
                             Long newNextRetryAt, String newLastError, long now) {
         return new OutboxEntry(messageId, messageType, payload, newStatus,
-                createdAt, now, newRetryCount, newNextRetryAt, expiresAt, newLastError);
+                createdAt, now, newRetryCount, newNextRetryAt, expiresAt, newLastError,
+                sequenceKey);
     }
 
     @Override
