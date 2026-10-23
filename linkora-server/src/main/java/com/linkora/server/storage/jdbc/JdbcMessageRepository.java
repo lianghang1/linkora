@@ -78,6 +78,81 @@ public final class JdbcMessageRepository implements MessageRepository {
         }
     }
 
+    @Override
+    public java.util.List<LinkoraMessage> listMessages(String clientId, String messageType,
+                                                       Long beginTime, Long endTime,
+                                                       int offset, int limit) {
+        StringBuilder where = new StringBuilder();
+        java.util.List<Object> params = new java.util.ArrayList<>();
+        if (clientId != null && !clientId.trim().isEmpty()) {
+            where.append(" client_id = ?");
+            params.add(clientId);
+        }
+        if (messageType != null && !messageType.trim().isEmpty()) {
+            where.append(where.length() > 0 ? " AND message_type = ?" : " message_type = ?");
+            params.add(messageType);
+        }
+        if (beginTime != null) {
+            where.append(where.length() > 0 ? " AND created_at >= ?" : " created_at >= ?");
+            params.add(beginTime);
+        }
+        if (endTime != null) {
+            where.append(where.length() > 0 ? " AND created_at <= ?" : " created_at <= ?");
+            params.add(endTime);
+        }
+        String sql = "SELECT " + COLUMNS + " FROM lk_message"
+                + (where.length() > 0 ? " WHERE" + where : "")
+                + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql)) {
+            int idx = 1;
+            for (Object param : params) {
+                ps.setObject(idx++, param);
+            }
+            ps.setInt(idx++, Math.max(1, Math.min(500, limit)));
+            ps.setInt(idx, Math.max(0, offset));
+            try (ResultSet rs = ps.executeQuery()) {
+                java.util.List<LinkoraMessage> result = new java.util.ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapMessage(rs));
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "管理查询消息列表失败", e);
+        }
+    }
+
+    @Override
+    public java.util.LinkedHashMap<String, Long> countPublishedPerDay(int days) {
+        long since = System.currentTimeMillis() - Math.max(1, days) * 24L * 3600_000L;
+        java.time.format.DateTimeFormatter fmt =
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        java.util.LinkedHashMap<String, Long> result = new java.util.LinkedHashMap<>();
+        for (int i = days - 1; i >= 0; i--) {
+            result.put(java.time.LocalDate.now(java.time.ZoneId.systemDefault())
+                    .minusDays(i).format(fmt), 0L);
+        }
+        // 只取 created_at 单列，在 Java 侧按本地日期聚合（SQL 方言中立）
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT created_at FROM lk_message WHERE created_at >= ?")) {
+            ps.setLong(1, since);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    String day = java.time.Instant.ofEpochMilli(rs.getLong(1))
+                            .atZone(java.time.ZoneId.systemDefault()).format(fmt);
+                    result.merge(day, 1L, Long::sum);
+                }
+            }
+            return result;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "统计每日发布量失败", e);
+        }
+    }
+
     private static LinkoraMessage mapMessage(ResultSet rs) throws SQLException {
         return LinkoraMessage.builder()
                 .messageId(rs.getString("message_id"))

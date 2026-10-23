@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -427,6 +428,198 @@ public final class LinkoraServer {
         if (value == null || value.trim().isEmpty()) {
             throw new IllegalArgumentException(field + " 不能为空");
         }
+    }
+
+    // ---------------- 管理/观测接口（第二批：零风险扩展） ----------------
+
+    /**
+     * 消息列表：按条件筛选 + 分页（created_at 倒序），附带各目标投递状态摘要。
+     *
+     * <p>全部过滤条件可为 null；时间参数为 epoch 毫秒（含边界）。
+     * 无 clientId 的全局查询在大表上可能全表扫描，建议至少带 clientId。</p>
+     *
+     * @param page 页码（从 1 开始）
+     * @param size 每页条数（1~100）
+     */
+    public List<com.linkora.server.admin.MessageView> listMessages(String clientId,
+                                                                   String messageType,
+                                                                   Long beginTime, Long endTime,
+                                                                   int page, int size) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.max(1, Math.min(100, size));
+        List<LinkoraMessage> messages = messageRepository.listMessages(
+                trimToNull(clientId), trimToNull(messageType),
+                beginTime, endTime, (safePage - 1) * safeSize, safeSize);
+        List<com.linkora.server.admin.MessageView> result = new ArrayList<>();
+        for (LinkoraMessage message : messages) {
+            result.add(new com.linkora.server.admin.MessageView(message,
+                    deliverySummary(message.getMessageId())));
+        }
+        return result;
+    }
+
+    /**
+     * 消息完整详情：完整 payload 明文（二进制只标注字节数）+ 全部投递记录。
+     *
+     * @return 消息不存在时返回 null
+     */
+    public com.linkora.server.admin.MessageDetailView getMessageDetail(String messageId) {
+        requireNotBlank(messageId, "messageId");
+        LinkoraMessage message = messageRepository.findByMessageId(messageId).orElse(null);
+        if (message == null) {
+            return null;
+        }
+        List<com.linkora.server.admin.DeliveryView> deliveries = new ArrayList<>();
+        for (DeliveryRecord record : deliveryRepository.findAllByMessageId(messageId)) {
+            deliveries.add(toView(record));
+        }
+        return new com.linkora.server.admin.MessageDetailView(message, deliveries);
+    }
+
+    /**
+     * 人工状态变更：把一条投递记录从当前状态变更为任意<b>合法</b>目标状态
+     * （合法性由状态机 {@code canTransitionTo} 校验）。
+     *
+     * <p>{@code retryDeadLetter} / {@code skipMessage} 是本方法的便捷特例。
+     * reason 会写入 lastError 留痕（格式：{@code 人工变更: <reason>}）。</p>
+     *
+     * @param target 目标状态（等于当前状态视为无效操作返回 false）
+     * @return true 表示变更成功；false 表示记录不存在或目标状态等于当前状态
+     * @throws IllegalArgumentException 非法状态转移
+     */
+    public boolean forceTransition(String clientId, String messageId,
+                                   com.linkora.core.message.MessageState target, String reason) {
+        requireNotBlank(clientId, "clientId");
+        requireNotBlank(messageId, "messageId");
+        requireNotBlank(reason, "reason");
+        if (target == null) {
+            throw new IllegalArgumentException("target 不能为 null");
+        }
+        DeliveryRecord record = deliveryRepository.find(messageId, clientId).orElse(null);
+        if (record == null) {
+            return false;
+        }
+        if (record.getState() == target) {
+            return false;
+        }
+        if (!record.getState().canTransitionTo(target)) {
+            throw new IllegalArgumentException("非法状态转移: " + record.getState()
+                    + " → " + target + "（当前记录 " + messageId + "）");
+        }
+        boolean moved = deliveryRepository.compareAndSetState(messageId, clientId,
+                record.getState(), target, "人工变更: " + reason, null,
+                record.getRetryCount(), record.getRetryCount());
+        if (moved) {
+            log.info("管理接口人工状态变更: messageId={}, clientId={}, {} → {}, 原因: {}",
+                    messageId, clientId, record.getState(), target, reason);
+            if (target == com.linkora.core.message.MessageState.RETRYING) {
+                coordinator.pushNow(clientId, messageId, record.getSeq());
+            } else {
+                coordinator.notifyDelivered(messageId, clientId);
+            }
+        }
+        return moved;
+    }
+
+    /** 运行时启用客户端（恢复收发）。 */
+    public boolean enableClient(String clientId) {
+        requireNotBlank(clientId, "clientId");
+        boolean ok = clientRegistry.setEnabled(clientId, true);
+        if (ok) {
+            log.info("管理接口启用客户端: clientId={}", clientId);
+        }
+        return ok;
+    }
+
+    /** 运行时禁用客户端（拒收新消息、拒绝接入；恢复用 enableClient）。 */
+    public boolean disableClient(String clientId) {
+        requireNotBlank(clientId, "clientId");
+        boolean ok = clientRegistry.setEnabled(clientId, false);
+        if (ok) {
+            log.info("管理接口禁用客户端: clientId={}", clientId);
+        }
+        return ok;
+    }
+
+    /**
+     * 批量重放死信（逐条走 {@link #retryDeadLetter}）。
+     *
+     * @return 成功重放的条数
+     */
+    public int retryAllDeadLetters(String clientId, int limit) {
+        requireNotBlank(clientId, "clientId");
+        int success = 0;
+        for (DeliveryRecord record : deliveryRepository.findDeadLetters(clientId, clampLimit(limit))) {
+            if (retryDeadLetter(clientId, record.getMessageId())) {
+                success++;
+            }
+        }
+        return success;
+    }
+
+    /**
+     * 批量跳过死信（逐条走 {@link #skipMessage}，全部标记 EXPIRED 留痕）。
+     *
+     * @return 成功跳过的条数
+     */
+    public int skipAllDeadLetters(String clientId, int limit) {
+        requireNotBlank(clientId, "clientId");
+        int success = 0;
+        for (DeliveryRecord record : deliveryRepository.findDeadLetters(clientId, clampLimit(limit))) {
+            if (skipMessage(clientId, record.getMessageId())) {
+                success++;
+            }
+        }
+        return success;
+    }
+
+    /**
+     * 运营统计（人类可读）：最近 N 天每日发布量 + 全部投递记录的状态分布。
+     */
+    public com.linkora.server.admin.DailyStatsView getDailyStats(int days) {
+        List<com.linkora.server.admin.DailyStatsView.DayPublish> perDay = new ArrayList<>();
+        for (Map.Entry<String, Long> entry
+                : messageRepository.countPublishedPerDay(Math.max(1, Math.min(90, days))).entrySet()) {
+            perDay.add(new com.linkora.server.admin.DailyStatsView.DayPublish(
+                    entry.getKey(), entry.getValue()));
+        }
+        Map<String, Long> distribution = new java.util.LinkedHashMap<>();
+        for (Map.Entry<String, Long> entry : deliveryRepository.countByState().entrySet()) {
+            try {
+                distribution.put(AdminStateText.text(entry.getKey()), entry.getValue());
+            } catch (IllegalArgumentException unknownState) {
+                // 未知状态名（历史数据）按原样输出
+                distribution.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return new com.linkora.server.admin.DailyStatsView(perDay, distribution);
+    }
+
+    private String deliverySummary(String messageId) {
+        StringBuilder sb = new StringBuilder();
+        for (DeliveryRecord record : deliveryRepository.findAllByMessageId(messageId)) {
+            if (sb.length() > 0) {
+                sb.append("；");
+            }
+            sb.append(record.getClientId()).append(':')
+                    .append(com.linkora.server.admin.AdminViews.stateText(record.getState()));
+        }
+        return sb.length() > 0 ? sb.toString() : "（无投递记录）";
+    }
+
+    /** 状态名的中文描述（供统计分布使用）。 */
+    private static final class AdminStateText {
+        private static String text(String stateName) {
+            return com.linkora.server.admin.AdminViews.stateText(
+                    com.linkora.core.message.MessageState.valueOf(stateName));
+        }
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return value.trim();
     }
 
     // ---------------- 宿主接入 ----------------

@@ -6,7 +6,7 @@ package com.linkora.server.admin;
  *
  * @author lianghang
  */
-final class AdminViews {
+public final class AdminViews {
 
     /** payload 预览的最大字符数。 */
     static final int PREVIEW_MAX_CHARS = 200;
@@ -15,7 +15,7 @@ final class AdminViews {
     }
 
     /** epoch 毫秒 → {@code yyyy-MM-dd HH:mm:ss}；null 返回 "—"。 */
-    static String formatTime(Long epochMillis) {
+    public static String formatTime(Long epochMillis) {
         if (epochMillis == null || epochMillis <= 0) {
             return "—";
         }
@@ -28,12 +28,12 @@ final class AdminViews {
      * payload 的人类可读预览：UTF-8 解码后截断；
      * 含不可打印字节（非文本内容）时只标注字节数，不输出乱码。
      */
-    static String payloadPreview(byte[] payload) {
+    public static String payloadPreview(byte[] payload) {
         if (payload == null || payload.length == 0) {
             return "（空）";
         }
         String text = new String(payload, java.nio.charset.StandardCharsets.UTF_8);
-        if (!isPrintableText(text)) {
+        if (!isPrintable(payload)) {
             return "[二进制数据 " + payload.length + " 字节]";
         }
         if (text.length() > PREVIEW_MAX_CHARS) {
@@ -43,7 +43,8 @@ final class AdminViews {
     }
 
     /** 可打印判定：允许常见空白（空格/换行/制表），其余控制字符视为二进制。 */
-    private static boolean isPrintableText(String text) {
+    static boolean isPrintable(byte[] payload) {
+        String text = new String(payload, java.nio.charset.StandardCharsets.UTF_8);
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
             if (c == '\n' || c == '\r' || c == '\t') {
@@ -57,7 +58,7 @@ final class AdminViews {
     }
 
     /** 投递状态的中文描述。 */
-    static String stateText(com.linkora.core.message.MessageState state) {
+    public static String stateText(com.linkora.core.message.MessageState state) {
         switch (state) {
             case CREATED:    return "已创建";
             case ACCEPTED:   return "已接受，等待推送";

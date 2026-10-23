@@ -74,14 +74,86 @@ public class AdminController {
         return result("skipped", linkoraServer.skipMessage(clientId, messageId));
     }
 
+    // ---------------- 第二批：消息查询 / 通用状态变更 / 批量操作 / 统计 ----------------
+
+    /** 消息列表：多条件筛选 + 分页（时间为 epoch 毫秒，含边界；可为空）。 */
+    @GetMapping("/messages")
+    public List<com.linkora.server.admin.MessageView> messages(
+            @RequestParam(required = false) String clientId,
+            @RequestParam(required = false) String messageType,
+            @RequestParam(required = false) Long beginTime,
+            @RequestParam(required = false) Long endTime,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return linkoraServer.listMessages(clientId, messageType, beginTime, endTime, page, size);
+    }
+
+    /** 消息完整详情：完整 payload 明文 + 全部投递记录。 */
+    @GetMapping("/message-detail")
+    public com.linkora.server.admin.MessageDetailView messageDetail(
+            @RequestParam String messageId) {
+        return linkoraServer.getMessageDetail(messageId);
+    }
+
+    /**
+     * 人工状态变更：把投递记录变更为任意合法目标状态（非法转移返回 400）。
+     * target 取值见 MessageState；reason 必填，将写入 lastError 留痕。
+     */
+    @PostMapping("/force-transition")
+    public Map<String, Object> forceTransition(@RequestParam String clientId,
+                                               @RequestParam String messageId,
+                                               @RequestParam String target,
+                                               @RequestParam String reason) {
+        boolean moved = linkoraServer.forceTransition(clientId, messageId,
+                com.linkora.core.message.MessageState.valueOf(target), reason);
+        return result("moved", moved);
+    }
+
+    /** 运行时启用客户端。 */
+    @PostMapping("/enable")
+    public Map<String, Object> enable(@RequestParam String clientId) {
+        return result("enabled", linkoraServer.enableClient(clientId));
+    }
+
+    /** 运行时禁用客户端（拒收新消息、拒绝接入）。 */
+    @PostMapping("/disable")
+    public Map<String, Object> disable(@RequestParam String clientId) {
+        return result("disabled", linkoraServer.disableClient(clientId));
+    }
+
+    /** 批量重放死信，返回成功条数。 */
+    @PostMapping("/retry-all-dead-letters")
+    public Map<String, Object> retryAllDeadLetters(
+            @RequestParam String clientId,
+            @RequestParam(defaultValue = "100") int limit) {
+        return result("replayed", linkoraServer.retryAllDeadLetters(clientId, limit));
+    }
+
+    /** 批量跳过死信（全部标记 EXPIRED 留痕），返回成功条数。 */
+    @PostMapping("/skip-all-dead-letters")
+    public Map<String, Object> skipAllDeadLetters(
+            @RequestParam String clientId,
+            @RequestParam(defaultValue = "100") int limit) {
+        return result("skipped", linkoraServer.skipAllDeadLetters(clientId, limit));
+    }
+
+    /** 运营统计：最近 N 天每日发布量 + 投递状态分布。 */
+    @GetMapping("/stats")
+    public com.linkora.server.admin.DailyStatsView stats(
+            @RequestParam(defaultValue = "7") int days) {
+        return linkoraServer.getDailyStats(days);
+    }
+
     private static Map<String, Object> result(String key, Object value) {
         Map<String, Object> body = new LinkedHashMap<String, Object>();
         body.put(key, value);
         return body;
     }
 
-    /** 参数错误转 400 提示（演示从简）。 */
+    /** 参数错误/非法状态转移转 400 提示（演示从简）。 */
     @ExceptionHandler(IllegalArgumentException.class)
+    @org.springframework.web.bind.annotation.ResponseStatus(
+            org.springframework.http.HttpStatus.BAD_REQUEST)
     public Map<String, Object> badRequest(IllegalArgumentException e) {
         Map<String, Object> body = new LinkedHashMap<String, Object>();
         body.put("error", e.getMessage());
@@ -90,6 +162,8 @@ public class AdminController {
 
     /** 存储异常转 500 提示（演示从简）。 */
     @ExceptionHandler(LinkoraException.class)
+    @org.springframework.web.bind.annotation.ResponseStatus(
+            org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
     public Map<String, Object> storageError(LinkoraException e) {
         Map<String, Object> body = new LinkedHashMap<String, Object>();
         body.put("error", e.getMessage());

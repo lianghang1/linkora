@@ -105,4 +105,12 @@ public interface DeliveryRepository {
     default long countDeadLetters(String clientId) {
         return 0;
     }
+
+    /**
+     * 管理接口：全部投递记录按状态分布（key = 状态名，value = 数量）。
+     * default 返回空 Map。
+     */
+    default java.util.Map<String, Long> countByState() {
+        return java.util.Collections.emptyMap();
+    }
 }

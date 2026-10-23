@@ -24,4 +24,13 @@ public interface ClientRegistry {
     default List<ClientRegistration> findAll() {
         return Collections.emptyList();
     }
+
+    /**
+     * 管理接口：运行时启用/禁用客户端（禁用后拒收新消息、拒绝接入）。
+     *
+     * @return true 表示更新成功；false 表示客户端不存在
+     */
+    default boolean setEnabled(String clientId, boolean enabled) {
+        return false;
+    }
 }

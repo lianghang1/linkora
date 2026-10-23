@@ -526,6 +526,54 @@ public class JdbcServerStorageTest {
         assertEquals(null, repo.findByMessageId("msg-k2").get().getSequenceKey());
     }
 
+    @Test
+    public void listMessagesFiltersAndPaginates() {
+        JdbcMessageRepository repo = new JdbcMessageRepository(freshH2("msg-admin"));
+        long base = System.currentTimeMillis() - 60_000L;
+        repo.save(msg("a-1", "c-1", "ORDER", base));
+        repo.save(msg("a-2", "c-1", "REVIEW", base + 1000));
+        repo.save(msg("a-3", "c-2", "ORDER", base + 2000));
+        repo.save(msg("a-4", "c-1", "ORDER", base + 3000));
+
+        // clientId + 类型过滤
+        List<com.linkora.core.message.LinkoraMessage> orders =
+                repo.listMessages("c-1", "ORDER", null, null, 0, 50);
+        assertEquals(2, orders.size());
+        assertEquals("a-4", orders.get(0).getMessageId()); // created_at 倒序
+
+        // 时间下界（c-1 中 base+1000 与 base+3000 两条满足）
+        assertEquals(2, repo.listMessages("c-1", null, base + 500, null, 0, 50).size());
+
+        // 分页
+        assertEquals(1, repo.listMessages("c-1", null, null, null, 0, 1).size());
+        assertEquals(1, repo.listMessages("c-1", null, null, null, 1, 1).size());
+
+        // 无过滤全量
+        assertEquals(4, repo.listMessages(null, null, null, null, 0, 50).size());
+    }
+
+    @Test
+    public void countPublishedPerDayBucketsToday() {
+        JdbcMessageRepository repo = new JdbcMessageRepository(freshH2("msg-stats"));
+        long now = System.currentTimeMillis();
+        repo.save(msg("s-1", "c-1", "ORDER", now));
+        repo.save(msg("s-2", "c-1", "ORDER", now - 1000));
+        repo.save(msg("s-3", "c-1", "ORDER", now - 40L * 3600_000L)); // 昨天之前
+
+        java.util.LinkedHashMap<String, Long> perDay = repo.countPublishedPerDay(7);
+        assertEquals(7, perDay.size());
+        long today = perDay.get(perDay.keySet().toArray(
+                new String[0])[perDay.size() - 1]);
+        assertEquals("今天的两条都要统计到", 2L, today);
+    }
+
+    private static com.linkora.core.message.LinkoraMessage msg(
+            String messageId, String clientId, String messageType, long createdAt) {
+        return com.linkora.core.message.LinkoraMessage.builder()
+                .messageId(messageId).clientId(clientId).messageType(messageType)
+                .payload("p").createdAt(createdAt).build();
+    }
+
     // ---------------- ClientRegistry ----------------
 
     @Test
