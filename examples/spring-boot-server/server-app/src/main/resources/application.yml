@@ -21,6 +21,9 @@ linkora:
     # 启动时自动注册的演示客户端（幂等）
     register-clients:
       demo-client: true
+    # 演示用：投递重试 2 次即进死信，便于快速演示管理接口的死信重放
+    max-delivery-retries: 2
+    retry-backoff-base-ms: 1000
     events-path: /events
     messages-path: /messages
     acks-path: /acks

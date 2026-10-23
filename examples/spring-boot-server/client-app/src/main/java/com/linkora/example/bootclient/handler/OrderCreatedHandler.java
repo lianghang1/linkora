@@ -6,8 +6,6 @@ import com.linkora.client.MessageListener;
 import com.linkora.core.error.LinkoraErrorCode;
 import com.linkora.serialize.jackson.LinkoraJsonUtil;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
 /**
@@ -28,8 +26,9 @@ public class OrderCreatedHandler implements MessageListener {
 
     private final CountDownLatch firstOrder;
 
-    /** 顺序键演示：已失败过一次的 messageId（第二次到达时改为成功）。 */
-    private final Set<String> failedOnce = ConcurrentHashMap.newKeySet();
+    /** 管理/死信演示：SO-9003(item=A) 已失败的次数（前两次注入故障）。 */
+    private final java.util.concurrent.atomic.AtomicInteger so9003Failures =
+            new java.util.concurrent.atomic.AtomicInteger(0);
 
     public OrderCreatedHandler(CountDownLatch firstOrder) {
         this.firstOrder = firstOrder;
@@ -47,11 +46,12 @@ public class OrderCreatedHandler implements MessageListener {
             return;
         }
         String orderNo = payload.path("orderNo").asText("");
-        // 顺序键演示分支：仅 SO-9003 的第一条（item=A）首次到达时模拟处理失败
+        // 顺序键/死信演示分支：SO-9003 的 item=A 前两次到达都模拟处理失败
+        // （配合服务端 max-delivery-retries=2 会快速进入死信，供管理接口重放）
         if ("SO-9003".equals(orderNo) && "A".equals(payload.path("item").asText())
-                && failedOnce.add(message.getMessageId())) {
-            System.out.println("[顺序键演示] SO-9003 首次处理失败（模拟门店系统故障）"
-                    + " → ack FAILED，服务端将重试；同键后续消息此时必须被门禁挡住");
+                && so9003Failures.incrementAndGet() <= 2) {
+            System.out.println("[管理演示] SO-9003 第 " + so9003Failures.get()
+                    + " 次处理失败（模拟门店系统故障）→ ack FAILED");
             message.ackFailed(LinkoraErrorCode.INTERNAL_ERROR, "模拟门店系统故障");
             return;
         }
