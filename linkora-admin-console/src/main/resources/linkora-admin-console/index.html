@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linkora 运维控制台</title>
+<style>
+:root{
+  --bg:#FAF9F6;--surface:#FFFFFF;--surface-2:#F4F2ED;
+  --border:#EBE8E3;--border-strong:#DDD9D2;
+  --ink:#26302C;--ink-2:#6E6A61;--ink-3:#9B968B;
+  --primary:#2F5D50;--primary-deep:#244A3F;--primary-tint:#EDF2EF;
+  --sidebar:#223B33;--sidebar-hover:#2B483E;
+  --ok:#3E7C4F;--ok-tint:#EBF3EC;
+  --warn:#B4762A;--warn-tint:#F8F1E5;
+  --bad:#A8442E;--bad-tint:#F8ECE8;
+  --mut:#8A857C;--mut-tint:#F1EFEA;
+  --code-bg:#1F2B27;
+  --shadow:0 1px 3px rgba(38,48,44,.05);
+  --shadow-lift:0 10px 32px rgba(38,48,44,.14);
+  --r-card:10px;--r-btn:8px;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+  --mono:"SF Mono",Consolas,"Liberation Mono",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:#D8D4CC;border-radius:4px}
+
+/* ───── 登录页 ───── */
+#login{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:var(--bg);z-index:50}
+#login.on{display:flex}
+#login::before{content:"";position:absolute;inset:0;background:
+  radial-gradient(600px 300px at 20% 0%,rgba(47,93,80,.06),transparent),
+  radial-gradient(500px 320px at 90% 100%,rgba(47,93,80,.05),transparent)}
+.login-card{position:relative;width:380px;background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow-lift);padding:40px 36px 36px;text-align:center}
+.login-mark{width:52px;height:52px;border-radius:14px;background:var(--primary);margin:0 auto 18px;display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 6px 16px rgba(47,93,80,.28)}
+.login-card h1{font-size:19px;font-weight:600}
+.login-card .sub{color:var(--ink-2);font-size:12.5px;margin:6px 0 26px}
+.login-card input{width:100%;padding:11px 13px;border:1px solid var(--border-strong);border-radius:var(--r-btn);font-size:14px;font-family:var(--mono);background:var(--bg);outline:none;transition:border-color .15s,box-shadow .15s}
+.login-card input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(47,93,80,.12)}
+.login-err{color:var(--bad);font-size:12px;text-align:left;margin-top:6px;min-height:18px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:var(--r-btn);font-size:13.5px;font-weight:500;transition:all .15s;border:1px solid transparent}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-deep)}
+.btn-ghost{border-color:var(--border-strong);color:var(--ink);background:var(--surface)}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+.btn-block{width:100%;padding:11px;margin-top:14px}
+.login-tip{margin-top:20px;font-size:11.5px;color:var(--ink-3)}
+
+/* ───── 骨架 ───── */
+#app{display:none;height:100vh}
+#app.on{display:flex}
+aside{width:208px;flex:none;background:var(--sidebar);color:#E8EDEA;display:flex;flex-direction:column;padding:18px 12px 14px}
+.brand{display:flex;align-items:center;gap:10px;padding:2px 8px 18px}
+.brand-mark{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:#fff}
+.brand b{font-size:15px;font-weight:600;color:#fff;display:block}
+.brand span{font-size:10.5px;color:rgba(232,237,234,.55);letter-spacing:.08em}
+nav{display:flex;flex-direction:column;gap:2px;flex:1}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;color:rgba(232,237,234,.72);font-size:13.5px;text-decoration:none;transition:background .15s,color .15s;position:relative}
+nav a svg{width:16px;height:16px;flex:none}
+nav a:hover{background:var(--sidebar-hover);color:#fff}
+nav a.on{background:rgba(255,255,255,.10);color:#fff;font-weight:500}
+nav a.on::before{content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:#8FC7A9}
+nav .badge{margin-left:auto;background:var(--bad);color:#fff;font-size:10.5px;padding:1px 7px;border-radius:99px;font-weight:600}
+nav .badge:empty{display:none}
+.side-foot{border-top:1px solid rgba(255,255,255,.09);padding:12px 8px 0;font-size:11px;color:rgba(232,237,234,.45);display:flex;justify-content:space-between}
+
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+header{height:58px;flex:none;display:flex;align-items:center;gap:14px;padding:0 28px;border-bottom:1px solid var(--border);background:rgba(250,249,246,.9)}
+header h2{font-size:16px;font-weight:600}
+.auto-refresh{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-2)}
+.switch{width:32px;height:18px;border-radius:99px;background:#D8D4CC;position:relative;transition:background .15s;cursor:pointer;flex:none}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.switch.on{background:var(--primary)}.switch.on::after{left:16px}
+.icon-btn{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink-2);transition:all .15s}
+.icon-btn:hover{background:var(--surface-2);color:var(--ink)}
+.icon-btn svg{width:16px;height:16px}
+.content{flex:1;overflow-y:auto;padding:24px 28px 40px}
+.view{display:none;max-width:1180px;margin:0 auto}
+.view.on{display:block;animation:fadeUp .25s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ───── 通用 ───── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);box-shadow:var(--shadow)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2.5px 10px;border-radius:99px;font-size:11.5px;font-weight:500;white-space:nowrap}
+.pill i{width:6px;height:6px;border-radius:50%;flex:none}
+.pill.ok{background:var(--ok-tint);color:var(--ok)}.pill.ok i{background:var(--ok)}
+.pill.warn{background:var(--warn-tint);color:var(--warn)}.pill.warn i{background:var(--warn)}
+.pill.bad{background:var(--bad-tint);color:var(--bad)}.pill.bad i{background:var(--bad)}
+.pill.mut{background:var(--mut-tint);color:var(--mut)}.pill.mut i{background:var(--mut)}
+table{width:100%;border-collapse:collapse}
+th{font-size:11.5px;font-weight:500;color:var(--ink-3);text-align:left;padding:11px 16px;border-bottom:1px solid var(--border);letter-spacing:.04em;white-space:nowrap}
+td{padding:13px 16px;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr.rowlink{cursor:pointer;transition:background .12s}
+tbody tr.rowlink:hover{background:#FBFAF7}
+.mono{font-family:var(--mono);font-size:12.5px}
+.sub{font-size:12px;color:var(--ink-2)}
+.weak{font-size:12px;color:var(--ink-3)}
+.empty{padding:56px 0;text-align:center;color:var(--ink-3)}
+.empty svg{width:34px;height:34px;margin-bottom:10px;opacity:.5}
+.empty p{font-size:13px}
+.btn-sm{padding:5.5px 12px;font-size:12.5px;border-radius:7px}
+.btn-outline{border-color:var(--border-strong);color:var(--ink);background:var(--surface)}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-tint{background:var(--primary-tint);color:var(--primary)}
+.btn-tint:hover{background:#E1EAE6}
+.skeleton{height:14px;border-radius:4px;background:linear-gradient(90deg,#F0EEE9 25%,#F8F6F2 45%,#F0EEE9 65%);background-size:200% 100%;animation:sk 1.2s infinite}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
+
+/* ───── 总览 ───── */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.kpi{padding:18px 20px 14px}
+.kpi .lbl{font-size:11.5px;color:var(--ink-2);letter-spacing:.05em;display:flex;align-items:center;gap:7px}
+.kpi .lbl i{width:7px;height:7px;border-radius:50%}
+.kpi .val{font-size:30px;font-weight:600;margin:8px 0 4px}
+.kpi .delta{font-size:11.5px;display:inline-flex;align-items:center;padding:1.5px 8px;border-radius:99px;background:var(--mut-tint);color:var(--mut)}
+.overview-grid{display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start}
+.panel-head{display:flex;align-items:center;padding:15px 18px;border-bottom:1px solid var(--border)}
+.panel-head h3{font-size:14px;font-weight:600}
+.panel-head .more{margin-left:auto;font-size:12px;color:var(--primary);cursor:pointer}
+.chart{padding:20px 18px 14px;display:flex;align-items:flex-end;gap:12px;height:190px}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.bar .col{width:100%;max-width:34px;background:linear-gradient(180deg,#3B6E5E,var(--primary));border-radius:6px 6px 3px 3px;cursor:pointer;position:relative;transition:opacity .15s}
+.bar .col:hover{opacity:.85}
+.bar .col.zero{background:var(--surface-2)}
+.bar .col .tip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:11px;padding:3px 9px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s}
+.bar .col:hover .tip{opacity:1}
+.bar .d{font-size:11px;color:var(--ink-3)}
+
+/* ───── 筛选 ───── */
+.filterbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+select,.filterbar input{padding:8px 12px;border:1px solid var(--border-strong);border-radius:var(--r-btn);background:var(--surface);font-size:13px;font-family:inherit;color:var(--ink);outline:none;transition:border-color .15s}
+select:focus,.filterbar input:focus{border-color:var(--primary)}
+.search{padding-left:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239B968B' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:10px center;width:220px}
+.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:12px 16px;font-size:12.5px;color:var(--ink-2)}
+.pager button{border:1px solid var(--border-strong);background:var(--surface);border-radius:6px;padding:4px 11px;font-size:12.5px;color:var(--ink-2)}
+.pager button:not(:disabled):hover{border-color:var(--primary);color:var(--primary)}
+
+/* ───── 抽屉 ───── */
+.mask{position:fixed;inset:0;background:rgba(30,38,35,.32);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+.mask.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:-480px;width:460px;max-width:92vw;height:100vh;background:var(--surface);box-shadow:var(--shadow-lift);transition:right .24s cubic-bezier(.32,.72,.35,1);z-index:45;display:flex;flex-direction:column}
+.drawer.on{right:0}
+.drawer-head{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px}
+.drawer-head h3{font-size:15px;font-weight:600;font-family:var(--mono);font-size:14px}
+.drawer-body{flex:1;overflow-y:auto;padding:20px 24px 30px}
+.kv{display:grid;grid-template-columns:88px 1fr;gap:7px 12px;font-size:13px;margin-bottom:20px}
+.kv dt{color:var(--ink-3)}.kv dd{color:var(--ink)}
+.sect{font-size:11.5px;font-weight:600;color:var(--ink-3);letter-spacing:.08em;margin:22px 0 10px}
+.codeblock{background:var(--code-bg);color:#D7E3DD;border-radius:9px;padding:14px 16px;font-family:var(--mono);font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;word-break:break-all}
+.tl{position:relative;padding-left:20px}
+.tl::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:1px;background:var(--border-strong)}
+.tl-item{position:relative;padding:0 0 16px}
+.tl-item::before{content:"";position:absolute;left:-19px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--surface);border:2px solid var(--primary)}
+.tl-item.err::before{border-color:var(--bad)}
+.tl-item .t{font-size:12px;color:var(--ink-3)}
+.tl-item .n{font-size:13px;margin-top:1px}
+
+/* ───── 弹窗 / Toast ───── */
+.modal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center}
+.modal.on{display:flex}
+.modal .m-mask{position:absolute;inset:0;background:rgba(30,38,35,.4)}
+.modal .m-box{position:relative;width:400px;background:var(--surface);border-radius:13px;box-shadow:var(--shadow-lift);padding:26px 26px 22px;animation:pop .18s ease}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:none;opacity:1}}
+.m-box h3{font-size:15.5px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:9px}
+.m-box h3 .m-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--warn-tint);color:var(--warn)}
+.m-box p{font-size:13px;color:var(--ink-2);margin-bottom:14px}
+.m-box label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:6px}
+.m-box label b{color:var(--bad)}
+.m-box textarea,.m-box select{width:100%;resize:none;border:1px solid var(--border-strong);border-radius:var(--r-btn);padding:9px 12px;font-size:13px;font-family:inherit;outline:none;transition:border-color .15s}
+.m-box textarea{height:64px}
+.m-box textarea:focus,.m-box select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(47,93,80,.12)}
+.m-acts{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
+#toasts{position:fixed;top:18px;right:22px;z-index:70;display:flex;flex-direction:column;gap:9px}
+.toast{display:flex;align-items:center;gap:9px;background:var(--ink);color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;box-shadow:var(--shadow-lift);animation:slideIn .22s ease}
+.toast svg{width:15px;height:15px;color:#8FC7A9;flex:none}
+.toast.warn{background:var(--warn)}.toast.bad{background:var(--bad)}
+@keyframes slideIn{from{transform:translateX(20px);opacity:0}to{transform:none;opacity:1}}
+
+/* ───── 客户端 ───── */
+.client-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.client-card{padding:18px 20px}
+.cc-top{display:flex;align-items:flex-start;gap:12px}
+.avatar{width:40px;height:40px;border-radius:10px;background:var(--primary-tint);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;flex:none}
+.cc-top h4{font-size:14.5px;font-weight:600;display:flex;align-items:center;gap:8px;word-break:break-all}
+.cc-top .switch{margin-left:auto;margin-top:3px}
+.cc-stats{display:flex;gap:26px;margin:15px 0 14px;padding:12px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.cc-stats div b{display:block;font-size:18px;font-weight:600}
+.cc-stats div span{font-size:11.5px;color:var(--ink-3)}
+.cc-acts{display:flex;gap:8px;flex-wrap:wrap}
+.cc-acts .spacer{flex:1}
+.detail-rows{margin-top:12px;display:none}
+.detail-rows.on{display:block}
+footer.ver{margin-top:26px;text-align:center;font-size:11.5px;color:var(--ink-3)}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(2,1fr)}.overview-grid{grid-template-columns:1fr}.client-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="login" class="on">
+  <div class="login-card">
+    <div class="login-mark">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg>
+    </div>
+    <h1>Linkora 运维控制台</h1>
+    <p class="sub">输入访问令牌以继续 · 凭证仅保存在本会话</p>
+    <input id="token" type="password" placeholder="Bearer Token" autocomplete="off">
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn btn-primary btn-block" onclick="doLogin()">进入控制台</button>
+    <p class="login-tip">令牌由服务端 linkora.admin-console.token 配置</p>
+  </div>
+</div>
+
+<div id="app">
+  <aside>
+    <div class="brand">
+      <div class="brand-mark"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg></div>
+      <div><b>Linkora</b><span>ADMIN CONSOLE</span></div>
+    </div>
+    <nav>
+      <a class="on" data-v="overview" href="#" onclick="go('overview');return false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        总览</a>
+      <a data-v="messages" href="#" onclick="go('messages');return false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        消息</a>
+      <a data-v="dead" href="#" onclick="go('dead');return false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        死信处置 <span class="badge num" id="deadBadge"></span></a>
+      <a data-v="clients" href="#" onclick="go('clients');return false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        客户端</a>
+    </nav>
+    <div class="side-foot"><span>v0.4.0</span><span id="connState">已连接</span></div>
+  </aside>
+
+  <main>
+    <header>
+      <h2 id="pageTitle">总览</h2>
+      <div class="auto-refresh">自动刷新
+        <div class="switch on" id="refreshSw" onclick="toggleRefresh()"></div>
+        <span class="num" style="font-size:12px;color:var(--ink-3)" id="nextTick">10s</span>
+      </div>
+      <button class="icon-btn" title="立即刷新" onclick="refreshCurrent()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+      </button>
+      <button class="icon-btn" title="退出登录" onclick="logout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </header>
+
+    <div class="content">
+      <section class="view on" id="v-overview">
+        <div class="kpis">
+          <div class="card kpi"><div class="lbl"><i style="background:var(--ok)"></i>在线客户端</div><div class="val num" id="kpiOnline">—</div><span class="delta num" id="kpiOnlineSub">加载中</span></div>
+          <div class="card kpi"><div class="lbl"><i style="background:var(--warn)"></i>未完成投递</div><div class="val num" id="kpiPending">—</div><span class="delta">全部客户端合计</span></div>
+          <div class="card kpi"><div class="lbl"><i style="background:var(--bad)"></i>死信</div><div class="val num" id="kpiDead">—</div><span class="delta" id="kpiDeadSub">全部客户端合计</span></div>
+          <div class="card kpi"><div class="lbl"><i style="background:var(--primary)"></i>今日发布</div><div class="val num" id="kpiPub">—</div><span class="delta num" id="kpiPubSub">—</span></div>
+        </div>
+        <div class="overview-grid">
+          <div class="card">
+            <div class="panel-head"><h3>客户端</h3><span class="more" onclick="go('clients')">查看全部 →</span></div>
+            <table><thead><tr><th>客户端</th><th>状态</th><th>未完成</th><th>死信</th><th>注册时间</th></tr></thead>
+              <tbody id="ovClients"></tbody></table>
+          </div>
+          <div class="card"><div class="panel-head"><h3>近 7 日发布量</h3></div><div class="chart" id="chart"></div></div>
+        </div>
+      </section>
+
+      <section class="view" id="v-messages">
+        <div class="filterbar">
+          <input class="search" id="mSearch" placeholder="客户端 ID 精确筛选…" onkeydown="if(event.key==='Enter')loadMessages()">
+          <select id="mType">
+            <option value="">全部类型</option>
+            <option>NOTICE</option><option>BIZ</option><option>SYNC</option><option>linkora.admin.result</option>
+          </select>
+          <input type="date" id="mBegin" onchange="loadMessages()">
+          <span style="flex:1"></span>
+          <button class="btn btn-ghost btn-sm" onclick="loadMessages()">查询</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>消息 ID</th><th>客户端</th><th>类型</th><th>顺序键</th><th>投递</th><th>发布时间</th></tr></thead>
+            <tbody id="msgRows"></tbody></table>
+          <div class="pager"><span class="num" id="mPageInfo"></span>
+            <button id="mPrev" onclick="pageMsgs(-1)">‹ 上一页</button>
+            <button id="mNext" onclick="pageMsgs(1)">下一页 ›</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="v-dead">
+        <div class="filterbar">
+          <select id="deadClient" onchange="loadDead()"><option value="">选择客户端…</option></select>
+          <span class="sub" id="deadHint">选择客户端查看其死信</span>
+          <span style="flex:1"></span>
+          <button class="btn btn-outline btn-sm" onclick="forceTransitionModal()">通用状态变更</button>
+          <button class="btn btn-outline btn-sm" id="deadBatchSkip" onclick="batchSkip()" style="display:none">批量跳过本客户端死信</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>消息 ID</th><th>类型</th><th>状态</th><th>重试</th><th>失败原因</th><th>更新时间</th><th style="width:150px">操作</th></tr></thead>
+            <tbody id="deadRows"></tbody></table>
+        </div>
+      </section>
+
+      <section class="view" id="v-clients">
+        <div class="client-grid" id="clientGrid"></div>
+        <footer class="ver">Linkora Admin Console · v0.4.0 · 数据每 10 秒自动刷新</footer>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="mask" id="mask" onclick="closeAll()"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <div><h3 id="dTitle">—</h3><span class="weak" id="dSub"></span></div>
+    <button class="icon-btn" style="margin-left:auto" onclick="closeAll()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="dBody"></div>
+</aside>
+
+<div class="modal" id="modal">
+  <div class="m-mask" onclick="closeModal()"></div>
+  <div class="m-box">
+    <h3><span class="m-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+      <span id="mTitle">操作确认</span></h3>
+    <p id="mDesc"></p>
+    <div id="mExtra"></div>
+    <label>操作原因 <b>*</b>（必填，将写入服务端日志留痕）</label>
+    <textarea id="mReason" placeholder="例如：门店已线下确认，人工重放"></textarea>
+    <div class="m-acts">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary btn-sm" id="mOk">确认执行</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* ═════════ 数据层：fetch + token 注入 + 错误归一 ═════════ */
+var TOKEN = sessionStorage.getItem("linkora-admin-token") || "";
+var mapper = {PROCESSED:"ok", RETRYING:"warn", FAILED:"warn", DEAD_LETTER:"bad"};
+function stPill(state, text){
+  var cls = mapper[state] || "mut";
+  return '<span class="pill ' + cls + '"><i></i>' + esc(text || state) + '</span>';
+}
+function esc(s){return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];})}
+
+function api(path, opts){
+  opts = opts || {};
+  opts.headers = Object.assign({"Authorization": "Bearer " + TOKEN}, opts.headers || {});
+  if (opts.body && typeof opts.body !== "string"){
+    opts.headers["Content-Type"] = "application/json;charset=UTF-8";
+    opts.body = JSON.stringify(opts.body);
+  }
+  return fetch(path, opts).then(function(resp){
+    if (resp.status === 401){ logout(); throw {error:"未授权：请重新输入令牌"}; }
+    return resp.json().catch(function(){ return {}; }).then(function(data){
+      if (!resp.ok) throw (data.error ? data : {error: "HTTP " + resp.status});
+      return data;
+    });
+  });
+}
+
+/* ═════════ 登录 / 退出 ═════════ */
+function doLogin(){
+  var v = document.getElementById("token").value.trim();
+  var errEl = document.getElementById("loginErr");
+  if (!v){ errEl.textContent = "请输入访问令牌"; return; }
+  var prev = TOKEN; TOKEN = v;
+  api("api/overview").then(function(){
+    sessionStorage.setItem("linkora-admin-token", v);
+    boot(); errEl.textContent = "";
+  }).catch(function(e){
+    TOKEN = prev; errEl.textContent = e.error || "登录失败";
+  });
+}
+function logout(){
+  sessionStorage.removeItem("linkora-admin-token"); TOKEN = "";
+  document.getElementById("app").classList.remove("on");
+  document.getElementById("login").classList.add("on");
+  document.getElementById("token").value = "";
+}
+document.getElementById("token").addEventListener("keydown", function(e){
+  if (e.key === "Enter") doLogin();
+});
+function boot(){
+  document.getElementById("login").classList.remove("on");
+  document.getElementById("app").classList.add("on");
+  refreshCurrent();
+}
+
+/* ═════════ 导航 ═════════ */
+var titles = {overview:"总览", messages:"消息", dead:"死信处置", clients:"客户端"};
+var current = "overview";
+function go(v){
+  current = v;
+  var links = document.querySelectorAll("nav a");
+  for (var i = 0; i < links.length; i++) links[i].classList.toggle("on", links[i].dataset.v === v);
+  var views = document.querySelectorAll(".view");
+  for (var j = 0; j < views.length; j++) views[j].classList.remove("on");
+  document.getElementById("v-" + v).classList.add("on");
+  document.getElementById("pageTitle").textContent = titles[v];
+  refreshCurrent();
+}
+function refreshCurrent(){
+  if (current === "overview") loadOverview();
+  else if (current === "messages") loadMessages();
+  else if (current === "dead") loadDead();
+  else if (current === "clients") loadClients();
+}
+
+/* ═════════ 总览 ═════════ */
+function loadOverview(){
+  api("api/overview").then(function(d){
+    var clients = d.clients || [], online = 0, pending = 0, dead = 0, i;
+    for (i = 0; i < clients.length; i++){
+      if (clients[i].online) online++;
+      pending += clients[i].unfinishedCount || 0;
+      dead += clients[i].deadLetterCount || 0;
+    }
+    document.getElementById("kpiOnline").textContent = online + " / " + clients.length;
+    document.getElementById("kpiOnlineSub").textContent = clients.length ? "共 " + clients.length + " 个注册客户端" : "暂无注册客户端";
+    document.getElementById("kpiPending").textContent = pending;
+    document.getElementById("kpiDead").textContent = dead;
+    document.getElementById("kpiDeadSub").textContent = dead > 0 ? "需人工处置" : "全部客户端合计";
+    document.getElementById("deadBadge").textContent = dead > 0 ? dead : "";
+
+    var days = d.publishedPerDay || [];
+    var today = days.length ? days[days.length - 1] : null;
+    document.getElementById("kpiPub").textContent = today ? fmtNum(today.count) : "0";
+    document.getElementById("kpiPubSub").textContent = today ? today.date : "—";
+
+    document.getElementById("ovClients").innerHTML = clients.length ? clients.map(function(c){
+      return '<tr class="rowlink" onclick="go(\'clients\')">'
+        + '<td><b>' + esc(c.clientId) + '</b></td>'
+        + '<td>' + (c.online ? '<span class="pill ok"><i></i>在线</span>'
+          : (c.enabled ? '<span class="pill mut"><i></i>离线</span>'
+          : '<span class="pill bad"><i></i>已禁用</span>')) + '</td>'
+        + '<td class="num" style="' + (c.unfinishedCount > 0 ? "color:var(--warn);font-weight:600" : "") + '">' + c.unfinishedCount + '</td>'
+        + '<td class="num" style="' + (c.deadLetterCount > 0 ? "color:var(--bad);font-weight:600" : "") + '">' + c.deadLetterCount + '</td>'
+        + '<td class="weak num">' + esc(c.createdAt) + '</td></tr>';
+    }).join("") : emptyRow(5, "暂无注册客户端，按 linkora.server.register-clients 配置注册");
+
+    var max = 0; for (i = 0; i < days.length; i++) max = Math.max(max, days[i].count);
+    document.getElementById("chart").innerHTML = days.map(function(day){
+      var h = max ? Math.max(3, day.count / max * 100) : 3;
+      return '<div class="bar"><div class="col' + (day.count ? "" : " zero") + '" style="height:' + h + '%">'
+        + '<span class="tip num">' + esc(day.date) + ' · ' + fmtNum(day.count) + ' 条</span></div>'
+        + '<span class="d">' + esc(day.date.slice(5)) + '</span></div>';
+    }).join("");
+  }).catch(showErr);
+}
+function fmtNum(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
+function emptyRow(cols, text){
+  return '<tr><td colspan="' + cols + '"><div class="empty">'
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
+    + '<p>' + esc(text) + '</p></div></td></tr>';
+}
+
+/* ═════════ 消息 ═════════ */
+var msgPage = 1;
+function pageMsgs(delta){
+  msgPage = Math.max(1, msgPage + delta);
+  loadMessages();
+}
+function loadMessages(){
+  var clientId = document.getElementById("mSearch").value.trim();
+  var type = document.getElementById("mType").value;
+  var begin = document.getElementById("mBegin").value;
+  var q = "?page=" + msgPage + "&size=20"
+    + (clientId ? "&clientId=" + encodeURIComponent(clientId) : "")
+    + (type ? "&type=" + encodeURIComponent(type) : "")
+    + (begin ? "&begin=" + new Date(begin + "T00:00:00").getTime() : "");
+  document.getElementById("msgRows").innerHTML = '<tr><td colspan="6"><div class="skeleton" style="width:60%"></div></td></tr>';
+  api("api/messages" + q).then(function(list){
+    list = list || [];
+    document.getElementById("msgRows").innerHTML = list.length ? list.map(function(m){
+      return '<tr class="rowlink" onclick="openMessage(\'' + esc(m.messageId) + '\')">'
+        + '<td class="mono">' + esc(m.messageId) + '</td>'
+        + '<td class="mono">' + esc(m.clientId) + '</td>'
+        + '<td>' + esc(m.messageType) + '</td>'
+        + '<td class="mono weak">' + esc(m.sequenceKey || "—") + '</td>'
+        + '<td class="num">' + esc(m.deliverySummary || "—") + '</td>'
+        + '<td class="weak num">' + esc(m.createdAt) + '</td></tr>';
+    }).join("") : emptyRow(6, "没有符合条件的消息");
+    document.getElementById("mPageInfo").textContent = "第 " + msgPage + " 页";
+    document.getElementById("mPrev").disabled = msgPage <= 1;
+    document.getElementById("mNext").disabled = list.length < 20;
+  }).catch(showErr);
+}
+function openMessage(id){
+  document.getElementById("dTitle").textContent = id;
+  document.getElementById("dSub").textContent = "";
+  document.getElementById("dBody").innerHTML = '<div class="skeleton" style="width:80%"></div>';
+  openDrawer();
+  api("api/messages/" + encodeURIComponent(id)).then(function(m){
+    document.getElementById("dSub").textContent = (m.messageType || "") + " · 发布于 " + (m.createdAt || "");
+    var pretty = m.payload || "";
+    if (pretty && pretty.indexOf("{") === 0){
+      try { pretty = JSON.stringify(JSON.parse(pretty), null, 2); } catch (e) { /* 保持原文 */ }
+    }
+    var html = '<div class="kv">'
+      + "<dt>客户端</dt><dd class='mono'>" + esc(m.clientId) + "</dd>"
+      + "<dt>类型</dt><dd>" + esc(m.messageType) + "</dd>"
+      + "<dt>顺序键</dt><dd class='mono'>" + esc(m.sequenceKey || "—") + "</dd>"
+      + "<dt>过期时间</dt><dd class='num'>" + esc(m.expiresAt || "不过期") + "</dd>"
+      + "<dt>大小</dt><dd class='num'>" + m.payloadSize + " 字节</dd></div>"
+      + '<div class="sect">PAYLOAD</div><div class="codeblock">' + esc(pretty) + "</div>"
+      + '<div class="sect">投递记录</div>' + deliveryTimeline(m.deliveries || []);
+    document.getElementById("dBody").innerHTML = html;
+  }).catch(function(e){
+    document.getElementById("dBody").innerHTML = '<div class="empty"><p>' + esc(e.error || "加载失败") + "</p></div>";
+  });
+}
+function deliveryTimeline(deliveries){
+  if (!deliveries.length) return '<div class="empty"><p>无投递记录</p></div>';
+  return '<div class="tl">' + deliveries.map(function(d){
+    var err = d.state === "FAILED" || d.state === "DEAD_LETTER";
+    return '<div class="tl-item' + (err ? " err" : "") + '">'
+      + '<div class="t mono">' + esc(d.updatedAt || "") + ' · seq ' + d.seq + '</div>'
+      + '<div class="n"><span class="mono">' + esc(d.clientId) + '</span> '
+      + stPill(d.state, d.stateText || d.state)
+      + ' <span class="weak">重试 ' + d.retryCount + ' 次</span>'
+      + (d.lastError ? '<div class="weak mono" style="margin-top:3px">' + esc(d.lastError) + "</div>" : "")
+      + "</div></div>";
+  }).join("") + "</div>";
+}
+
+/* ═════════ 死信处置 ═════════ */
+function loadDead(){
+  var sel = document.getElementById("deadClient");
+  api("api/clients").then(function(clients){
+    var cur = sel.value, opts = '<option value="">选择客户端…</option>';
+    for (var i = 0; i < clients.length; i++){
+      opts += '<option value="' + esc(clients[i].clientId) + '">' + esc(clients[i].clientId)
+        + "（死信 " + clients[i].deadLetterCount + "）</option>";
+    }
+    sel.innerHTML = opts; sel.value = cur;
+    var id = sel.value;
+    document.getElementById("deadBatchSkip").style.display = id ? "" : "none";
+    document.getElementById("deadHint").textContent = id ? "" : "选择客户端查看其死信";
+    if (!id){
+      document.getElementById("deadRows").innerHTML = emptyRow(7, "死信按客户端隔离存放，先选择要处置的客户端");
+      return;
+    }
+    document.getElementById("deadRows").innerHTML = '<tr><td colspan="7"><div class="skeleton" style="width:60%"></div></td></tr>';
+    api("api/dead-letters?clientId=" + encodeURIComponent(id)).then(function(list){
+      document.getElementById("deadRows").innerHTML = list.length ? list.map(function(d){
+        return '<tr><td class="mono">' + esc(d.messageId) + "</td>"
+          + "<td>" + esc(d.messageType) + "</td>"
+          + "<td>" + stPill(d.state, d.stateText || d.state) + "</td>"
+          + '<td class="num">' + d.retryCount + "</td>"
+          + '<td class="weak mono">' + esc(d.lastError || "—") + "</td>"
+          + '<td class="weak num">' + esc(d.updatedAt || "") + "</td>"
+          + '<td><button class="btn btn-tint btn-sm" onclick="retryDead(\'' + esc(d.messageId) + '\')">重放</button> '
+          + '<button class="btn btn-outline btn-sm" onclick="skipDead(\'' + esc(d.messageId) + '\')">跳过</button></td></tr>';
+      }).join("") : emptyRow(7, "当前没有死信");
+    }).catch(showErr);
+  }).catch(showErr);
+}
+function retryDead(messageId){
+  confirmOp("重放死信", messageId + " 将重新进入投递队列（DEAD_LETTER → RETRYING），按顺序键补发。", "重放",
+    function(reason){ return api("api/actions/retry-dead-letter", {method:"POST", body:{clientId: document.getElementById("deadClient").value, messageId: messageId, reason: reason}}); });
+}
+function skipDead(messageId){
+  confirmOp("跳过死信", messageId + " 将标记为 EXPIRED 终态，不再投递，同键后续消息立即放行。", "跳过",
+    function(reason){ return api("api/actions/skip", {method:"POST", body:{clientId: document.getElementById("deadClient").value, messageId: messageId, reason: reason}}); });
+}
+function batchSkip(){
+  confirmOp("批量跳过死信", "所选客户端的全部死信将标记为 EXPIRED 终态（上限 100 条），不再投递。", "批量跳过",
+    function(reason){ return api("api/actions/batch-skip", {method:"POST", body:{clientId: document.getElementById("deadClient").value, reason: reason}}); },
+    function(){ loadDead(); });
+}
+function forceTransitionModal(){
+  var states = ["ACCEPTED","RECEIVED","PROCESSED","FAILED","RETRYING","EXPIRED","DEAD_LETTER"];
+  var opts = states.map(function(s){return '<option>' + s + "</option>"}).join("");
+  document.getElementById("mTitle").textContent = "通用状态变更";
+  document.getElementById("mDesc").textContent = "把指定投递记录变更为目标状态（仅允许合法转移），立即生效。";
+  document.getElementById("mExtra").innerHTML =
+    '<label>客户端 ID</label><input id="mClientId" style="width:100%" placeholder="clientId">'
+    + '<label style="margin-top:10px">消息 ID</label><input id="mMessageId" style="width:100%" placeholder="messageId">'
+    + '<label style="margin-top:10px">目标状态</label><select id="mTarget">' + opts + "</select>";
+  confirmOp(null, null, "变更",
+    function(reason){
+      return api("api/actions/force-transition", {method:"POST", body:{
+        clientId: document.getElementById("mClientId").value.trim(),
+        messageId: document.getElementById("mMessageId").value.trim(),
+        target: document.getElementById("mTarget").value, reason: reason}});
+    },
+    function(){ loadDead(); });
+}
+
+/* ═════════ 客户端 ═════════ */
+function loadClients(){
+  api("api/clients").then(function(clients){
+    document.getElementById("clientGrid").innerHTML = clients.length ? clients.map(function(c){
+      return '<div class="card client-card">'
+        + '<div class="cc-top"><div class="avatar">' + esc(shortId(c.clientId)) + "</div>"
+        + "<div><h4>" + esc(c.clientId) + "</h4>"
+        + '<div class="weak num">注册于 ' + esc(c.createdAt) + "</div></div>"
+        + '<div class="switch' + (c.enabled ? " on" : "") + '" onclick="toggleClient(\'' + esc(c.clientId) + '\',' + c.enabled + ')"></div></div>'
+        + '<div class="cc-stats">'
+        + "<div><b>" + (c.online ? '<span style="color:var(--ok)">在线</span>' : "离线") + "</b><span>连接 " + c.connectionCount + "</span></div>"
+        + '<div><b class="num" style="' + (c.unfinishedCount > 0 ? "color:var(--warn)" : "") + '">' + c.unfinishedCount + "</b><span>未完成</span></div>"
+        + '<div><b class="num" style="' + (c.deadLetterCount > 0 ? "color:var(--bad)" : "") + '">' + c.deadLetterCount + "</b><span>死信</span></div></div>"
+        + '<div class="cc-acts">'
+        + '<button class="btn btn-outline btn-sm" onclick="toggleDetail(this,\'' + esc(c.clientId) + '\')">未完成明细</button>'
+        + '<button class="btn btn-outline btn-sm" onclick="cmdPanel(this)">远程指令</button>'
+        + '<span class="spacer"></span>'
+        + '<button class="btn btn-outline btn-sm" onclick="kick(\'' + esc(c.clientId) + '\')">断开连接</button></div>'
+        + '<div class="detail-rows"></div>'
+        + '<div class="cmd-panel" style="display:none;margin-top:12px;background:var(--surface-2);border-radius:9px;padding:12px 14px">'
+        + '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px">'
+        + '<button class="btn btn-outline btn-sm" style="font-family:var(--mono);font-size:11.5px" onclick="sendCmd(\'' + esc(c.clientId) + '\',\'PING\')">PING</button>'
+        + '<button class="btn btn-outline btn-sm" style="font-family:var(--mono);font-size:11.5px" onclick="queryOutbox(\'' + esc(c.clientId) + '\',this)">QUERY_OUTBOX</button>'
+        + "</div>"
+        + '<div class="codeblock" style="font-size:11px;color:var(--ink-2);background:var(--code-bg)">指令经 SSE ctrl 事件实时下发（特殊通道，不落库、不混业务消息），仅在线客户端生效。</div>'
+        + '<div class="codeblock cmd-result" style="margin-top:8px;display:none"></div></div></div>';
+    }).join("") : '<div class="card"><div class="empty"><p>暂无注册客户端</p></div></div>';
+  }).catch(showErr);
+}
+function shortId(id){
+  var digits = id.replace(/[^0-9]/g, "");
+  return digits.length >= 2 ? digits.slice(-2) : id.slice(0, 2).toUpperCase();
+}
+function toggleDetail(btn, clientId){
+  var box = btn.closest(".client-card").querySelector(".detail-rows");
+  if (box.classList.contains("on")){ box.classList.remove("on"); return; }
+  box.classList.add("on");
+  box.innerHTML = '<div class="skeleton" style="width:70%;margin-top:12px"></div>';
+  api("api/clients/" + encodeURIComponent(clientId) + "/unfinished").then(function(list){
+    box.innerHTML = list.length ? "<table><tbody>" + list.map(function(d){
+      return "<tr><td class='mono'>" + esc(d.messageId) + "</td><td>"
+        + stPill(d.state, d.stateText || d.state) + "</td>"
+        + '<td class="num">' + d.retryCount + " 次</td>"
+        + '<td class="weak num">' + esc(d.updatedAt || "") + "</td></tr>";
+    }).join("") + "</tbody></table>"
+      : '<div class="empty" style="padding:20px 0"><p>没有未完成投递</p></div>';
+  }).catch(function(e){ box.innerHTML = '<div class="weak">' + esc(e.error || "加载失败") + "</div>"; });
+}
+function toggleClient(clientId, enabled){
+  var next = !enabled;
+  confirmOp(next ? "启用客户端" : "停用客户端",
+    next ? clientId + " 将恢复接收新消息与接入。"
+      : "停用后 " + clientId + " 将拒收新消息并拒绝接入，存量消息保留。", next ? "启用" : "停用",
+    function(reason){ return api("api/actions/" + (next ? "enable" : "disable"),
+      {method:"POST", body:{clientId: clientId, reason: reason}}); },
+    function(){ loadClients(); });
+}
+function kick(clientId){
+  confirmOp("断开连接", "将关闭 " + clientId + " 的全部 SSE 连接，客户端会按退避策略自动重连补发。", "断开",
+    function(reason){ return api("api/actions/disconnect",
+      {method:"POST", body:{clientId: clientId, reason: reason}}); },
+    function(){ loadClients(); });
+}
+function cmdPanel(btn){
+  var panel = btn.closest(".client-card").querySelector(".cmd-panel");
+  panel.style.display = panel.style.display === "none" ? "" : "none";
+}
+function sendCmd(clientId, command){
+  confirmOp("下发指令 " + command, "指令经 SSE ctrl 通道实时下发，仅在线客户端生效。", "下发",
+    function(reason){ return api("api/actions/client-command",
+      {method:"POST", body:{clientId: clientId, command: command, reason: reason}}); },
+    function(res){
+      toast(command + " 已送达 " + res.delivered + " 个连接", res.delivered ? "" : "warn");
+    });
+}
+function queryOutbox(clientId, btn){
+  var panel = btn.closest(".cmd-panel");
+  var out = panel.querySelector(".cmd-result");
+  confirmOp("远程查询 outbox", "下发 QUERY_OUTBOX，客户端执行后经上行回传结果（与业务消息隔离）。", "查询",
+    function(reason){
+      return api("api/actions/client-command", {method:"POST", body:{
+        clientId: clientId, command: "QUERY_OUTBOX", reason: reason}});
+    },
+    function(res){
+      if (!res.queryId){ toast("指令未送达（客户端离线）", "bad"); return; }
+      out.style.display = ""; out.textContent = "→ 指令已下发，轮询回执中…";
+      var n = 0;
+      var timer = setInterval(function(){
+        api("api/command-result/" + encodeURIComponent(res.queryId)).then(function(r){
+          if (r.result){ clearInterval(timer); out.textContent = r.result; }
+          else if (++n >= 15){ clearInterval(timer); out.textContent = "等待回执超时（客户端可能离线或未执行）"; }
+        });
+      }, 2000);
+    });
+}
+
+/* ═════════ 抽屉 / 弹窗 / Toast ═════════ */
+function openDrawer(){
+  document.getElementById("drawer").classList.add("on");
+  document.getElementById("mask").classList.add("on");
+}
+function closeAll(){
+  document.getElementById("drawer").classList.remove("on");
+  document.getElementById("mask").classList.remove("on");
+}
+var confirmHandler = null, afterHandler = null;
+function confirmOp(title, desc, okLabel, handler, after){
+  if (title !== null){
+    document.getElementById("mTitle").textContent = title;
+    document.getElementById("mDesc").textContent = desc || "";
+    document.getElementById("mExtra").innerHTML = "";
+  }
+  document.getElementById("mReason").value = "";
+  document.getElementById("mOk").textContent = "确认" + (okLabel || "执行");
+  confirmHandler = handler; afterHandler = after || null;
+  document.getElementById("modal").classList.add("on");
+}
+function closeModal(){ document.getElementById("modal").classList.remove("on"); }
+document.getElementById("mOk").addEventListener("click", function(){
+  var reason = document.getElementById("mReason").value.trim();
+  if (!reason){ toast("请填写操作原因（必填留痕）", "warn"); return; }
+  if (!confirmHandler) { closeModal(); return; }
+  confirmHandler(reason).then(function(res){
+    closeModal(); toast("操作已执行" + (res && res.ok === false ? "（目标记录不满足条件）" : ""));
+    if (afterHandler) afterHandler(res); else refreshCurrent();
+  }).catch(function(e){ toast(e.error || "操作失败", "bad"); });
+});
+function toast(msg, kind){
+  var t = document.createElement("div");
+  t.className = "toast" + (kind ? " " + kind : "");
+  t.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' + esc(msg);
+  document.getElementById("toasts").appendChild(t);
+  setTimeout(function(){
+    t.style.opacity = "0"; t.style.transition = "opacity .3s";
+    setTimeout(function(){ if (t.parentNode) t.parentNode.removeChild(t); }, 320);
+  }, 2600);
+}
+function showErr(e){ toast(e && e.error ? e.error : "请求失败", "bad"); }
+
+/* ═════════ 自动刷新 ═════════ */
+var tick = 10;
+setInterval(function(){
+  var sw = document.getElementById("refreshSw");
+  document.getElementById("nextTick").textContent = sw.classList.contains("on") ? tick + "s" : "已暂停";
+  if (!sw.classList.contains("on")) return;
+  if (--tick <= 0){ tick = 10; if (!document.getElementById("modal").classList.contains("on")) refreshCurrent(); }
+}, 1000);
+function toggleRefresh(){
+  var sw = document.getElementById("refreshSw");
+  sw.classList.toggle("on");
+  tick = 10;
+}
+
+/* 恢复会话：已有 token 直接进入 */
+if (TOKEN){ boot(); }
+</script>
+</body>
+</html>

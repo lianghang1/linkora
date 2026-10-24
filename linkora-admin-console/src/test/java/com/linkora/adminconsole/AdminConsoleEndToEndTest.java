@@ -1,0 +1,314 @@
+package com.linkora.adminconsole;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkora.core.message.MessageState;
+import com.linkora.core.storage.server.ClientRegistration;
+import com.linkora.core.storage.server.ClientRegistry;
+import com.linkora.server.LinkoraServer;
+import com.linkora.server.ServerConfig;
+import com.linkora.server.auth.AllowAllClientAuthenticator;
+import com.linkora.server.pipeline.SsePushGateway;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.servlet.FilterHolder;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.h2.jdbcx.JdbcDataSource;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+import javax.servlet.DispatcherType;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+/**
+ * 控制台端到端测试：内嵌 Jetty + 真实 H2 JDBC 存储 + 真实 LinkoraServer，
+ * 经 {@link AdminConsoleInstaller} 装配（真实宿主路径），HTTP 断言鉴权与全部端点。
+ *
+ * @author lianghang
+ */
+public class AdminConsoleEndToEndTest {
+
+    private static final String CLIENT = "store-001";
+    private static final String TOKEN = "it-console-token";
+
+    private LinkoraServer server;
+    private Server jetty;
+    private int port;
+    private final ObjectMapper mapper = new ObjectMapper();
+
+    @Before
+    public void setUp() throws Exception {
+        JdbcDataSource dataSource = new JdbcDataSource();
+        dataSource.setURL("jdbc:h2:mem:linkora_admin_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+        com.linkora.server.storage.jdbc.JdbcServerSchema.migrate(dataSource);
+        ClientRegistry registry = new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource);
+        registry.register(new ClientRegistration(CLIENT, true, System.currentTimeMillis()));
+
+        server = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(registry)
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(new StubGateway())
+                .config(ServerConfig.builder().sweepIntervalMs(60_000).build())
+                .build();
+        server.start();
+
+        // 真实宿主路径：经 AdminConsoleInstaller 手动装配（与 MVC/纯 Servlet 宿主一致）
+        jetty = new Server(0);
+        ServletContextHandler ctx = new ServletContextHandler();
+        ctx.setContextPath("/");
+        AdminConsoleInstaller.register(ctx.getServletContext(), server, TOKEN);
+        jetty.setHandler(ctx);
+        jetty.start();
+        port = jetty.getURI().getPort();
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        jetty.stop();
+        server.close();
+    }
+
+    // ---------------- 鉴权 ----------------
+
+    @Test
+    public void missingTokenIsUnauthorized() throws Exception {
+        HttpResult r = http("/linkora-admin/api/overview", null, "GET", null);
+        assertEquals(401, r.status);
+        assertTrue(r.body.contains("未授权"));
+    }
+
+    @Test
+    public void wrongTokenIsUnauthorized() throws Exception {
+        HttpResult r = http("/linkora-admin/api/overview", "bad-token", "GET", null);
+        assertEquals(401, r.status);
+    }
+
+    @Test
+    public void indexPageServedWithCorrectToken() throws Exception {
+        HttpResult r = http("/linkora-admin/", TOKEN, "GET", null);
+        assertEquals(200, r.status);
+        assertTrue(r.body.contains("Linkora 运维控制台"));
+        assertTrue(r.body.contains("</html>"));
+    }
+
+    // ---------------- 查询端点 ----------------
+
+    @Test
+    public void overviewContainsClientAndStats() throws Exception {
+        publishOne("hello");
+        HttpResult r = http("/linkora-admin/api/overview", TOKEN, "GET", null);
+        assertEquals(200, r.status);
+        JsonNode body = mapper.readTree(r.body);
+        assertEquals(1, body.get("clients").size());
+        assertEquals(CLIENT, body.get("clients").get(0).get("clientId").asText());
+        assertTrue(body.has("publishedPerDay"));
+        assertTrue(body.has("deliveryStateDistribution"));
+    }
+
+    @Test
+    public void messagesListAndDetailRoundTrip() throws Exception {
+        String messageId = publishOne("{\"k\":\"v\"}");
+        HttpResult list = http("/linkora-admin/api/messages?clientId=" + CLIENT, TOKEN, "GET", null);
+        assertEquals(200, list.status);
+        JsonNode items = mapper.readTree(list.body);
+        assertEquals(1, items.size());
+        assertEquals(messageId, items.get(0).get("messageId").asText());
+
+        HttpResult detail = http("/linkora-admin/api/messages/" + messageId, TOKEN, "GET", null);
+        assertEquals(200, detail.status);
+        JsonNode d = mapper.readTree(detail.body);
+        assertEquals("{\"k\":\"v\"}", d.get("payload").asText());
+        assertEquals(1, d.get("deliveries").size());
+        assertEquals(MessageState.ACCEPTED.name(),
+                d.get("deliveries").get(0).get("state").asText());
+
+        HttpResult missing = http("/linkora-admin/api/messages/no-such", TOKEN, "GET", null);
+        assertEquals(404, missing.status);
+    }
+
+    @Test
+    public void deadLettersRequireClientId() throws Exception {
+        HttpResult r = http("/linkora-admin/api/dead-letters", TOKEN, "GET", null);
+        assertEquals(400, r.status);
+        assertTrue(r.body.contains("clientId"));
+    }
+
+    // ---------------- 写操作端点 ----------------
+
+    @Test
+    public void retryAndSkipDeadLetterViaConsole() throws Exception {
+        String messageId = publishOne("dead");
+        // 构造死信：人工状态变更 ACCEPTED → DEAD_LETTER（合法转移）
+        server.forceTransition(CLIENT, messageId, MessageState.DEAD_LETTER, "测试构造死信");
+
+        HttpResult list = http("/linkora-admin/api/dead-letters?clientId=" + CLIENT, TOKEN, "GET", null);
+        assertEquals(1, mapper.readTree(list.body).size());
+
+        // 重放：DEAD_LETTER → RETRYING
+        HttpResult retry = http("/linkora-admin/api/actions/retry-dead-letter", TOKEN, "POST",
+                "{\"clientId\":\"" + CLIENT + "\",\"messageId\":\"" + messageId
+                        + "\",\"reason\":\"门店已线下确认\"}");
+        assertEquals(200, retry.status);
+        assertTrue(mapper.readTree(retry.body).get("ok").asBoolean());
+
+        // 跳过：RETRYING → EXPIRED
+        HttpResult skip = http("/linkora-admin/api/actions/skip", TOKEN, "POST",
+                "{\"clientId\":\"" + CLIENT + "\",\"messageId\":\"" + messageId
+                        + "\",\"reason\":\"重复推送\"}");
+        assertEquals(200, skip.status);
+        assertTrue(mapper.readTree(skip.body).get("ok").asBoolean());
+
+        JsonNode detail = mapper.readTree(
+                http("/linkora-admin/api/messages/" + messageId, TOKEN, "GET", null).body);
+        assertEquals(MessageState.EXPIRED.name(),
+                detail.get("deliveries").get(0).get("state").asText());
+    }
+
+    @Test
+    public void batchSkipAndEnableDisableAndDisconnect() throws Exception {
+        String first = publishOne("a");
+        String second = publishOne("b");
+        server.forceTransition(CLIENT, first, MessageState.DEAD_LETTER, "测试");
+        server.forceTransition(CLIENT, second, MessageState.DEAD_LETTER, "测试");
+
+        HttpResult batch = http("/linkora-admin/api/actions/batch-skip", TOKEN, "POST",
+                "{\"clientId\":\"" + CLIENT + "\",\"reason\":\"批量清理\"}");
+        assertEquals(200, batch.status);
+        assertEquals(2, mapper.readTree(batch.body).get("count").asInt());
+
+        assertEquals(true, mapper.readTree(http("/linkora-admin/api/actions/disable", TOKEN,
+                "POST", "{\"clientId\":\"" + CLIENT + "\",\"reason\":\"维护窗口\"}").body).get("ok").asBoolean());
+        assertEquals(true, mapper.readTree(http("/linkora-admin/api/actions/enable", TOKEN,
+                "POST", "{\"clientId\":\"" + CLIENT + "\",\"reason\":\"维护结束\"}").body).get("ok").asBoolean());
+        assertEquals(0, mapper.readTree(http("/linkora-admin/api/actions/disconnect", TOKEN,
+                "POST", "{\"clientId\":\"" + CLIENT + "\",\"reason\":\"踢假在线\"}").body).get("count").asInt());
+    }
+
+    @Test
+    public void forceTransitionRejectsIllegalMove() throws Exception {
+        String messageId = publishOne("x");
+        // ACCEPTED → PROCESSED 为非法转移（跳过 RECEIVED/FAILED 链），应 400
+        HttpResult r = http("/linkora-admin/api/actions/force-transition", TOKEN, "POST",
+                "{\"clientId\":\"" + CLIENT + "\",\"messageId\":\"" + messageId
+                        + "\",\"target\":\"PROCESSED\",\"reason\":\"误操作校验\"}");
+        assertEquals(400, r.status);
+    }
+
+    @Test
+    public void clientCommandChannel() throws Exception {
+        HttpResult ping = http("/linkora-admin/api/actions/client-command", TOKEN, "POST",
+                "{\"clientId\":\"" + CLIENT + "\",\"command\":\"PING\",\"reason\":\"连通性探测\"}");
+        assertEquals(200, ping.status);
+        assertEquals(0, mapper.readTree(ping.body).get("delivered").asInt()); // 离线 = 0
+
+        HttpResult query = http("/linkora-admin/api/actions/client-command", TOKEN, "POST",
+                "{\"clientId\":\"" + CLIENT + "\",\"command\":\"QUERY_OUTBOX\",\"reason\":\"排查积压\"}");
+        String queryId = mapper.readTree(query.body).get("queryId").asText();
+        assertTrue(!queryId.isEmpty());
+
+        HttpResult result = http("/linkora-admin/api/command-result/" + queryId, TOKEN, "GET", null);
+        assertTrue(mapper.readTree(result.body).get("result").isNull());
+    }
+
+    @Test
+    public void unknownEndpointIs404() throws Exception {
+        assertEquals(404, http("/linkora-admin/api/nope", TOKEN, "GET", null).status);
+        assertEquals(404, http("/linkora-admin/api/actions/nope", TOKEN, "POST", "{}").status);
+    }
+
+    // ---------------- 工具 ----------------
+
+    private String publishOne(String payload) {
+        return server.publish(CLIENT, "BIZ", payload.getBytes(StandardCharsets.UTF_8))
+                .getMessageId();
+    }
+
+    private HttpResult http(String path, String token, String method, String body) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection)
+                new URL("http://127.0.0.1:" + port + path).openConnection();
+        conn.setRequestMethod(method);
+        if (token != null) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        if (body != null) {
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8");
+            byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+            conn.setFixedLengthStreamingMode(bytes.length);
+            OutputStream out = conn.getOutputStream();
+            out.write(bytes);
+            out.flush();
+        }
+        int status = conn.getResponseCode();
+        InputStream in = status < 400 ? conn.getInputStream() : conn.getErrorStream();
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        byte[] chunk = new byte[4096];
+        int read;
+        while (in != null && (read = in.read(chunk)) > 0) {
+            buffer.write(chunk, 0, read);
+        }
+        conn.disconnect();
+        return new HttpResult(status, new String(buffer.toByteArray(), StandardCharsets.UTF_8));
+    }
+
+    private static final class HttpResult {
+        final int status;
+        final String body;
+
+        HttpResult(int status, String body) {
+            this.status = status;
+            this.body = body;
+        }
+    }
+
+    /** 不出网记录型网关：离线语义（push/sendControl 返回 0）。 */
+    private static class StubGateway implements SsePushGateway {
+        @Override
+        public int push(String clientId, String eventId, String eventType, String data) {
+            return 0;
+        }
+
+        @Override
+        public boolean isConnected(String clientId) {
+            return false;
+        }
+
+        @Override
+        public int connectionCount(String clientId) {
+            return 0;
+        }
+
+        @Override
+        public Set<String> activeClientIds() {
+            return new HashSet<>();
+        }
+
+        @Override
+        public void closeAll() {
+        }
+
+        @Override
+        public int disconnectClient(String clientId) {
+            return 0;
+        }
+
+        @Override
+        public int sendControl(String clientId, String data) {
+            return 0;
+        }
+    }
+}

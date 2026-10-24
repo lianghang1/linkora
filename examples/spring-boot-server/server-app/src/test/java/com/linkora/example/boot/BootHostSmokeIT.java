@@ -84,6 +84,80 @@ class BootHostSmokeIT {
         assertTrue(awaitServerReceived(linkoraServer, "smoke-report", 15_000), "服务端应已收到上行消息");
     }
 
+    @Test
+    void adminConsoleServesPageAndEndpointsWithTokenAuth() throws Exception {
+        // 启动真实 Boot 宿主，显式开启控制台（starter 自动装配 + Bearer Token）
+        context = new SpringApplicationBuilder(SpringBootServerApplication.class)
+                .properties("server.port=0",
+                        "linkora.server.register-clients." + CLIENT_ID + "=true",
+                        "linkora.admin-console.enabled=true",
+                        "linkora.admin-console.token=it-console-token")
+                .run();
+        int port = ((WebServerApplicationContext) context).getWebServer().getPort();
+
+        // 无令牌 / 错误令牌 → 401
+        assertEquals(401, httpStatus(port, "/linkora-admin/api/overview", null));
+        assertEquals(401, httpStatus(port, "/linkora-admin/api/overview", "wrong-token"));
+
+        // 正确令牌：页面与端点可用
+        String page = httpGet(port, "/linkora-admin/", "it-console-token");
+        assertTrue(page.contains("Linkora 运维控制台"), "控制台单页应正常直出");
+        String overview = httpGet(port, "/linkora-admin/api/overview", "it-console-token");
+        assertTrue(overview.contains("smoke-client"), "总览应包含注册客户端");
+
+        // 写操作端点 + reason 留痕（断开连接：客户端离线返回 count=0 也算端点生效）
+        String disconnect = httpPost(port, "/linkora-admin/api/actions/disconnect",
+                "it-console-token", "{\"clientId\":\"smoke-client\",\"reason\":\"烟测\"}");
+        assertTrue(disconnect.contains("\"count\""), "写操作端点应返回执行结果");
+    }
+
+    private int httpStatus(int port, String path, String token) throws Exception {
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                new java.net.URL("http://127.0.0.1:" + port + path).openConnection();
+        if (token != null) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        int status = conn.getResponseCode();
+        conn.disconnect();
+        return status;
+    }
+
+    private String httpGet(int port, String path, String token) throws Exception {
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                new java.net.URL("http://127.0.0.1:" + port + path).openConnection();
+        conn.setRequestProperty("Authorization", "Bearer " + token);
+        String body = new String(readAll(conn.getInputStream()), StandardCharsets.UTF_8);
+        conn.disconnect();
+        return body;
+    }
+
+    private String httpPost(int port, String path, String token, String json) throws Exception {
+        java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
+                new java.net.URL("http://127.0.0.1:" + port + path).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Authorization", "Bearer " + token);
+        conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8");
+        conn.setDoOutput(true);
+        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+        conn.setFixedLengthStreamingMode(bytes.length);
+        try (java.io.OutputStream out = conn.getOutputStream()) {
+            out.write(bytes);
+        }
+        String body = new String(readAll(conn.getInputStream()), StandardCharsets.UTF_8);
+        conn.disconnect();
+        return body;
+    }
+
+    private static byte[] readAll(java.io.InputStream in) throws Exception {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        byte[] chunk = new byte[4096];
+        int read;
+        while ((read = in.read(chunk)) > 0) {
+            buffer.write(chunk, 0, read);
+        }
+        return buffer.toByteArray();
+    }
+
     private boolean awaitOnline(LinkoraServer server, long timeoutMs) throws InterruptedException {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {

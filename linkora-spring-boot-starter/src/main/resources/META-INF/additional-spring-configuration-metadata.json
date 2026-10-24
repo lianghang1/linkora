@@ -102,6 +102,23 @@
       "name": "linkora.client.idle-timeout-ms",
       "type": "java.lang.Long",
       "description": "SSE 空闲死链检测超时（毫秒），0 禁用；未设置使用 SDK 默认。"
+    },
+    {
+      "name": "linkora.admin-console.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "是否启用嵌入式运维控制台（默认关闭，完全不装配）。"
+    },
+    {
+      "name": "linkora.admin-console.token",
+      "type": "java.lang.String",
+      "description": "控制台访问令牌（Authorization: Bearer <token>），启用时必填，缺失则装配期快速失败。"
+    },
+    {
+      "name": "linkora.admin-console.path",
+      "type": "java.lang.String",
+      "defaultValue": "/linkora-admin",
+      "description": "控制台挂载路径前缀，页面与端点位于 {path}/*。"
     }
   ],
   "hints": []

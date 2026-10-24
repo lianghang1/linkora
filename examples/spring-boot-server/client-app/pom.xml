@@ -20,7 +20,7 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <!-- 固定引用已发布的正式版；升级示例依赖时仅需改此属性（联调 SNAPSHOT 先 mvn install） -->
-        <linkora.version>0.3.0</linkora.version>
+        <linkora.version>0.4.0</linkora.version>
         <!-- 独立 pom 不继承 examples 聚合的该属性：maven-deploy-plugin 识别它，
              防止 deploy 时把示例推往 settings.xml altDeploymentRepository 指向的公司 nexus -->
         <maven.deploy.skip>true</maven.deploy.skip>

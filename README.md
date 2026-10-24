@@ -70,6 +70,7 @@ uplinkPublisher.publish("order-status-updated", payload);
 | 慢客户端隔离 | 自动 | 非阻塞推送 + 每连接有界队列，单个失联客户端不影响其他客户端。详见 [docs/reliability.md](docs/reliability.md) |
 | 消息状态查询 | `getMessageStatus` / `getBacklog` | 投递记录、积压与在线状态，可用于对账与监控 |
 | 管理接口 | `LinkoraServer` 管理方法 | 监控、死信重放/跳过、踢连接、运行时启停、远程指令——全部人类可读视图。详见 [docs/api.md](docs/api.md) |
+| 运维控制台 | `linkora-admin-console`（可选 jar） | 嵌入宿主容器的开箱运维界面：总览、死信处置、客户端管理、远程指令；Bearer Token 鉴权、默认关闭。详见 [docs/admin-console.md](docs/admin-console.md) |
 | 自定义存储 | 存储 SPI / 事务接管 | 服务端复用宿主 DataSource 或业务库事务（发件箱语义）；客户端队列可进 MySQL。详见 [docs/custom-storage.md](docs/custom-storage.md) |
 
 ## 使用前必读
@@ -97,6 +98,7 @@ uplinkPublisher.publish("order-status-updated", payload);
 | [docs/custom-storage.md](docs/custom-storage.md) | 自定义存储与事务接管（发件箱语义）、客户端 MySQL 队列 | 存储改造 |
 | [docs/storage-spi.md](docs/storage-spi.md) | 存储 SPI 完整契约 | 自实现存储 |
 | [docs/deployment.md](docs/deployment.md) | 部署形态、数据库表结构、容量与维护 | 运维 |
+| [docs/admin-console.md](docs/admin-console.md) | 嵌入式运维控制台：开启方式、页面与端点、远程指令通道 | 运维 |
 | [docs/architecture.md](docs/architecture.md) | 模块划分与内部结构 | 深入了解 |
 | [docs/protocol.md](docs/protocol.md) | 线路协议：消息 JSON、SSE 事件、HTTP 端点 | 深入了解 |
 | [docs/compatibility.md](docs/compatibility.md) | 容器/JDK/Spring 兼容矩阵 | 升级评估 |
