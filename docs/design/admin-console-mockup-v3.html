@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linkora 控制台 · 重构版设计稿 v3</title>
+<style>
+:root{
+  --bg:#0B0C12;--raised:rgba(255,255,255,.03);--raised-2:rgba(255,255,255,.06);
+  --hair:rgba(255,255,255,.07);--hair-2:rgba(255,255,255,.13);
+  --ink:#F2F3F7;--ink-2:#A6ACBB;--ink-3:#5D6370;
+  --accent:#8B7CF8;--accent-2:#4CC3F7;
+  --accent-grad:linear-gradient(135deg,#8B7CF8,#4CC3F7);
+  --accent-tint:rgba(139,124,248,.10);
+  --accent-border:rgba(139,124,248,.32);
+  --accent-ring:rgba(139,124,248,.16);
+  --ok:#34D399;--warn:#FBBF24;--bad:#FB6F6A;--mut:#7E8694;
+  --glow-ok:0 0 9px rgba(52,211,153,.5);--glow-warn:0 0 9px rgba(251,191,36,.5);--glow-bad:0 0 9px rgba(251,111,106,.5);
+  --shadow-lift:0 24px 64px rgba(0,0,0,.55);
+  --r-md:12px;--r-sm:9px;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--mono);font-size:12.5px}
+.num{font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+kbd{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:5px;border:1px solid var(--hair-2);background:rgba(255,255,255,.04);color:var(--ink-3)}
+
+/* 设计稿横幅 */
+.banner{position:sticky;top:0;z-index:99;display:flex;align-items:center;gap:12px;padding:9px 20px;background:linear-gradient(90deg,rgba(139,124,248,.16),rgba(76,195,247,.12));border-bottom:1px solid var(--accent-border);font-size:12.5px;color:var(--ink-2)}
+.banner b{color:var(--ink)}
+.banner .tag{font-size:10.5px;padding:2px 9px;border-radius:99px;background:var(--accent-tint);border:1px solid var(--accent-border);color:var(--accent);font-weight:600}
+
+.topbar{display:flex;align-items:center;gap:26px;height:58px;padding:0 32px;border-bottom:1px solid var(--hair);background:rgba(11,12,18,.9);position:sticky;top:37px;z-index:20;backdrop-filter:blur(16px)}
+.brand{display:flex;align-items:center;gap:10px;cursor:pointer}
+.brand-mark{width:28px;height:28px;border-radius:9px;background:var(--accent-grad);display:flex;align-items:center;justify-content:center;color:#14102E;box-shadow:0 4px 18px rgba(139,124,248,.35)}
+.brand b{font-size:15px;font-weight:650;letter-spacing:-.01em}
+.tabs{display:flex;gap:2px;height:100%}
+.tabs a{display:flex;align-items:center;gap:7px;padding:0 15px;font-size:13.5px;font-weight:500;color:var(--ink-2);text-decoration:none;position:relative;transition:color .15s;cursor:pointer}
+.tabs a svg{width:14px;height:14px}
+.tabs a:hover{color:var(--ink)}
+.tabs a.on{color:#fff;font-weight:600}
+.tabs a.on::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;border-radius:2px 2px 0 0;background:var(--accent-grad);box-shadow:0 -2px 12px rgba(139,124,248,.5)}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.cswitch{display:flex;align-items:center;gap:9px;padding:6.5px 13px;border-radius:9px;border:1px solid var(--hair-2);background:rgba(255,255,255,.03);font-size:12.5px;color:var(--ink-2);cursor:pointer;transition:border-color .15s}
+.cswitch:hover{border-color:rgba(255,255,255,.22)}
+.cswitch b{color:var(--ink);font-weight:550}
+.cswitch svg{width:12px;height:12px;color:var(--ink-3)}
+
+.page{display:none;max-width:1240px;margin:0 auto;padding:32px 32px 80px}
+.page.on{display:block;animation:fadeUp .3s cubic-bezier(.22,.8,.35,1)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.page-head{margin-bottom:24px;display:flex;align-items:flex-start;gap:16px}
+.crumb{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3);cursor:pointer;margin-bottom:10px}
+.crumb:hover{color:var(--ink-2)}
+.page-head h1{font-size:27px;font-weight:680;letter-spacing:-.025em}
+.page-head .desc{margin-top:5px;font-size:13.5px;color:var(--ink-2)}
+.note{margin-left:auto;max-width:330px;font-size:11.5px;color:var(--ink-3);background:var(--raised);border:1px dashed var(--hair-2);border-radius:10px;padding:10px 14px;line-height:1.6}
+.note b{color:var(--accent);font-weight:600}
+
+.metric{padding:0 40px;border-left:1px solid var(--hair)}
+.metric:first-child{padding-left:0;border-left:none}
+.metrics{display:flex;margin-bottom:34px}
+.metric .m-lbl{font-size:11px;font-weight:550;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.metric .m-lbl i{width:6px;height:6px;border-radius:50%}
+.metric .m-val{font-family:var(--mono);font-size:38px;font-weight:700;letter-spacing:-.02em;margin:6px 0 4px;background:linear-gradient(180deg,#fff,#9AA2B1);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.metric .m-val small{font-size:16px;-webkit-text-fill-color:var(--ink-3);font-weight:450}
+.metric .m-sub{font-size:11.5px;color:var(--ink-3)}
+
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2.5px 10px;border-radius:99px;font-size:11px;font-weight:550;border:1px solid transparent;white-space:nowrap}
+.pill i{width:5.5px;height:5.5px;border-radius:50%}
+.pill.ok{background:rgba(52,211,153,.1);color:var(--ok);border-color:rgba(52,211,153,.24)}.pill.ok i{background:var(--ok);box-shadow:var(--glow-ok)}
+.pill.warn{background:rgba(251,191,36,.1);color:var(--warn);border-color:rgba(251,191,36,.24)}.pill.warn i{background:var(--warn);box-shadow:var(--glow-warn)}
+.pill.bad{background:rgba(251,111,106,.1);color:var(--bad);border-color:rgba(251,111,106,.26)}.pill.bad i{background:var(--bad);box-shadow:var(--glow-bad)}
+.pill.mut{background:rgba(126,134,148,.1);color:var(--mut);border-color:rgba(126,134,148,.22)}.pill.mut i{background:var(--mut)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:7px;border:1px solid var(--hair-2);background:rgba(255,255,255,.03);font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.chip svg{width:10px;height:10px;color:var(--ink-3)}
+.chip.block{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:var(--warn)}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:var(--r-sm);font-size:13px;font-weight:550;transition:all .16s;border:1px solid transparent;white-space:nowrap}
+.btn-sm{padding:5.5px 12px;font-size:12px;border-radius:7px}
+.btn-ghost{border-color:var(--hair-2);color:var(--ink);background:rgba(255,255,255,.03)}
+.btn-ghost:hover{border-color:rgba(255,255,255,.24)}
+.btn-primary{background:var(--accent-grad);color:#14102E;font-weight:650;box-shadow:0 4px 16px rgba(139,124,248,.28),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-outline{border-color:var(--hair-2);color:var(--ink);background:rgba(255,255,255,.03)}
+.btn-outline:hover{border-color:var(--accent-border);color:var(--accent)}
+.btn-tint{background:var(--accent-tint);color:var(--accent);border-color:var(--accent-border)}
+.btn-danger-tint{background:rgba(251,111,106,.1);color:var(--bad);border-color:rgba(251,111,106,.28)}
+
+/* 分段器 */
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:11px;background:var(--raised);border:1px solid var(--hair)}
+.seg button{padding:6px 14px;border-radius:8px;font-size:12.5px;color:var(--ink-2);transition:all .15s}
+.seg button .n{font-family:var(--mono);font-size:11px;margin-left:5px;color:var(--ink-3)}
+.seg button.on{background:var(--accent-tint);border:none;box-shadow:inset 0 0 0 1px var(--accent-border);color:#fff;font-weight:600}
+.seg button.on .n{color:var(--accent)}
+.seg button.dead.on{box-shadow:inset 0 0 0 1px rgba(251,111,106,.4);background:rgba(251,111,106,.1)}
+.seg button.dead.on .n{color:var(--bad)}
+
+/* 统一列表行 */
+.rows{border-top:1px solid var(--hair)}
+.row{display:flex;align-items:center;gap:14px;padding:15px 14px;border-bottom:1px solid var(--hair);border-radius:10px;transition:background .13s;cursor:pointer}
+.row:hover{background:var(--raised)}
+.row.sel{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border)}
+.r-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.r-ico svg{width:15px;height:15px}
+.r-ico.ok{background:rgba(52,211,153,.09);color:var(--ok);box-shadow:inset 0 0 0 1px rgba(52,211,153,.22)}
+.r-ico.bad{background:rgba(251,111,106,.1);color:var(--bad);box-shadow:inset 0 0 0 1px rgba(251,111,106,.26)}
+.r-ico.warn{background:rgba(251,191,36,.1);color:var(--warn);box-shadow:inset 0 0 0 1px rgba(251,191,36,.24)}
+.r-ico.mut{background:rgba(126,134,148,.08);color:var(--mut);box-shadow:inset 0 0 0 1px rgba(126,134,148,.2)}
+.r-main{min-width:0;flex:1}
+.r-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.r-title .mid{font-family:var(--mono);font-size:12.5px;font-weight:550;color:var(--ink)}
+.r-title .type{font-size:11px;color:var(--ink-2);background:var(--raised-2);padding:1.5px 8px;border-radius:6px}
+.r-sub{margin-top:3px;font-size:12px;color:var(--ink-3);display:flex;gap:13px;flex-wrap:wrap;align-items:center}
+.r-sub .mono{color:var(--ink-3)}
+.r-time{font-family:var(--mono);font-size:11px;color:var(--ink-3);flex:none}
+.r-acts{display:flex;gap:7px;flex:none;opacity:0;transition:opacity .15s}
+.row:hover .r-acts,.row.sel .r-acts{opacity:1}
+
+/* 死信批量条 */
+.batchbar{display:none;align-items:center;gap:10px;margin:14px 0 6px;padding:10px 16px;border-radius:11px;background:rgba(251,111,106,.06);border:1px solid rgba(251,111,106,.22);font-size:12.5px;color:var(--ink-2)}
+.batchbar.on{display:flex}
+.batchbar .spacer{flex:1}
+
+/* 客户端 */
+.client-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.client-card{padding:19px 21px;border:1px solid var(--hair);border-radius:14px;background:var(--raised);transition:border-color .18s,transform .18s;cursor:pointer}
+.client-card:hover{border-color:var(--accent-border);transform:translateY(-2px)}
+.cc-top{display:flex;align-items:flex-start;gap:13px}
+.avatar{width:40px;height:40px;border-radius:11px;background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:650;font-size:13px;font-family:var(--mono);flex:none}
+.cc-top h4{font-size:14px;font-weight:600;font-family:var(--mono)}
+.cc-top .switch{margin-left:auto;margin-top:3px}
+.switch{width:34px;height:19px;border-radius:99px;background:rgba(255,255,255,.14);position:relative;cursor:pointer;flex:none}
+.switch::after{content:"";position:absolute;top:2.5px;left:2.5px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.switch.on{background:var(--accent)}
+.switch.on::after{left:17.5px}
+.cc-stats{display:flex;gap:30px;margin:16px 0 15px;padding:12px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.cc-stats div b{display:block;font-size:18px;font-weight:650;font-family:var(--mono)}
+.cc-stats div span{font-size:11px;color:var(--ink-3)}
+
+/* 客户端详情 */
+.cd-head{display:flex;align-items:center;gap:16px;padding:18px 0;margin-bottom:8px;border-bottom:1px solid var(--hair)}
+.cd-head h1{font-size:24px;font-weight:680;font-family:var(--mono);letter-spacing:-.02em}
+.cd-head .actions{margin-left:auto;display:flex;gap:9px}
+.subtabs{display:flex;gap:2px;margin:22px 0 4px;border-bottom:1px solid var(--hair)}
+.subtabs button{padding:10px 16px;font-size:13px;color:var(--ink-3);border-bottom:2px solid transparent;margin-bottom:-1px}
+.subtabs button.on{color:#fff;font-weight:600;border-bottom-color:var(--accent)}
+
+/* 图表装饰 */
+.chartwrap{margin-top:36px}
+.chartwrap h3,.feed h3{font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:16px}
+.duo{display:grid;grid-template-columns:1fr 350px;gap:56px}
+.feed{border-left:1px solid var(--hair);padding-left:30px}
+.feed-item{position:relative;padding:0 0 20px 20px}
+.feed-item::before{content:"";position:absolute;left:3px;top:6px;width:6px;height:6px;border-radius:50%;background:var(--ink-3)}
+.feed-item.ok::before{background:var(--ok);box-shadow:var(--glow-ok)}
+.feed-item.bad::before{background:var(--bad);box-shadow:var(--glow-bad)}
+.feed-item::after{content:"";position:absolute;left:5.5px;top:16px;bottom:-2px;width:1px;background:var(--hair)}
+.feed-item:last-child::after{display:none}
+.feed-item .f-t{font-size:10.5px;color:var(--ink-3);font-family:var(--mono)}
+.feed-item .f-n{font-size:12.5px;color:var(--ink-2);margin-top:1px}
+.chartbox svg{width:100%;height:200px;display:block}
+.dot-live{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:var(--glow-ok);display:inline-block}
+</style>
+</head>
+<body>
+
+<div class="banner">
+  <span class="tag">设计稿 v3 · 仅供评审</span>
+  <span><b>重构要点：</b>① 消息/死信合并为统一消息页（状态分段器，切到死信出现批量操作）② 顶栏全局客户端选择器 ③ 列表行统一规格（顺序键芯片 + 同键阻塞提示）④ 客户端点进详情页，复用统一列表</span>
+</div>
+
+<div class="topbar">
+  <div class="brand" onclick="go('cockpit')">
+    <div class="brand-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg></div>
+    <b>Linkora</b>
+  </div>
+  <nav class="tabs">
+    <a class="on" data-v="cockpit" onclick="go('cockpit')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>驾驶舱</a>
+    <a data-v="messages" onclick="go('messages')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>消息</a>
+    <a data-v="clients" onclick="go('clients')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>客户端</a>
+  </nav>
+  <div class="top-right">
+    <div class="cswitch" onclick="cycleClient()" title="全局客户端筛选（作用于消息页）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      客户端：<b id="csLabel">全部</b>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <button class="btn-ghost btn btn-sm"><kbd>⌘K</kbd></button>
+  </div>
+</div>
+
+<!-- ══════════ 驾驶舱 ══════════ -->
+<div class="page on" id="p-cockpit">
+  <div class="page-head">
+    <div><h1>驾驶舱</h1><p class="desc">全局健康度 · 需要人工介入的事项优先呈现（本页不受客户端筛选影响）</p></div>
+    <div class="note"><b>设计说明</b>：驾驶舱职责是"一眼看全局"，顶栏客户端选择器只作用于消息页；待办工单新增顺序键芯片与同键阻塞提示。</div>
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="m-lbl"><i style="background:var(--ok);box-shadow:var(--glow-ok)"></i>在线客户端</div><div class="m-val">3<small> / 5</small></div><div class="m-sub">共 5 个注册客户端</div></div>
+    <div class="metric"><div class="m-lbl"><i style="background:var(--warn);box-shadow:var(--glow-warn)"></i>未完成投递</div><div class="m-val">6</div><div class="m-sub">全部客户端合计</div></div>
+    <div class="metric"><div class="m-lbl"><i style="background:var(--bad);box-shadow:var(--glow-bad)"></i>死信</div><div class="m-val">2</div><div class="m-sub" style="color:var(--bad)">需人工处置</div></div>
+    <div class="metric"><div class="m-lbl"><i style="background:var(--accent);box-shadow:0 0 9px rgba(139,124,248,.5)"></i>今日发布</div><div class="m-val">10</div><div class="m-sub">10-24</div></div>
+  </div>
+
+  <div style="display:flex;align-items:baseline;gap:12px;margin:30px 0 4px">
+    <h2 style="font-size:16.5px;font-weight:650">需要你处理</h2><span class="mono" style="font-size:12px;color:var(--ink-3)">3 项</span>
+    <span style="margin-left:auto;font-size:12.5px;color:var(--accent);cursor:pointer" onclick="go('messages');setSeg('dead')">进入消息页死信视图 →</span>
+  </div>
+  <div class="rows">
+    <div class="row">
+      <div class="r-ico bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="r-main">
+        <div class="r-title"><span class="mid">msg-2026-0-4</span><span class="type">BIZ</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg>store-002-seq</span><span class="chip block">同键阻塞 2 条</span></div>
+        <div class="r-sub"><span class="mono">store-002</span><span>目标状态不可达 MAX_RETRY</span><span>重试 5 次</span></div>
+      </div>
+      <span class="r-time">09:42</span>
+      <div class="r-acts"><button class="btn btn-ghost btn-sm">详情</button><button class="btn btn-tint btn-sm">重放</button></div>
+    </div>
+    <div class="row">
+      <div class="r-ico bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="r-main">
+        <div class="r-title"><span class="mid">msg-2026-0-7</span><span class="type">SYNC</span><span class="chip block">同键阻塞 1 条</span></div>
+        <div class="r-sub"><span class="mono">kiosk-001</span><span>存储写入失败 STORAGE_ERROR（无顺序键，不影响其他消息）</span><span>重试 5 次</span></div>
+      </div>
+      <span class="r-time">09:28</span>
+      <div class="r-acts"><button class="btn btn-ghost btn-sm">详情</button><button class="btn btn-tint btn-sm">重放</button></div>
+    </div>
+    <div class="row">
+      <div class="r-ico warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></div>
+      <div class="r-main">
+        <div class="r-title"><span class="mid">msg-2026-0-1</span><span class="type">BIZ</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg>store-002-seq</span></div>
+        <div class="r-sub"><span class="mono">store-002</span><span>客户端处理异常 STOCK_LOCK_TIMEOUT，等待下次补发</span><span>重试 2 次</span></div>
+      </div>
+      <span class="r-time">09:12</span>
+      <div class="r-acts"><button class="btn btn-ghost btn-sm">详情</button><button class="btn btn-outline btn-sm">跳过</button></div>
+    </div>
+  </div>
+
+  <div class="duo">
+    <div class="chartwrap">
+      <h3>近 7 日发布量</h3>
+      <div class="chartbox"><svg viewBox="0 0 760 200" preserveAspectRatio="none">
+        <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8B7CF8" stop-opacity=".28"/><stop offset="100%" stop-color="#8B7CF8" stop-opacity="0"/></linearGradient></defs>
+        <path d="M10 150 L130 120 L250 165 L370 90 L490 110 L610 60 L750 78 L750 178 L10 178 Z" fill="url(#ag)"/>
+        <path d="M10 150 L130 120 L250 165 L370 90 L490 110 L610 60 L750 78" fill="none" stroke="#8B7CF8" stroke-width="2" stroke-linecap="round" style="filter:drop-shadow(0 0 7px rgba(139,124,248,.45))"/>
+        <circle cx="750" cy="78" r="3.5" fill="#0B0C12" stroke="#8B7CF8" stroke-width="2"/>
+        <circle cx="610" cy="60" r="3.5" fill="#0B0C12" stroke="#8B7CF8" stroke-width="2"/>
+        <circle cx="490" cy="110" r="3.5" fill="#0B0C12" stroke="#8B7CF8" stroke-width="2"/>
+      </svg></div>
+      <div style="display:flex;justify-content:space-around;font-size:10.5px;color:var(--ink-3);font-family:var(--mono);margin-top:8px"><span>10-18</span><span>10-19</span><span>10-20</span><span>10-21</span><span>10-22</span><span>10-23</span><span>今日</span></div>
+    </div>
+    <div class="feed">
+      <h3>最近动态</h3>
+      <div class="feed-item ok"><div class="f-t">09:44:02</div><div class="f-n">BIZ · …-0388 → store-001 已送达</div></div>
+      <div class="feed-item bad"><div class="f-t">09:42:31</div><div class="f-n">BIZ · …-0391 → store-002 进入死信</div></div>
+      <div class="feed-item ok"><div class="f-t">09:31:02</div><div class="f-n">NOTICE · …-0388 → store-003 已确认</div></div>
+      <div class="feed-item warn"><div class="f-t">09:12:44</div><div class="f-n">BIZ · …-0001 → store-002 第 2 次重试</div></div>
+      <div class="feed-item ok"><div class="f-t">08:59:10</div><div class="f-n">SYNC · …-0005 → kiosk-001 已送达</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 统一消息页 ══════════ -->
+<div class="page" id="p-messages">
+  <div class="page-head">
+    <div><h1>消息</h1><p class="desc">一个列表看所有状态 · 点「死信」段进入处置视图（批量操作随之出现）· 受顶栏客户端筛选影响</p></div>
+    <div class="note"><b>设计说明</b>：原「死信处置」页合并于此——同组件、同列表风格，仅是状态过滤预设；顺序键以芯片常驻行内，无 key 的消息不占位。</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px">
+    <div class="seg" id="seg">
+      <button class="on" onclick="setSeg('all')">全部<span class="n">64</span></button>
+      <button onclick="setSeg('run')">进行中<span class="n">6</span></button>
+      <button class="dead" onclick="setSeg('dead')">死信<span class="n">2</span></button>
+      <button onclick="setSeg('done')">已完成<span class="n">55</span></button>
+      <button onclick="setSeg('expired')">已过期<span class="n">1</span></button>
+    </div>
+    <input class="search" placeholder="搜索消息 ID / 顺序键…" style="padding:8px 13px;border:1px solid var(--hair-2);border-radius:9px;background:rgba(255,255,255,.03);color:var(--ink);width:230px;outline:none;font-family:var(--font);font-size:13px">
+    <span style="flex:1"></span>
+    <span class="pill mut" id="csScope" style="font-size:11.5px"><i></i>范围：全部客户端</span>
+  </div>
+  <div class="batchbar" id="batchbar">
+    <span>死信处置模式 · 勾选或多选后批量操作，操作需填原因留痕</span>
+    <span class="spacer"></span>
+    <button class="btn btn-outline btn-sm">通用状态变更</button>
+    <button class="btn btn-danger-tint btn-sm">批量跳过（2）</button>
+  </div>
+  <div class="rows" id="msgList"></div>
+  <div style="display:flex;justify-content:center;gap:10px;margin-top:18px">
+    <button class="btn btn-ghost btn-sm">‹ 上一页</button>
+    <span class="num weak" style="align-self:center">第 1 页</span>
+    <button class="btn btn-ghost btn-sm">下一页 ›</button>
+  </div>
+</div>
+
+<!-- ══════════ 客户端 ══════════ -->
+<div class="page" id="p-clients">
+  <div class="page-head">
+    <div><h1>客户端</h1><p class="desc">点卡片进入客户端详情（指标 / 远程指令 / 该客户端的消息，复用统一列表）</p></div>
+    <div class="note"><b>设计说明</b>：客户端从"卡片即终点"升级为"卡片是入口"，点进详情后所有信息以客户端为维度组织。</div>
+  </div>
+  <div class="client-grid">
+    <div class="client-card" onclick="go('clientDetail')">
+      <div class="cc-top"><div class="avatar">01</div>
+        <div><h4>store-001</h4><div class="weak num">注册于 2026-07-26</div></div>
+        <div class="switch on"></div></div>
+      <div class="cc-stats">
+        <div><b style="color:var(--ok);text-shadow:0 0 12px rgba(52,211,153,.5)">在线</b><span>连接 1</span></div>
+        <div><b class="num">2</b><span>未完成</span></div>
+        <div><b class="num" style="color:var(--bad)">1</b><span>死信</span></div></div>
+    </div>
+    <div class="client-card" onclick="go('clientDetail')">
+      <div class="cc-top"><div class="avatar">02</div>
+        <div><h4>store-002</h4><div class="weak num">注册于 2026-07-26</div></div>
+        <div class="switch on"></div></div>
+      <div class="cc-stats">
+        <div><b style="color:var(--ok);text-shadow:0 0 12px rgba(52,211,153,.5)">在线</b><span>连接 1</span></div>
+        <div><b class="num" style="color:var(--warn)">4</b><span>未完成</span></div>
+        <div><b class="num" style="color:var(--bad)">1</b><span>死信</span></div></div>
+    </div>
+    <div class="client-card" onclick="go('clientDetail')">
+      <div class="cc-top"><div class="avatar">03</div>
+        <div><h4>store-003</h4><div class="weak num">注册于 2026-08-14</div></div>
+        <div class="switch on"></div></div>
+      <div class="cc-stats">
+        <div><b style="color:var(--ok);text-shadow:0 0 12px rgba(52,211,153,.5)">在线</b><span>连接 1</span></div>
+        <div><b class="num">0</b><span>未完成</span></div>
+        <div><b class="num">0</b><span>死信</span></div></div>
+    </div>
+    <div class="client-card" onclick="go('clientDetail')">
+      <div class="cc-top"><div class="avatar">02</div>
+        <div><h4>kiosk-002</h4><div class="weak num">注册于 2026-09-02</div></div>
+        <div class="switch"></div></div>
+      <div class="cc-stats">
+        <div><b style="color:var(--mut)">已禁用</b><span>连接 0</span></div>
+        <div><b class="num">0</b><span>未完成</span></div>
+        <div><b class="num">0</b><span>死信</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ 客户端详情 ══════════ -->
+<div class="page" id="p-clientDetail">
+  <div class="crumb" onclick="go('clients')">← 返回客户端列表</div>
+  <div class="cd-head">
+    <div class="avatar" style="width:46px;height:46px;font-size:15px">02</div>
+    <div>
+      <h1>store-002</h1>
+      <div class="weak num">注册于 2026-07-26 · 本页所有数据按该客户端过滤</div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-outline btn-sm">PING</button>
+      <button class="btn btn-outline btn-sm">QUERY_OUTBOX</button>
+      <button class="btn btn-outline btn-sm">断开连接</button>
+      <div class="switch on" style="margin-left:4px"></div>
+    </div>
+  </div>
+  <div class="metrics" style="margin-top:18px">
+    <div class="metric"><div class="m-lbl"><i style="background:var(--ok);box-shadow:var(--glow-ok)"></i>连接状态</div><div class="m-val" style="font-size:26px">在线</div><div class="m-sub">1 个活动连接</div></div>
+    <div class="metric"><div class="m-lbl"><i style="background:var(--warn);box-shadow:var(--glow-warn)"></i>未完成</div><div class="m-val">4</div><div class="m-sub">含重试 1 · 死信 1</div></div>
+    <div class="metric"><div class="m-lbl"><i style="background:var(--bad);box-shadow:var(--glow-bad)"></i>死信</div><div class="m-val">1</div><div class="m-sub">需人工处置</div></div>
+    <div class="metric"><div class="m-lbl"><i style="background:var(--accent);box-shadow:0 0 9px rgba(139,124,248,.5)"></i>近 7 日接收</div><div class="m-val">18</div><div class="m-sub">全部已确认 16 条</div></div>
+  </div>
+  <div class="subtabs">
+    <button class="on">该客户端的消息</button>
+    <button>未完成明细</button>
+    <button>远程指令</button>
+  </div>
+  <div class="seg" style="margin:16px 0 6px" id="seg2">
+    <button class="on" onclick="setSeg2('all')">全部<span class="n">18</span></button>
+    <button class="dead" onclick="setSeg2('dead')">死信<span class="n">1</span></button>
+    <button onclick="setSeg2('done')">已完成<span class="n">16</span></button>
+    <button onclick="setSeg2('run')">进行中<span class="n">1</span></button>
+  </div>
+  <div class="rows" id="cdList"></div>
+  <div class="note" style="margin-top:22px;max-width:none"><b>设计说明</b>：客户端详情页复用统一消息列表组件（固定 clientId），远程指令从未完成明细中独立成页签；顶栏客户端选择器与面包屑联动。</div>
+</div>
+
+<script>
+"use strict";
+function go(v){
+  var pages=document.querySelectorAll(".page");
+  for(var i=0;i<pages.length;i++)pages[i].classList.remove("on");
+  document.getElementById("p-"+v).classList.add("on");
+  var links=document.querySelectorAll(".tabs a");
+  for(var j=0;j<links.length;j++)links[j].classList.toggle("on",links[j].dataset.v===v);
+  window.scrollTo(0,0);
+}
+/* 顶栏客户端选择器（演示：循环切换） */
+var clients=["全部","store-001","store-002","store-003","kiosk-001"],ci=0;
+function cycleClient(){
+  ci=(ci+1)%clients.length;
+  document.getElementById("csLabel").textContent=clients[ci];
+  document.getElementById("csScope").innerHTML="<i></i>范围："+(clients[ci]==="全部"?"全部客户端":clients[ci]);
+  renderMsgs();renderCd();
+}
+/* 消息分段器 */
+var SEGS={
+ all:[["msg-2026-0-7","SYNC","kiosk-001","bad","存储写入失败 STORAGE_ERROR","5",null,0,"09:28"],
+      ["msg-2026-0-4","BIZ","store-002","bad","目标状态不可达 MAX_RETRY","5","store-002-seq",2,"09:42"],
+      ["msg-2026-0-1","BIZ","store-002","warn","STOCK_LOCK_TIMEOUT 等待补发","2","store-002-seq",0,"09:12"],
+      ["msg-2026-0-8","NOTICE","store-001","ok","全部已确认","0","store-001-seq",0,"08:59"],
+      ["msg-2026-1-3","SYNC","kiosk-001","ok","全部已确认","0",null,0,"昨日 22:04"],
+      ["msg-2026-1-0","BIZ","store-003","mut","已过期未送达","0",null,0,"昨日 18:00"]],
+ run:[["msg-2026-0-1","BIZ","store-002","warn","STOCK_LOCK_TIMEOUT 等待补发","2","store-002-seq",0,"09:12"]],
+ dead:[["msg-2026-0-4","BIZ","store-002","bad","目标状态不可达 MAX_RETRY","5","store-002-seq",2,"09:42"],
+       ["msg-2026-0-7","SYNC","kiosk-001","bad","存储写入失败 STORAGE_ERROR","5",null,0,"09:28"]],
+ done:[["msg-2026-1-3","SYNC","kiosk-001","ok","全部已确认","0",null,0,"昨日 22:04"],
+       ["msg-2026-0-8","NOTICE","store-001","ok","全部已确认","0","store-001-seq",0,"08:59"]],
+ expired:[["msg-2026-1-0","BIZ","store-003","mut","已过期未送达","0",null,0,"昨日 18:00"]]
+};
+var ICONS={
+ bad:'<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+ warn:'<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+ ok:'<polyline points="20 6 9 17 4 12"/>',
+ mut:'<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/>'
+};
+function rowHtml(m,acts){
+  var chip=m[6]?'<span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg>'+m[6]+'</span>':"";
+  var block=m[7]?'<span class="chip block">同键阻塞 '+m[7]+' 条</span>':"";
+  var stateName={bad:"死信",warn:"重试中",ok:"已完成",mut:"已过期"}[m[3]];
+  return '<div class="row"><div class="r-ico '+m[3]+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'+ICONS[m[3]]+'</svg></div>'
+    +'<div class="r-main"><div class="r-title"><span class="mid">'+m[0]+'</span><span class="type">'+m[1]+'</span>'+chip+block+'</div>'
+    +'<div class="r-sub"><span class="mono">'+m[2]+'</span><span>'+stateName+' · '+m[4]+'</span><span>重试 '+m[5]+' 次</span></div></div>'
+    +'<span class="r-time">'+m[8]+'</span>'
+    +(acts?'<div class="r-acts"><button class="btn btn-ghost btn-sm">详情</button>'
+      +(m[3]==="bad"?'<button class="btn btn-tint btn-sm">重放</button><button class="btn btn-danger-tint btn-sm">跳过</button>':"")
+      +(m[3]==="warn"?'<button class="btn btn-outline btn-sm">跳过</button>':"")+'</div>':"")
+    +'</div>';
+}
+function renderMsgs(){
+  var seg=document.getElementById("seg").querySelector(".on").textContent.replace(/\d+/g,"").trim();
+  var key={全部:"all",进行中:"run",死信:"dead",已完成:"done",已过期:"expired"}[seg];
+  var list=SEGS[key].filter(function(m){return clients[ci]==="全部"||m[2]===clients[ci];});
+  document.getElementById("msgList").innerHTML=list.length?list.map(function(m){
+    return rowHtml(m,key==="dead");
+  }).join(""):'<div class="empty" style="padding:50px 0;text-align:center;color:var(--ink-3)">该客户端在此状态下没有消息</div>';
+  document.getElementById("batchbar").classList.toggle("on",key==="dead");
+}
+function setSeg(s){
+  var btns=document.querySelectorAll("#seg button");
+  for(var i=0;i<btns.length;i++){
+    var k={all:"全部",run:"进行中",dead:"死信",done:"已完成",expired:"已过期"}[s];
+    btns[i].classList.toggle("on",btns[i].textContent.replace(/\d+/g,"").trim()===k);
+  }
+  renderMsgs();
+}
+/* 客户端详情列表 */
+function renderCd(){
+  var c=clients[ci];
+  var list=SEGS.all.filter(function(m){return c==="全部"?true:m[2]===c;});
+  var shown=c==="全部"?SEGS.all.slice(0,4):list;
+  document.getElementById("cdList").innerHTML=shown.length?shown.map(function(m){return rowHtml(m,false);}).join("")
+    :'<div class="empty" style="padding:50px 0;text-align:center;color:var(--ink-3)">该客户端暂无消息</div>';
+}
+function setSeg2(s){
+  var btns=document.querySelectorAll("#seg2 button");
+  for(var i=0;i<btns.length;i++){
+    var k={all:"全部",dead:"死信",done:"已完成",run:"进行中"}[s];
+    btns[i].classList.toggle("on",btns[i].textContent.replace(/\d+/g,"").trim()===k);
+  }
+}
+renderMsgs();renderCd();
+</script>
+</body>
+</html>
