@@ -177,14 +177,29 @@ tbody tr.rowlink:hover{background:var(--raised)}
 .detail-rows.on{display:block}
 footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)}
 
-/* ───── 抽屉 ───── */
-.mask{position:fixed;inset:0;background:rgba(4,4,6,.62);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:opacity .22s;z-index:40}
-.mask.on{opacity:1;pointer-events:auto}
-.drawer{position:fixed;top:0;right:-490px;width:470px;max-width:94vw;height:100vh;background:#0D0D10;border-left:1px solid var(--hair-2);box-shadow:var(--shadow-lift);transition:right .28s cubic-bezier(.3,.9,.3,1);z-index:45;display:flex;flex-direction:column}
-.drawer.on{right:0}
-.drawer-head{padding:22px 26px 16px;border-bottom:1px solid var(--hair)}
-.drawer-head h3{font-size:14.5px;font-weight:600;font-family:var(--mono);color:#fff}
-.drawer-body{flex:1;overflow-y:auto;padding:22px 26px 32px}
+/* ───── 消息主从双栏 ───── */
+.msg-split{display:grid;grid-template-columns:400px 1fr;gap:44px;align-items:start}
+.vstack{flex-direction:column;align-items:stretch;gap:9px}
+.mlist{margin-top:4px}
+.mrow{padding:13px 14px;border-bottom:1px solid var(--hair);border-radius:10px;cursor:pointer;transition:background .13s}
+.mrow:hover{background:var(--raised)}
+.mrow.sel{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border)}
+.mrow-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.mrow-top .mid{font-family:var(--mono);font-size:12.5px;color:var(--accent)}
+.mrow-sub{margin-top:3px;font-size:12px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow-sub .mono{color:var(--ink-3)}
+.msg-detail{position:sticky;top:86px;max-height:calc(100vh - 130px);overflow-y:auto;border-left:1px solid var(--hair);padding-left:36px;min-height:420px}
+.md-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px}
+.md-head h3{font-size:14.5px;font-weight:600;font-family:var(--mono);color:#fff}
+.md-close{display:none;margin-left:auto}
+@media (max-width:1100px){
+  .msg-split{grid-template-columns:1fr}
+  .msg-detail{position:fixed;inset:0;z-index:45;background:#0D0D10;padding:22px 26px;max-height:none;border-left:none;transform:translateX(100%);transition:transform .28s cubic-bezier(.3,.9,.3,1);min-height:0}
+  .msg-detail.on{transform:none}
+  .md-close{display:flex}
+}
+
+/* ───── 详情内容组件 ───── */
 .kv{display:grid;grid-template-columns:88px 1fr;gap:8px 12px;font-size:13px;margin-bottom:22px}
 .kv dt{color:var(--ink-3)}.kv dd{color:var(--ink)}
 .sect-lbl{font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.12em;margin:24px 0 10px;display:flex;align-items:center;gap:8px}
@@ -235,12 +250,28 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 .k-item .k-hint{margin-left:auto;font-size:11px;color:var(--ink-3);font-family:var(--mono)}
 .k-empty{padding:24px;text-align:center;color:var(--ink-3);font-size:13px}
 
-/* ───── 登录 ───── */
-#login{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:50}
+/* ───── 登录：左右分栏 ───── */
+#login{position:fixed;inset:0;display:none;z-index:50}
 #login.on{display:flex}
-#login .aurora::before,#login .aurora::after{content:"";position:absolute;width:560px;height:560px;border-radius:50%;filter:blur(150px);opacity:.15}
-#login .aurora::before{background:#8B7CF8;top:-180px;left:10%}
-#login .aurora::after{background:#4CC3F7;bottom:-200px;right:8%}
+.login-side{flex:1;position:relative;display:flex;align-items:center;padding:0 7%;overflow:hidden;border-right:1px solid var(--hair)}
+.aurora-blob{position:absolute;width:520px;height:520px;border-radius:50%;filter:blur(140px);opacity:.14;pointer-events:none}
+.b1{background:#8B7CF8;top:-160px;left:-60px;animation:drift1 18s ease-in-out infinite alternate}
+.b2{background:#4CC3F7;bottom:-200px;right:6%;animation:drift2 22s ease-in-out infinite alternate}
+@keyframes drift1{to{transform:translate(120px,80px) scale(1.15)}}
+@keyframes drift2{to{transform:translate(-100px,-60px) scale(1.1)}}
+.side-inner{position:relative;max-width:540px}
+.side-brand{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.side-brand .brand-mark{width:38px;height:38px;border-radius:11px}
+.side-brand b{font-size:17px;font-weight:650}
+.login-side h2{font-size:32px;font-weight:700;letter-spacing:-.025em;line-height:1.32;margin-bottom:26px}
+.feat{display:flex;align-items:center;gap:13px;padding:9px 0;color:var(--ink-2);font-size:13.5px}
+.f-ico{width:30px;height:30px;border-radius:9px;background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border);color:var(--accent);display:flex;align-items:center;justify-content:center;flex:none}
+.f-ico svg{width:14px;height:14px}
+.silhouette{display:flex;gap:40px;margin-top:46px;padding-top:26px;border-top:1px solid var(--hair)}
+.s-metric span{display:block;font-size:10.5px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
+.s-metric b{font-family:var(--mono);font-size:20px;font-weight:650;color:var(--ink-2)}
+.login-panel{width:460px;flex:none;display:flex;align-items:center;justify-content:center;padding:40px;background:rgba(255,255,255,.012)}
+@media (max-width:1100px){.login-side{display:none}.login-panel{width:100%;border-left:none}}
 .login-card{position:relative;width:392px;background:rgba(15,15,18,.85);backdrop-filter:blur(18px);border:1px solid var(--hair-2);border-radius:20px;box-shadow:var(--shadow-lift);padding:42px 36px 34px;text-align:center}
 .login-mark{width:56px;height:56px;border-radius:16px;background:var(--accent-grad);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;color:#14102E;box-shadow:0 8px 32px rgba(139,124,248,.4)}
 .login-card h1{font-size:20px;font-weight:650}
@@ -256,8 +287,8 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 .eye svg{width:15px;height:15px;display:block}
 @keyframes shakeX{0%,100%{transform:none}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
 .login-card.shake{animation:shakeX .38s}
-#dTitle{cursor:pointer;transition:color .15s}
-#dTitle:hover{color:var(--accent)}
+#mdTitle{cursor:pointer;transition:color .15s}
+#mdTitle:hover{color:var(--accent)}
 
 @media (max-width:1100px){.duo{grid-template-columns:1fr}.feed{border-left:none;padding-left:0}.client-grid{grid-template-columns:1fr}.metric{padding:0 26px}}
 </style>
@@ -265,8 +296,35 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 <body>
 
 <div id="login" class="on">
-  <div class="aurora"></div>
-  <div class="login-card">
+  <div class="login-side">
+    <div class="aurora-blob b1"></div><div class="aurora-blob b2"></div>
+    <div class="side-inner">
+      <div class="side-brand">
+        <div class="brand-mark"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg></div>
+        <b>Linkora</b>
+      </div>
+      <h2>面向线上服务与线下客户端的<br>可靠通信底座</h2>
+      <div class="feat">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></span>
+        先落库再推送，客户端断线自动补发，不丢消息
+      </div>
+      <div class="feat">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg></span>
+        顺序键严格保序，重放与重试零乱序
+      </div>
+      <div class="feat">
+        <span class="f-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+        死信兜底 + 工单流人工处置，全程留痕
+      </div>
+      <div class="silhouette">
+        <div class="s-metric"><span>在线客户端</span><b>3 / 5</b></div>
+        <div class="s-metric"><span>今日发布</span><b>1,284</b></div>
+        <div class="s-metric"><span>投递成功率</span><b>99.98%</b></div>
+      </div>
+    </div>
+  </div>
+  <div class="login-panel">
+    <div class="login-card">
     <div class="login-mark">
       <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg>
     </div>
@@ -281,6 +339,7 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
     <div class="login-err" id="loginErr"></div>
     <button class="btn btn-primary btn-block" onclick="doLogin()">进入控制台</button>
     <p class="login-tip">令牌由服务端 linkora.admin-console.token 配置</p>
+    </div>
   </div>
 </div>
 
@@ -344,20 +403,37 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
   <div class="page" id="v-messages">
     <div class="page-head">
       <h1>消息</h1>
-      <p class="desc">按条件检索全部上下行消息，点行查看完整 payload 与投递时间线</p>
+      <p class="desc">按条件检索全部上下行消息，点行在右侧查看完整 payload 与投递时间线</p>
     </div>
-    <div class="filterbar">
-      <input class="search" id="mSearch" placeholder="客户端 ID 精确筛选…" onkeydown="if(event.key==='Enter')loadMessages()">
-      <select id="mType"><option value="">全部类型</option><option>NOTICE</option><option>BIZ</option><option>SYNC</option><option>linkora.admin.result</option></select>
-      <input type="date" id="mBegin" onchange="loadMessages()">
-      <span style="flex:1"></span>
-      <button class="btn btn-ghost btn-sm" onclick="loadMessages()">查询</button>
-    </div>
-    <table><thead><tr><th>消息 ID</th><th>客户端</th><th>类型</th><th>顺序键</th><th>投递</th><th>发布时间</th></tr></thead>
-      <tbody id="msgRows"></tbody></table>
-    <div class="pager"><span class="num" id="mPageInfo"></span>
-      <button id="mPrev" onclick="pageMsgs(-1)">‹ 上一页</button>
-      <button id="mNext" onclick="pageMsgs(1)">下一页 ›</button>
+    <div class="msg-split">
+      <div class="msg-list">
+        <div class="filterbar vstack">
+          <input class="search" style="width:100%" id="mSearch" placeholder="客户端 ID 精确筛选…" onkeydown="if(event.key==='Enter')loadMessages()">
+          <select id="mType"><option value="">全部类型</option><option>NOTICE</option><option>BIZ</option><option>SYNC</option><option>linkora.admin.result</option></select>
+          <input type="date" id="mBegin" onchange="loadMessages()">
+          <button class="btn btn-ghost btn-sm" onclick="loadMessages()">查询</button>
+        </div>
+        <div id="msgRows" class="mlist"></div>
+        <div class="pager" style="justify-content:center">
+          <button id="mPrev" onclick="pageMsgs(-1)">‹ 上一页</button>
+          <span class="num" id="mPageInfo"></span>
+          <button id="mNext" onclick="pageMsgs(1)">下一页 ›</button>
+        </div>
+      </div>
+      <div class="msg-detail" id="msgDetail">
+        <div class="md-head">
+          <div><h3 class="mono" id="mdTitle" onclick="copyText(this.textContent)" title="点击复制">—</h3><span class="weak" id="mdSub"></span></div>
+          <button class="icon-btn md-close" onclick="closeMsgDetail()" title="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="mdBody">
+          <div class="empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <p>从左侧选择一条消息查看详情</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -385,17 +461,6 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
     <footer class="ver">Linkora Admin Console · v0.4.0 · 数据每 10 秒自动刷新</footer>
   </div>
 </div>
-
-<div class="mask" id="mask" onclick="closeAll()"></div>
-<aside class="drawer" id="drawer">
-  <div class="drawer-head">
-    <div><h3 id="dTitle">—</h3><span class="weak" id="dSub"></span></div>
-    <button class="icon-btn" style="margin-left:auto" onclick="closeAll()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-    </button>
-  </div>
-  <div class="drawer-body" id="dBody"></div>
-</aside>
 
 <div class="modal" id="modal">
   <div class="m-mask" onclick="closeModal()"></div>
@@ -604,7 +669,7 @@ function loadTasks(clients, pending, dead){
         + '<span>重试 ' + d.retryCount + ' 次 · 更新于 ' + esc(d.updatedAt || "—") + '</span></div>'
         + '</div>'
         + '<div class="t-acts">'
-        + '<button class="btn btn-ghost btn-sm" onclick="openMessage(\'' + esc(d.messageId) + '\')">详情</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="viewMessage(\'' + esc(d.messageId) + '\')">详情</button>'
         + (bad
           ? '<button class="btn btn-tint btn-sm" onclick="cockpitRetry(\'' + esc(t.clientId) + '\',\'' + esc(d.messageId) + '\')">重放</button>'
           : '<button class="btn btn-outline btn-sm" onclick="cockpitSkip(\'' + esc(t.clientId) + '\',\'' + esc(d.messageId) + '\')">跳过</button>')
@@ -679,30 +744,36 @@ function loadMessages(){
     + (clientId ? "&clientId=" + encodeURIComponent(clientId) : "")
     + (type ? "&type=" + encodeURIComponent(type) : "")
     + (begin ? "&begin=" + new Date(begin + "T00:00:00").getTime() : "");
-  rowSkeleton("msgRows", 6);
+  boxSkeleton("msgRows");
   api("api/messages" + q).then(function(list){
     list = list || [];
     document.getElementById("msgRows").innerHTML = list.length ? list.map(function(m){
-      return '<tr class="rowlink" onclick="openMessage(\'' + esc(m.messageId) + '\')">'
-        + '<td class="mono" style="color:var(--accent)">' + esc(m.messageId) + '</td>'
-        + '<td class="mono">' + esc(m.clientId) + '</td>'
-        + '<td>' + esc(m.messageType) + '</td>'
-        + '<td class="mono weak">' + esc(m.sequenceKey || "—") + '</td>'
-        + '<td class="num">' + esc(m.deliverySummary || "—") + '</td>'
-        + '<td class="weak num">' + esc(m.createdAt) + '</td></tr>';
-    }).join("") : '<tr><td colspan="6"><div class="empty"><p>没有符合条件的消息</p></div></td></tr>';
+      var sel = m.messageId === currentMsgId ? " sel" : "";
+      return '<div class="mrow' + sel + '" onclick="openMessage(\'' + esc(m.messageId) + '\')">'
+        + '<div class="mrow-top"><span class="mid">' + esc(m.messageId) + '</span>'
+        + '<span class="weak num">' + esc(m.createdAt) + '</span></div>'
+        + '<div class="mrow-sub">' + esc(m.messageType) + ' · <span class="mono">' + esc(m.clientId)
+        + '</span> · 投递 ' + esc(m.deliverySummary || "—") + '</div></div>';
+    }).join("") : '<div class="empty"><p>没有符合条件的消息</p></div>';
     document.getElementById("mPageInfo").textContent = "第 " + msgPage + " 页";
     document.getElementById("mPrev").disabled = msgPage <= 1;
     document.getElementById("mNext").disabled = list.length < 20;
   }).catch(showErr);
 }
+var currentMsgId = "";
 function openMessage(id){
-  document.getElementById("dTitle").textContent = id;
-  document.getElementById("dSub").textContent = "";
-  document.getElementById("dBody").innerHTML = '<div class="skeleton" style="width:80%"></div>';
-  openDrawer();
+  currentMsgId = id;
+  var rows = document.querySelectorAll("#msgRows .mrow");
+  for (var i = 0; i < rows.length; i++){
+    rows[i].classList.toggle("sel", rows[i].getAttribute("onclick").indexOf("'" + id + "'") >= 0);
+  }
+  document.getElementById("mdTitle").textContent = id;
+  document.getElementById("mdSub").textContent = "";
+  document.getElementById("mdBody").innerHTML = '<div class="skeleton" style="width:80%"></div>';
+  var detail = document.getElementById("msgDetail");
+  if (window.matchMedia("(max-width:1100px)").matches) detail.classList.add("on");
   api("api/messages/" + encodeURIComponent(id)).then(function(m){
-    document.getElementById("dSub").textContent = (m.messageType || "") + " · 发布于 " + (m.createdAt || "");
+    document.getElementById("mdSub").textContent = (m.messageType || "") + " · 发布于 " + (m.createdAt || "");
     var pretty = m.payload || "";
     if (pretty && pretty.indexOf("{") === 0){
       try { pretty = JSON.stringify(JSON.parse(pretty), null, 2); } catch (e) { /* 保持原文 */ }
@@ -715,10 +786,16 @@ function openMessage(id){
       + "<dt>大小</dt><dd class='num'>" + m.payloadSize + " 字节</dd></div>"
       + '<div class="sect-lbl">PAYLOAD</div><div class="codeblock">' + esc(pretty) + "</div>"
       + '<div class="sect-lbl">投递记录</div>' + deliveryTimeline(m.deliveries || []);
-    document.getElementById("dBody").innerHTML = html;
+    document.getElementById("mdBody").innerHTML = html;
   }).catch(function(e){
-    document.getElementById("dBody").innerHTML = '<div class="empty"><p>' + esc(e.error || "加载失败") + "</p></div>";
+    document.getElementById("mdBody").innerHTML = '<div class="empty"><p>' + esc(e.error || "加载失败") + "</p></div>";
   });
+}
+function viewMessage(id){ go("messages"); openMessage(id); }
+function closeMsgDetail(){
+  if (window.matchMedia("(max-width:1100px)").matches){
+    document.getElementById("msgDetail").classList.remove("on");
+  }
 }
 function deliveryTimeline(deliveries){
   if (!deliveries.length) return '<div class="empty"><p>无投递记录</p></div>';
@@ -765,7 +842,7 @@ function loadDead(){
           + '<span>重试 ' + d.retryCount + ' 次 · 更新于 ' + esc(d.updatedAt || "") + '</span></div>'
           + '</div>'
           + '<div class="t-acts">'
-          + '<button class="btn btn-ghost btn-sm" onclick="openMessage(\'' + esc(d.messageId) + '\')">详情</button>'
+          + '<button class="btn btn-ghost btn-sm" onclick="viewMessage(\'' + esc(d.messageId) + '\')">详情</button>'
           + '<button class="btn btn-tint btn-sm" onclick="deadRetry(\'' + esc(d.messageId) + '\')">重放</button>'
           + '<button class="btn btn-danger-tint btn-sm" onclick="deadSkip(\'' + esc(d.messageId) + '\')">跳过</button>'
           + '</div></div>';
@@ -943,7 +1020,7 @@ document.addEventListener("keydown", function(e){
     document.getElementById("cmdk").classList.contains("on") ? closeCmdk() : openCmdk();
     return;
   }
-  if (e.key === "Escape"){ closeCmdk(); closeAll(); closeModal(); return; }
+  if (e.key === "Escape"){ closeCmdk(); closeMsgDetail(); closeModal(); return; }
   var cmdkOn = document.getElementById("cmdk").classList.contains("on");
   if (cmdkOn && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter")){
     e.preventDefault();
@@ -956,15 +1033,7 @@ document.addEventListener("keydown", function(e){
   }
 });
 
-/* ═════════ 抽屉 / 弹窗 / Toast ═════════ */
-function openDrawer(){
-  document.getElementById("drawer").classList.add("on");
-  document.getElementById("mask").classList.add("on");
-}
-function closeAll(){
-  document.getElementById("drawer").classList.remove("on");
-  document.getElementById("mask").classList.remove("on");
-}
+/* ═════════ 弹窗 / Toast ═════════ */
 var confirmHandler = null, afterHandler = null;
 function confirmOp(title, desc, okLabel, handler, after){
   if (title !== null){
@@ -1003,7 +1072,7 @@ function copyText(s){
   catch (e) { toast("复制失败", "warn"); }
   document.body.removeChild(ta);
 }
-document.getElementById("dTitle").addEventListener("click", function(){
+document.getElementById("mdTitle").addEventListener("click", function(){
   var id = this.textContent;
   if (id && id !== "—") copyText(id);
 });
