@@ -47,7 +47,22 @@ public final class SpringMvcServerMain {
 
     public static void main(String[] args) throws Exception {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : 8081;
+        Tomcat tomcat = startServer(port);
 
+        System.out.println("========================================");
+        System.out.println("Linkora Spring MVC 示例已启动（内嵌 Tomcat）");
+        System.out.println("  业务接口 : http://127.0.0.1:" + port + "/api/orders /api/reviews");
+        System.out.println("  上行查询 : http://127.0.0.1:" + port + "/api/uplink/order-status-updates");
+        System.out.println("  SSE 下行 : http://127.0.0.1:" + port + "/events");
+        System.out.println("  消息上报 : http://127.0.0.1:" + port + "/messages");
+        System.out.println("  ACK 上报 : http://127.0.0.1:" + port + "/acks");
+        System.out.println("========================================");
+
+        Thread.currentThread().join();
+    }
+
+    /** 启动完整服务（内嵌 Tomcat + Spring 容器 + Linkora 三端点），返回已启动的 Tomcat 实例。 */
+    public static Tomcat startServer(int port) throws Exception {
         // 1. 搭建内嵌 Tomcat，拿到 ServletContext 后再刷新 Spring 容器
         //    （@EnableWebMvc 的 MVC 基础设施在 refresh 期就需要 ServletContext）
         Tomcat tomcat = new Tomcat();
@@ -94,17 +109,9 @@ public final class SpringMvcServerMain {
                         server.ackHttpHandler(), server.getMaxBodyBytes()),
                 "/acks");
         tomcat.start();
+        tomcat.start();
 
-        System.out.println("========================================");
-        System.out.println("Linkora Spring MVC 示例已启动（内嵌 Tomcat）");
-        System.out.println("  业务接口 : http://127.0.0.1:" + port + "/api/orders /api/reviews");
-        System.out.println("  上行查询 : http://127.0.0.1:" + port + "/api/uplink/order-status-updates");
-        System.out.println("  SSE 下行 : http://127.0.0.1:" + port + "/events");
-        System.out.println("  消息上报 : http://127.0.0.1:" + port + "/messages");
-        System.out.println("  ACK 上报 : http://127.0.0.1:" + port + "/acks");
-        System.out.println("========================================");
-
-        // 4. 优雅关闭：先停容器再关 Spring（容器销毁时 LinkoraServer.close()）
+        // 优雅关闭：先停容器再关 Spring（容器销毁时 LinkoraServer.close()）
         Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
             @Override
             public void run() {
@@ -117,8 +124,7 @@ public final class SpringMvcServerMain {
                 System.out.println("Linkora Spring MVC 示例已关闭");
             }
         }, "spring-mvc-demo-shutdown"));
-
-        Thread.currentThread().join();
+        return tomcat;
     }
 
     /** Tomcat 原生注册（asyncSupported 必须显式开，SSE 依赖异步）。 */

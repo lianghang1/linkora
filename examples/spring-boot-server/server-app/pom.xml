@@ -85,6 +85,24 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>2.22.2</version>
+                <configuration>
+                    <!-- spring-boot repackage 会把主 artifact 替换为 fat jar；
+                         显式指回 classes 目录，避免 failsafe 运行时 NoClassDefFoundError -->
+                    <classesDirectory>${project.build.outputDirectory}</classesDirectory>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 </project>

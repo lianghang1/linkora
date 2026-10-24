@@ -33,4 +33,23 @@
         <module>spring-tx-server</module>
         <module>tx-client</module>
     </modules>
+
+    <build>
+        <plugins>
+            <!-- 集成测试（*IT）在 verify 阶段运行；日常 mvn test 不受影响 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>2.22.2</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
