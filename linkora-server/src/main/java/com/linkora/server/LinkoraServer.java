@@ -80,6 +80,9 @@ public final class LinkoraServer {
             new ConcurrentHashMap<String, String>();
 
     private final AtomicBoolean running = new AtomicBoolean(false);
+    /** 保留期清理调度器：仅 retentionDays > 0 时创建；独立线程，避免清理 DELETE 占用编排线程。 */
+    private ScheduledExecutorService retentionScheduler;
+    private ScheduledFuture<?> retentionTask;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile ScheduledFuture<?> sweepTask;
 
@@ -179,7 +182,27 @@ public final class LinkoraServer {
                 coordinator.sweep();
             }
         }, config.getSweepIntervalMs(), config.getSweepIntervalMs(), TimeUnit.MILLISECONDS);
-        log.info("Linkora 服务端已启动（扫描周期 {} ms）", config.getSweepIntervalMs());
+        if (config.getRetentionDays() > 0) {
+            retentionScheduler = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+                private final AtomicInteger seq = new AtomicInteger(0);
+
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread t = new Thread(r, "linkora-retention-" + seq.incrementAndGet());
+                    t.setDaemon(true);
+                    return t;
+                }
+            });
+            retentionTask = retentionScheduler.scheduleWithFixedDelay(new Runnable() {
+                @Override
+                public void run() {
+                    runRetentionCleanup();
+                }
+            }, 60_000L, 24L * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
+        }
+        log.info("Linkora 服务端已启动（扫描周期 {} ms，数据保留 {} 天）",
+                config.getSweepIntervalMs(),
+                config.getRetentionDays() > 0 ? String.valueOf(config.getRetentionDays()) : "不限");
     }
 
     /** 优雅关闭：停止扫描、断开全部 SSE 连接、释放调度线程。幂等。 */
@@ -199,6 +222,9 @@ public final class LinkoraServer {
         }
         if (ownsScheduler) {
             scheduler.shutdownNow();
+        }
+        if (retentionScheduler != null) {
+            retentionScheduler.shutdownNow();
         }
         log.info("Linkora 服务端已关闭");
     }
@@ -765,6 +791,35 @@ public final class LinkoraServer {
     /** 每连接 SSE 出站队列字节水位（透传 ServerConfig，供宿主装配 Servlet 时使用）。 */
     public long getMaxOutboundBytesPerConnection() {
         return config.getMaxOutboundBytesPerConnection();
+    }
+
+    /**
+     * 立即执行一次保留期清理（也可由 retentionDays > 0 时的每日调度自动触发）。
+     * 清理范围与豁免规则见 {@code DeliveryRepository#cleanupRetained}：
+     * 仅删除已终态（PROCESSED/EXPIRED）且超期的记录；死信与非终态保留。
+     *
+     * @return 删除的总行数；retentionDays = 0（未启用）时返回 0
+     */
+    public int cleanupOnce() {
+        if (config.getRetentionDays() <= 0) {
+            return 0;
+        }
+        long cutoff = System.currentTimeMillis()
+                - config.getRetentionDays() * 24L * 60 * 60 * 1000L;
+        return deliveryRepository.cleanupRetained(cutoff);
+    }
+
+    private void runRetentionCleanup() {
+        try {
+            int removed = cleanupOnce();
+            if (removed > 0) {
+                log.info("保留期清理完成：删除 {} 行（保留期 {} 天）",
+                        removed, config.getRetentionDays());
+            }
+        } catch (RuntimeException e) {
+            // 清理失败不影响投递主链路，等待下一个周期重试
+            log.warn("保留期清理失败，将在下一周期重试", e);
+        }
     }
 
     /** SSE 连接注册表（接到 SsePushServlet；使用默认网关时非 null）。 */

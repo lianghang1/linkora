@@ -15,6 +15,7 @@ public final class ServerConfig {
     private final long pushPacingMaxMs;
     private final long messageSizeLimitBytes;
     private final long maxOutboundBytesPerConnection;
+    private final int retentionDays;
 
     private ServerConfig(Builder b) {
         this.pushBatchSize = b.pushBatchSize;
@@ -26,6 +27,7 @@ public final class ServerConfig {
         this.pushPacingMaxMs = b.pushPacingMaxMs;
         this.messageSizeLimitBytes = b.messageSizeLimitBytes;
         this.maxOutboundBytesPerConnection = b.maxOutboundBytesPerConnection;
+        this.retentionDays = b.retentionDays;
     }
 
     public static Builder builder() {
@@ -73,6 +75,11 @@ public final class ServerConfig {
         return maxOutboundBytesPerConnection;
     }
 
+    /** 数据保留天数：已终态且超期的记录被低频清理；0 = 不清理（默认）。 */
+    public int getRetentionDays() {
+        return retentionDays;
+    }
+
     public long getMessageSizeLimitBytes() {
         return messageSizeLimitBytes;
     }
@@ -99,6 +106,7 @@ public final class ServerConfig {
         private long pushPacingMaxMs = 60_000L;
         private long messageSizeLimitBytes = 1024 * 1024L;
         private long maxOutboundBytesPerConnection = 8L * 1024 * 1024;
+        private int retentionDays = 0;
 
         public Builder pushBatchSize(int pushBatchSize) {
             if (pushBatchSize < 1 || pushBatchSize > 10_000) {
@@ -161,6 +169,14 @@ public final class ServerConfig {
                 throw new IllegalArgumentException("maxOutboundBytesPerConnection 必须 > 0");
             }
             this.maxOutboundBytesPerConnection = maxOutboundBytesPerConnection;
+            return this;
+        }
+
+        public Builder retentionDays(int retentionDays) {
+            if (retentionDays < 0) {
+                throw new IllegalArgumentException("retentionDays 必须 >= 0（0 = 不清理）");
+            }
+            this.retentionDays = retentionDays;
             return this;
         }
 

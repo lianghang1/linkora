@@ -142,6 +142,9 @@ public class LinkoraServerAutoConfiguration {
         if (p.getMessageSizeLimitBytes() != null) {
             builder.messageSizeLimitBytes(p.getMessageSizeLimitBytes());
         }
+        if (p.getRetentionDays() != null) {
+            builder.retentionDays(p.getRetentionDays());
+        }
         return builder.build();
     }
 

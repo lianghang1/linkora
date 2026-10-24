@@ -66,6 +66,7 @@ context.addServlet(new ServletHolder(
 | `pushPacingBaseMs/MaxMs` | 5000 / 60000 | 在线客户端重推节奏（防风暴） |
 | `messageSizeLimitBytes` | 1MB | 上行 **HTTP body** 上限。原始 payload ≈ 该值 × 0.75（Base64 膨胀 4/3 + 信封开销），默认约 786KB |
 | `maxOutboundBytesPerConnection` | 8MB | 单连接 SSE 推送队列字节水位，超限主动断开慢客户端（见 reliability.md"推送写模型"） |
+| `retentionDays` | 0（不清理） | 数据保留天数：每日清理一次"已终态（PROCESSED/EXPIRED）且超期"的记录与不再被引用的消息正文；**死信与非终态记录一律豁免**。也可随时调 `cleanupOnce()` 手动触发 |
 
 ## 客户端部署
 

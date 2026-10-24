@@ -310,6 +310,66 @@ public class LinkoraServerTest {
     }
 
     @Test
+    public void cleanupOnceDisabledByDefault() {
+        assertEquals(0, server.cleanupOnce());
+    }
+
+    @Test
+    public void cleanupOnceRemovesExpiredTerminalAndExemptsDeadLetter() throws Exception {
+        java.sql.Connection c = dataSource.getConnection();
+        c.setAutoCommit(false);
+        c.commit();
+        c.close();
+
+        LinkoraServer cleaner = LinkoraServer.builder()
+                .clientAuthenticator(new AllowAllClientAuthenticator())
+                .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                .messageRepository(new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource))
+                .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                .pushGateway(gateway)
+                .config(com.linkora.server.ServerConfig.builder()
+                        .maxDeliveryRetries(1).retentionDays(1).build())
+                .build();
+        cleaner.start();
+        try {
+            // EXPIRED 终态（旧）：应被清理
+            PublishResult expired = cleaner.publish(CLIENT, "ORDER",
+                    "e".getBytes(StandardCharsets.UTF_8));
+            awaitPush(expired.getMessageId());
+            assertTrue(cleaner.forceTransition(CLIENT, expired.getMessageId(),
+                    MessageState.EXPIRED, "烟测过期"));
+            // 死信（旧）：豁免保留
+            PublishResult dead = cleaner.publish(CLIENT, "ORDER",
+                    "d".getBytes(StandardCharsets.UTF_8));
+            awaitPush(dead.getMessageId());
+            assertEquals(200, postAckOn(cleaner, dead.getMessageId(), "FAILED",
+                    "BIZ-9", "boom").getStatus());
+            assertEquals(MessageState.DEAD_LETTER, currentStateOn(cleaner, dead.getMessageId()));
+
+            // 把投递记录的 updated_at 与消息正文的 created_at 拨回 40 天前
+            java.sql.Statement st = dataSource.getConnection().createStatement();
+            st.executeUpdate("UPDATE lk_delivery SET updated_at = "
+                    + (System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000)
+                    + " WHERE message_id IN ('" + expired.getMessageId() + "', '"
+                    + dead.getMessageId() + "')");
+            st.executeUpdate("UPDATE lk_message SET created_at = "
+                    + (System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000)
+                    + " WHERE message_id = '" + expired.getMessageId() + "'");
+            st.close();
+
+            int removed = cleaner.cleanupOnce();
+            assertTrue("至少清理 1 条投递记录 + 1 条消息正文", removed >= 2);
+            assertEquals("超期消息应整体清理（投递记录 + 正文）",
+                    java.util.Optional.empty(), cleaner.getMessageStatus(expired.getMessageId()));
+            assertEquals("死信必须豁免", MessageState.DEAD_LETTER,
+                    currentStateOn(cleaner, dead.getMessageId()));
+        } finally {
+            cleaner.close();
+        }
+    }
+
+    @Test
     public void disconnectClientDelegatesToGateway() {
         gateway.connectedClients.set(1);
         assertEquals(1, server.disconnectClient(CLIENT));

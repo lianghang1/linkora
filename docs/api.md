@@ -36,6 +36,7 @@
 | `retryAllDeadLetters(clientId, limit)` | `int` | 批量重放死信，返回成功条数 |
 | `skipAllDeadLetters(clientId, limit)` | `int` | 批量跳过死信（全部 EXPIRED 留痕） |
 | `sweepOnce()` | `void` | 手动触发一轮补发扫描（运维/测试用） |
+| `cleanupOnce()` | `int` | 立即执行一次保留期清理（仅删除已终态且超期的记录，死信豁免）；返回删除行数；`retentionDays=0` 时返回 0 |
 
 **skipMessage 竞态边界（重要）**：skip 只保证"**之后**不再投递"，**无法撤回已经写出的
 在途推送帧**——若消息在跳过生效瞬间已被推给在线客户端（客户端照常处理，其 PROCESSED

@@ -209,6 +209,7 @@ linkora.client.db-path=data/client.db
 | `max-delivery-retries` | 10 | 投递重试上限，耗尽进死信 |
 | `message-size-limit-bytes` | 1MB | 上行 HTTP body 上限（对应原始 payload 约 786KB） |
 | `max-outbound-bytes-per-connection` | 8MB | 单连接推送队列水位，超限断开慢客户端 |
+| `retention-days` | 0（不清理） | 数据保留天数：每日清理已终态且超期的记录（死信豁免） |
 | `heartbeat-interval-ms` | 15000 | SSE 心跳间隔 |
 | `sweep-interval-ms` | 5000 | 补发扫描周期 |
 | `max-outbound-bytes-per-connection` | 8MB | 见 reliability.md"推送写模型" |
