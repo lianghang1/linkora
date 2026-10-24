@@ -113,4 +113,21 @@ public interface DeliveryRepository {
     default java.util.Map<String, Long> countByState() {
         return java.util.Collections.emptyMap();
     }
+
+    /**
+     * 清理保留期之外的记录：删除更新时间早于 cutoff 且已到终态
+     * （PROCESSED / EXPIRED）的投递记录，以及不再被任何投递记录引用、
+     * 创建时间早于 cutoff 的消息正文。
+     *
+     * <p>豁免：死信（DEAD_LETTER）与非终态记录一律保留——死信等待人工处置，
+     * 不得被自动清理。</p>
+     *
+     * <p>默认空实现（不清理），自实现仓储不升级不破坏编译。</p>
+     *
+     * @param cutoffEpochMs 保留期截止时间（epoch 毫秒），早于该时间的记录才会被清理
+     * @return 删除的总行数（投递记录 + 消息正文）
+     */
+    default int cleanupRetained(long cutoffEpochMs) {
+        return 0;
+    }
 }

@@ -47,6 +47,7 @@ public class LinkoraServerProperties {
     private Long pushPacingBaseMs;
     private Long pushPacingMaxMs;
     private Long messageSizeLimitBytes;
+    private Integer retentionDays;
 
     public boolean isEnabled() {
         return enabled;
@@ -182,5 +183,13 @@ public class LinkoraServerProperties {
 
     public void setMessageSizeLimitBytes(Long messageSizeLimitBytes) {
         this.messageSizeLimitBytes = messageSizeLimitBytes;
+    }
+
+    public Integer getRetentionDays() {
+        return retentionDays;
+    }
+
+    public void setRetentionDays(Integer retentionDays) {
+        this.retentionDays = retentionDays;
     }
 }

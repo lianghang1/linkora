@@ -43,6 +43,52 @@ public class JdbcServerStorageTest {
         return new DeliveryRecord(messageId, clientId, seq, state, 0, null, null, NOW, NOW);
     }
 
+    @Test
+    public void cleanupRetainedRemovesOnlyExpiredTerminalRecords() {
+        DataSource ds = freshH2("dlv-retention");
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(ds);
+        JdbcMessageRepository messages = new JdbcMessageRepository(ds);
+        long old = NOW - 40L * 24 * 60 * 60 * 1000;
+        long cutoff = NOW - 30L * 24 * 60 * 60 * 1000;
+
+        // 老 PROCESSED（含消息正文）→ 应删；老 EXPIRED → 应删
+        repo.init(new DeliveryRecord("old-ok", "c-1", 1, MessageState.PROCESSED, 0, null, null, old, old));
+        repo.init(new DeliveryRecord("old-exp", "c-1", 2, MessageState.EXPIRED, 0, null, null, old, old));
+        messages.save(message("old-ok", old));
+        messages.save(message("old-exp", old));
+        // 新 PROCESSED → 保留
+        repo.init(new DeliveryRecord("fresh-ok", "c-1", 3, MessageState.PROCESSED, 0, null, null, NOW, NOW));
+        // 老非终态（RETRYING）→ 保留
+        repo.init(new DeliveryRecord("retrying", "c-1", 4, MessageState.RETRYING, 0, null, null, old, old));
+        // 老死信 → 豁免保留
+        repo.init(new DeliveryRecord("dead-1", "c-1", 5, MessageState.DEAD_LETTER, 0, null, null, old, old));
+        // 老上行消息（无投递记录）→ 应删；新上行 → 保留
+        messages.save(message("uplink-old", old));
+        messages.save(message("uplink-new", NOW));
+
+        // 删除行数：2 条投递记录 + 3 条消息正文（old-ok / old-exp / uplink-old）
+        int removed = repo.cleanupRetained(cutoff);
+        assertEquals(5, removed);
+
+        assertFalse(messages.findByMessageId("old-ok").isPresent());
+        assertFalse(messages.findByMessageId("old-exp").isPresent());
+        assertFalse(messages.findByMessageId("uplink-old").isPresent());
+        assertTrue(messages.findByMessageId("uplink-new").isPresent());
+
+        List<DeliveryRecord> dead = repo.findDeadLetters("c-1", 10);
+        assertEquals("死信必须豁免清理", 1, dead.size());
+        assertEquals("dead-1", dead.get(0).getMessageId());
+
+        List<DeliveryRecord> unsettled = repo.findUnsettled("c-1", 10);
+        assertEquals("非终态记录（含死信）必须保留", 2, unsettled.size());
+    }
+
+    private static com.linkora.core.message.LinkoraMessage message(String messageId, long createdAt) {
+        return com.linkora.core.message.LinkoraMessage.builder()
+                .messageId(messageId).clientId("c-1").messageType("T")
+                .payload("p").createdAt(createdAt).build();
+    }
+
     // ---------------- schema 迁移 ----------------
 
     @Test

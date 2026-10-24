@@ -3,8 +3,13 @@ package com.linkora.server.storage.jdbc;
 import com.linkora.core.message.LinkoraMessage;
 import com.linkora.core.message.MessageState;
 import com.linkora.core.storage.server.ClientRegistration;
+import com.linkora.core.storage.server.DeliveryRecord;
+import org.junit.Assert;
 import org.junit.Assume;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -114,6 +119,47 @@ public class JdbcServerStorageMySqlIT {
         cleanSchema(ds);
         JdbcServerSchema.migrate(ds);
         return ds;
+    }
+
+    // ---------------- 保留期清理 ----------------
+
+    @Test
+    public void retentionCleanupOnMySql() throws Exception {
+        Assume.assumeTrue(enabled());
+        DataSource ds = freshMySql();
+        JdbcDeliveryRepository repo = new JdbcDeliveryRepository(ds);
+        JdbcMessageRepository messages = new JdbcMessageRepository(ds);
+        long old = System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000;
+        long cutoff = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000;
+
+        repo.init(new DeliveryRecord("old-ok", "c-1", 1, MessageState.PROCESSED, 0, null, null, old, old));
+        repo.init(new DeliveryRecord("old-exp", "c-1", 2, MessageState.EXPIRED, 0, null, null, old, old));
+        repo.init(new DeliveryRecord("dead-1", "c-1", 3, MessageState.DEAD_LETTER, 0, null, null, old, old));
+        repo.init(new DeliveryRecord("fresh-ok", "c-1", 4, MessageState.PROCESSED, 0, null, null,
+                System.currentTimeMillis(), System.currentTimeMillis()));
+        for (String id : new String[]{"old-ok", "old-exp", "uplink-old"}) {
+            messages.save(LinkoraMessage.builder()
+                    .messageId(id).clientId("c-1").messageType("T")
+                    .payload("p").createdAt(old).build());
+        }
+        messages.save(LinkoraMessage.builder()
+                .messageId("uplink-new").clientId("c-1").messageType("T")
+                .payload("p").createdAt(System.currentTimeMillis()).build());
+
+        int removed = repo.cleanupRetained(cutoff);
+        // 2 条投递记录 + 3 条消息正文（old-ok / old-exp / uplink-old）
+        assertEquals(5, removed);
+
+        assertTrue("超期消息正文应被删除",
+                !messages.findByMessageId("old-ok").isPresent());
+        assertTrue("新上行消息应保留",
+                messages.findByMessageId("uplink-new").isPresent());
+        // 死信豁免
+        boolean deadKept = false;
+        for (DeliveryRecord d : repo.findDeadLetters("c-1", 10)) {
+            deadKept |= "dead-1".equals(d.getMessageId());
+        }
+        assertTrue("死信必须豁免清理", deadKept);
     }
 
     // ---------------- 迁移 ----------------

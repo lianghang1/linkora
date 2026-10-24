@@ -402,6 +402,91 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
         }
     }
 
+    /** 单批清理的行数上限：控制单条 DELETE 规模，避免长事务与锁放大。 */
+    private static final int CLEANUP_BATCH = 500;
+    private static final String TERMINAL_FOR_CLEANUP =
+            MessageState.PROCESSED.name() + "','" + MessageState.EXPIRED.name();
+
+    @Override
+    public int cleanupRetained(long cutoffEpochMs) {
+        int total = 0;
+        total += cleanupDeliveryRows(cutoffEpochMs);
+        total += cleanupOrphanMessages(cutoffEpochMs);
+        return total;
+    }
+
+    /** 分批删除"已终态（PROCESSED/EXPIRED）且超期"的投递记录；死信与非终态天然不在范围内。 */
+    private int cleanupDeliveryRows(long cutoff) {
+        int total = 0;
+        while (true) {
+            List<String> ids = new ArrayList<>();
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement select = connection.prepareStatement(
+                         "SELECT message_id FROM lk_delivery WHERE state IN ('" + TERMINAL_FOR_CLEANUP
+                                 + "') AND updated_at < ? LIMIT " + CLEANUP_BATCH)) {
+                select.setLong(1, cutoff);
+                try (ResultSet rs = select.executeQuery()) {
+                    while (rs.next()) {
+                        ids.add(rs.getString(1));
+                    }
+                }
+            } catch (SQLException e) {
+                throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                        "保留期清理：查询超期投递记录失败", e);
+            }
+            if (ids.isEmpty()) {
+                return total;
+            }
+            total += deleteByIds("lk_delivery", "message_id", ids);
+        }
+    }
+
+    /** 分批删除"无任何投递记录引用且超期"的消息正文（上行消息与已清完投递的下行消息）。 */
+    private int cleanupOrphanMessages(long cutoff) {
+        int total = 0;
+        while (true) {
+            List<String> ids = new ArrayList<>();
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement select = connection.prepareStatement(
+                         "SELECT message_id FROM lk_message m WHERE m.created_at < ? "
+                                 + "AND NOT EXISTS (SELECT 1 FROM lk_delivery d "
+                                 + "WHERE d.message_id = m.message_id) LIMIT " + CLEANUP_BATCH)) {
+                select.setLong(1, cutoff);
+                try (ResultSet rs = select.executeQuery()) {
+                    while (rs.next()) {
+                        ids.add(rs.getString(1));
+                    }
+                }
+            } catch (SQLException e) {
+                throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                        "保留期清理：查询超期消息正文失败", e);
+            }
+            if (ids.isEmpty()) {
+                return total;
+            }
+            total += deleteByIds("lk_message", "message_id", ids);
+        }
+    }
+
+    private int deleteByIds(String table, String column, List<String> ids) {
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < ids.size(); i++) {
+            placeholders.append(i == 0 ? "?" : ",?");
+        }
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement delete = connection.prepareStatement(
+                     "DELETE FROM " + table + " WHERE " + column
+                             + " IN (" + placeholders + ")")) {
+            for (int i = 0; i < ids.size(); i++) {
+                delete.setString(i + 1, ids.get(i));
+            }
+            return delete.executeUpdate();
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "保留期清理：删除 " + table + " 失败", e);
+        }
+    }
+
     private static DeliveryRecord mapRecord(ResultSet rs) throws SQLException {
         return new DeliveryRecord(
                 rs.getString("message_id"),
