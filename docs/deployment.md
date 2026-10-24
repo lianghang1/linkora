@@ -96,6 +96,13 @@ context.addServlet(new ServletHolder(
 - 日志：SLF4J 门面，实现交给宿主；日志含 messageId/clientId/traceId，
   不含凭据与未脱敏负载。
 
+## 运维控制台（可选）
+
+需要图形化运维界面时，引入可选模块 `linkora-admin-console` 并配置
+`linkora.admin-console.enabled=true` + `token`，即可在宿主容器同端口获得
+运维页面与 REST 端点（默认关闭，开启方式、页面与安全约束见
+[admin-console.md](admin-console.md)）。
+
 ## 升级与备份
 
 - **升级**：新版本若含 schema 变更，启动时自动增量应用；

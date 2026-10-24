@@ -14,6 +14,7 @@ public final class DeliveryView {
     private final String clientId;
     private final String messageType;
     private final long seq;
+    private final String sequenceKey;
     private final MessageState state;
     private final String stateText;
     private final int retryCount;
@@ -25,12 +26,13 @@ public final class DeliveryView {
     private final String updatedAt;
 
     public DeliveryView(String messageId, String clientId, String messageType, long seq,
-                        MessageState state, int retryCount, Long nextRetryAt, String lastError,
-                        byte[] payload, long createdAt, long updatedAt) {
+                        String sequenceKey, MessageState state, int retryCount, Long nextRetryAt,
+                        String lastError, byte[] payload, long createdAt, long updatedAt) {
         this.messageId = messageId;
         this.clientId = clientId;
         this.messageType = messageType;
         this.seq = seq;
+        this.sequenceKey = sequenceKey;
         this.state = state;
         this.stateText = AdminViews.stateText(state);
         this.retryCount = retryCount;
@@ -57,6 +59,11 @@ public final class DeliveryView {
     /** 投递序号（Last-Event-ID 同源）。 */
     public long getSeq() {
         return seq;
+    }
+
+    /** 顺序键（null/空白 = 无键，不参与顺序约束）。 */
+    public String getSequenceKey() {
+        return sequenceKey;
     }
 
     public MessageState getState() {

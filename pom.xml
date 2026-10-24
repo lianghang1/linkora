@@ -39,6 +39,7 @@
         <module>linkora-server</module>
         <module>linkora-client</module>
         <module>linkora-spring</module>
+        <module>linkora-admin-console</module>
         <module>linkora-spring-boot-starter</module>
         <module>examples</module>
     </modules>
@@ -76,6 +77,16 @@
             <dependency>
                 <groupId>io.github.lianghang1</groupId>
                 <artifactId>linkora-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lianghang1</groupId>
+                <artifactId>linkora-admin-console</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lianghang1</groupId>
+                <artifactId>linkora-server</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

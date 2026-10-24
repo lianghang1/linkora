@@ -228,3 +228,4 @@ linkora.client.db-path=data/client.db
 - 可靠性语义（状态机、顺序保证、重试与死信）：[reliability.md](reliability.md)
 - 生产认证配置：[security.md](security.md)
 - 部署与数据库表：[deployment.md](deployment.md)
+- 嵌入式运维控制台（可选模块，开箱即用的运维界面）：[admin-console.md](admin-console.md)

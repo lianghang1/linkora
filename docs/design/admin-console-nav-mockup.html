@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linkora 控制台 · 导航方案对比稿</title>
+<style>
+:root{
+  --bg:#0B0C12;--raised:rgba(255,255,255,.03);--raised-2:rgba(255,255,255,.06);
+  --hair:rgba(255,255,255,.07);--hair-2:rgba(255,255,255,.13);
+  --ink:#F2F3F7;--ink-2:#A6ACBB;--ink-3:#5D6370;
+  --accent:#8B7CF8;--accent-2:#4CC3F7;
+  --accent-grad:linear-gradient(135deg,#8B7CF8,#4CC3F7);
+  --accent-tint:rgba(139,124,248,.10);
+  --accent-border:rgba(139,124,248,.32);
+  --ok:#34D399;--warn:#FBBF24;--bad:#FB6F6A;--mut:#7E8694;
+  --glow-ok:0 0 9px rgba(52,211,153,.5);--glow-warn:0 0 9px rgba(251,191,36,.5);--glow-bad:0 0 9px rgba(251,111,106,.5);
+  --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Segoe UI",sans-serif;
+  --mono:ui-monospace,"SF Mono","JetBrains Mono",Consolas,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.mono{font-family:var(--mono);font-size:12.5px}
+.num{font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+kbd{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:5px;border:1px solid var(--hair-2);background:rgba(255,255,255,.04);color:var(--ink-3)}
+
+/* 设计稿切换器 */
+.picker{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);z-index:99;display:flex;gap:4px;padding:5px;border-radius:14px;background:rgba(19,19,24,.92);backdrop-filter:blur(12px);border:1px solid var(--hair-2);box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.picker button{padding:8px 16px;border-radius:10px;font-size:12.5px;color:var(--ink-2);transition:all .15s}
+.picker button:hover{color:var(--ink)}
+.picker button.on{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border);color:#fff;font-weight:600}
+
+/* ═══ 方案 A：悬浮胶囊导航（居中） ═══ */
+.navA{display:none;align-items:center;height:64px;padding:0 28px;border-bottom:1px solid var(--hair);position:relative}
+body[data-nav="A"] .navA{display:flex}
+.navA .brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:28px;height:28px;border-radius:9px;background:var(--accent-grad);display:flex;align-items:center;justify-content:center;color:#14102E;box-shadow:0 4px 18px rgba(139,124,248,.35)}
+.brand b{font-size:15px;font-weight:650}
+.pillnav{position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:3px;padding:4px;border-radius:99px;background:var(--raised);border:1px solid var(--hair)}
+.pillnav a{display:flex;align-items:center;gap:7px;padding:7px 17px;border-radius:99px;font-size:13px;font-weight:500;color:var(--ink-2);transition:all .18s;cursor:pointer}
+.pillnav a svg{width:14px;height:14px}
+.pillnav a:hover{color:var(--ink)}
+.pillnav a.on{background:var(--accent-grad);color:#14102E;font-weight:650;box-shadow:0 4px 14px rgba(139,124,248,.35)}
+.pillnav a .badge{background:var(--bad);color:#fff;font-size:10px;padding:0 6px;border-radius:99px;font-weight:650;box-shadow:var(--glow-bad)}
+.pillnav a .badge:empty{display:none}
+.pillnav a.on .badge{background:#14102E;color:#fff;box-shadow:none}
+.topright{margin-left:auto;display:flex;align-items:center;gap:12px}
+.cswitch{display:flex;align-items:center;gap:9px;padding:6.5px 13px;border-radius:9px;border:1px solid var(--hair-2);background:rgba(255,255,255,.03);font-size:12.5px;color:var(--ink-2);cursor:pointer}
+.cswitch b{color:var(--ink);font-weight:550}
+.cswitch svg{width:12px;height:12px;color:var(--ink-3)}
+
+/* ═══ 方案 B：左侧图标栏（hover 展开） ═══ */
+.layoutB{display:none;height:100vh}
+body[data-nav="B"] .layoutB{display:flex}
+.rail{width:64px;flex:none;background:rgba(255,255,255,.015);border-right:1px solid var(--hair);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;transition:width .22s cubic-bezier(.3,.9,.3,1);overflow:hidden}
+.rail:hover{width:208px;align-items:stretch;padding:14px 12px}
+.rail .brand{display:flex;align-items:center;gap:10px;padding:0 0 16px;justify-content:center}
+.rail .brand b{opacity:0;transition:opacity .15s;white-space:nowrap}
+.rail:hover .brand b{opacity:1}
+.rail .brand-mark{flex:none}
+.ritem{display:flex;align-items:center;gap:11px;height:42px;border-radius:10px;color:var(--ink-2);font-size:13.5px;font-weight:500;cursor:pointer;position:relative;transition:all .15s;justify-content:center;padding:0}
+.rail:hover .ritem{justify-content:flex-start;padding:0 12px}
+.ritem svg{width:17px;height:17px;flex:none}
+.ritem span{opacity:0;transition:opacity .15s;white-space:nowrap}
+.rail:hover .ritem span{opacity:1}
+.ritem:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+.ritem.on{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border);color:#fff}
+.ritem.on svg{color:var(--accent);filter:drop-shadow(0 0 6px rgba(139,124,248,.55))}
+.ritem .badge{margin-left:auto;background:var(--bad);color:#fff;font-size:10px;padding:0 6px;border-radius:99px;font-weight:650;box-shadow:var(--glow-bad);opacity:0}
+.rail:hover .ritem .badge{opacity:1}
+.ritem .badge:empty{display:none}
+.rail .foot{margin-top:auto;font-size:10px;color:var(--ink-3);white-space:nowrap;opacity:0;transition:opacity .15s}
+.rail:hover .foot{opacity:1}
+.layoutB main{flex:1;min-width:0;overflow-y:auto;height:100vh}
+.layoutB .topright{display:flex;justify-content:flex-end;gap:12px;padding:14px 28px}
+
+/* ═══ 方案 C：顶栏分段胶囊（现布局精修） ═══ */
+.navC{display:none;align-items:center;height:58px;padding:0 28px;border-bottom:1px solid var(--hair)}
+body[data-nav="C"] .navC{display:flex}
+.navC .brand{display:flex;align-items:center;gap:10px}
+.segnav{margin-left:26px;display:flex;gap:3px;padding:3.5px;border-radius:11px;background:var(--raised);border:1px solid var(--hair)}
+.segnav a{display:flex;align-items:center;gap:7px;padding:6.5px 15px;border-radius:8px;font-size:13px;font-weight:500;color:var(--ink-2);cursor:pointer;transition:all .15s}
+.segnav a svg{width:13.5px;height:13.5px}
+.segnav a:hover{color:var(--ink)}
+.segnav a.on{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border);color:#fff;font-weight:600}
+.segnav a .badge{background:var(--bad);color:#fff;font-size:10px;padding:0 6px;border-radius:99px;font-weight:650;box-shadow:var(--glow-bad)}
+.segnav a .badge:empty{display:none}
+
+/* 页面内容（三种方案共用） */
+.stage{display:none}
+body[data-nav="A"] .stage.wrap,body[data-nav="C"] .stage.wrap{display:block;max-width:1240px;margin:0 auto;padding:32px}
+body[data-nav="B"] .stage{display:block;padding:20px 32px 60px}
+.page-head h1{font-size:27px;font-weight:680;letter-spacing:-.025em}
+.page-head .desc{margin-top:5px;font-size:13.5px;color:var(--ink-2)}
+.metrics{display:flex;margin:26px 0 30px}
+.metric{padding:0 40px;border-left:1px solid var(--hair)}
+.metric:first-child{padding-left:0;border-left:none}
+.metric .m-lbl{font-size:11px;font-weight:550;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
+.metric .m-lbl i{width:6px;height:6px;border-radius:50%}
+.metric .m-val{font-family:var(--mono);font-size:38px;font-weight:700;margin:6px 0 4px;background:linear-gradient(180deg,#fff,#9AA2B1);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.metric .m-val small{font-size:16px;-webkit-text-fill-color:var(--ink-3);font-weight:450}
+.metric .m-sub{font-size:11.5px;color:var(--ink-3)}
+.sect-head{display:flex;align-items:baseline;gap:12px;margin:28px 0 4px}
+.sect-head h2{font-size:16.5px;font-weight:650}
+.sect-head .cnt{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.rows{border-top:1px solid var(--hair)}
+.row{display:flex;align-items:center;gap:14px;padding:15px 14px;border-bottom:1px solid var(--hair);border-radius:10px;transition:background .13s}
+.row:hover{background:var(--raised)}
+.r-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.r-ico svg{width:15px;height:15px}
+.r-ico.bad{background:rgba(251,111,106,.1);color:var(--bad);box-shadow:inset 0 0 0 1px rgba(251,111,106,.26)}
+.r-ico.warn{background:rgba(251,191,36,.1);color:var(--warn);box-shadow:inset 0 0 0 1px rgba(251,191,36,.24)}
+.r-main{min-width:0;flex:1}
+.r-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.r-title .mid{font-family:var(--mono);font-size:12.5px;font-weight:550}
+.r-title .type{font-size:11px;color:var(--ink-2);background:var(--raised-2);padding:1.5px 8px;border-radius:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:7px;border:1px solid var(--hair-2);background:rgba(255,255,255,.03);font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.chip svg{width:10px;height:10px;color:var(--ink-3)}
+.chip.block{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:var(--warn)}
+.r-sub{margin-top:3px;font-size:12px;color:var(--ink-3);display:flex;gap:13px;flex-wrap:wrap}
+.r-sub .mono{color:var(--ink-3)}
+.r-time{font-family:var(--mono);font-size:11px;color:var(--ink-3);flex:none}
+.r-acts{display:flex;gap:7px;flex:none;opacity:0;transition:opacity .15s}
+.row:hover .r-acts{opacity:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:5.5px 12px;border-radius:7px;font-size:12px;font-weight:550;border:1px solid transparent;white-space:nowrap}
+.btn-tint{background:rgba(139,124,248,.1);color:var(--accent);border-color:var(--accent-border)}
+.btn-danger-tint{background:rgba(251,111,106,.1);color:var(--bad);border-color:rgba(251,111,106,.28)}
+.btn-outline{border-color:var(--hair-2);color:var(--ink);background:rgba(255,255,255,.03)}
+.duo{display:grid;grid-template-columns:1fr 350px;gap:56px;margin-top:34px}
+.chartwrap h3,.feed h3{font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:16px}
+.feed{border-left:1px solid var(--hair);padding-left:30px}
+.feed-item{position:relative;padding:0 0 20px 20px}
+.feed-item::before{content:"";position:absolute;left:3px;top:6px;width:6px;height:6px;border-radius:50%;background:var(--ink-3)}
+.feed-item.ok::before{background:var(--ok);box-shadow:var(--glow-ok)}
+.feed-item.bad::before{background:var(--bad);box-shadow:var(--glow-bad)}
+.feed-item::after{content:"";position:absolute;left:5.5px;top:16px;bottom:-2px;width:1px;background:var(--hair)}
+.feed-item:last-child::after{display:none}
+.feed-item .f-t{font-size:10.5px;color:var(--ink-3);font-family:var(--mono)}
+.feed-item .f-n{font-size:12.5px;color:var(--ink-2);margin-top:1px}
+.chartbox svg{width:100%;height:190px;display:block}
+.chart-x{display:flex;justify-content:space-around;font-size:10.5px;color:var(--ink-3);font-family:var(--mono);margin-top:8px}
+.hint{margin-top:34px;font-size:12px;color:var(--ink-3);background:var(--raised);border:1px dashed var(--hair-2);border-radius:10px;padding:10px 16px;line-height:1.7}
+.hint b{color:var(--accent)}
+</style>
+</head>
+<body data-nav="A">
+
+<!-- 方案 A -->
+<div class="navA">
+  <div class="brand">
+    <div class="brand-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg></div>
+    <b>Linkora</b>
+  </div>
+  <nav class="pillnav">
+    <a class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>驾驶舱</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>消息</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>客户端</a>
+  </nav>
+  <div class="topright">
+    <div class="cswitch">客户端：<b>全部</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <button class="btn btn-outline"><kbd>⌘K</kbd></button>
+  </div>
+</div>
+
+<!-- 方案 B -->
+<div class="layoutB">
+  <aside class="rail">
+    <div class="brand">
+      <div class="brand-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg></div>
+      <b>Linkora</b>
+    </div>
+    <a class="ritem on" title="驾驶舱"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>驾驶舱</span></a>
+    <a class="ritem" title="消息"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>消息</span></a>
+    <a class="ritem" title="客户端"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>客户端</span></a>
+    <div class="foot">v0.4.0</div>
+  </aside>
+  <main>
+    <div class="topright">
+      <div class="cswitch">客户端：<b>全部</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+      <button class="btn btn-outline"><kbd>⌘K</kbd></button>
+    </div>
+    <div class="stage stageContent"></div>
+  </main>
+</div>
+
+<!-- 方案 C -->
+<div class="navC">
+  <div class="brand">
+    <div class="brand-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg></div>
+    <b>Linkora</b>
+  </div>
+  <nav class="segnav">
+    <a class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>驾驶舱</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>消息</a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>客户端</a>
+  </nav>
+  <div class="topright">
+    <div class="cswitch">客户端：<b>全部</b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <button class="btn btn-outline"><kbd>⌘K</kbd></button>
+  </div>
+</div>
+
+<div class="stage wrap"><div class="stageContent"></div></div>
+
+<script>
+"use strict";
+var CONTENT='\
+<div class="page-head"><h1>驾驶舱</h1><p class="desc">全局健康度 · 需要人工介入的事项优先呈现</p></div>\
+<div class="metrics">\
+ <div class="metric"><div class="m-lbl"><i style="background:var(--ok);box-shadow:var(--glow-ok)"></i>在线客户端</div><div class="m-val">3<small> / 5</small></div><div class="m-sub">共 5 个注册客户端</div></div>\
+ <div class="metric"><div class="m-lbl"><i style="background:var(--warn);box-shadow:var(--glow-warn)"></i>未完成投递</div><div class="m-val">6</div><div class="m-sub">全部客户端合计</div></div>\
+ <div class="metric"><div class="m-lbl"><i style="background:var(--bad);box-shadow:var(--glow-bad)"></i>死信</div><div class="m-val">2</div><div class="m-sub" style="color:var(--bad)">需人工处置</div></div>\
+ <div class="metric"><div class="m-lbl"><i style="background:var(--accent);box-shadow:0 0 9px rgba(139,124,248,.5)"></i>今日发布</div><div class="m-val">10</div><div class="m-sub">10-24</div></div>\
+</div>\
+<div class="sect-head"><h2>需要你处理</h2><span class="cnt">3 项</span></div>\
+<div class="rows">\
+ <div class="row"><div class="r-ico bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>\
+  <div class="r-main"><div class="r-title"><span class="mid">msg-2026-0-4</span><span class="type">BIZ</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg>store-002-seq</span><span class="chip block">同键阻塞 2 条</span></div>\
+  <div class="r-sub"><span class="mono">store-002</span><span>目标状态不可达 MAX_RETRY</span><span>重试 5 次</span></div></div><span class="r-time">09:42</span>\
+  <div class="r-acts"><button class="btn btn-tint">重放</button></div></div>\
+ <div class="row"><div class="r-ico warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></div>\
+  <div class="r-main"><div class="r-title"><span class="mid">msg-2026-0-1</span><span class="type">BIZ</span><span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg>store-002-seq</span></div>\
+  <div class="r-sub"><span class="mono">store-002</span><span>STOCK_LOCK_TIMEOUT，等待补发</span><span>重试 2 次</span></div></div><span class="r-time">09:12</span>\
+  <div class="r-acts"><button class="btn btn-outline">跳过</button></div></div>\
+</div>\
+<div class="duo">\
+ <div class="chartwrap"><h3>近 7 日发布量</h3>\
+  <div class="chartbox"><svg viewBox="0 0 760 190" preserveAspectRatio="none">\
+   <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#8B7CF8" stop-opacity=".28"/><stop offset="100%" stop-color="#8B7CF8" stop-opacity="0"/></linearGradient></defs>\
+   <path d="M10 142 L130 114 L250 156 L370 86 L490 104 L610 58 L750 74 L750 168 L10 168 Z" fill="url(#ag)"/>\
+   <path d="M10 142 L130 114 L250 156 L370 86 L490 104 L610 58 L750 74" fill="none" stroke="#8B7CF8" stroke-width="2" stroke-linecap="round" style="filter:drop-shadow(0 0 7px rgba(139,124,248,.45))"/></svg></div>\
+  <div class="chart-x"><span>10-18</span><span>10-19</span><span>10-20</span><span>10-21</span><span>10-22</span><span>10-23</span><span>今日</span></div></div>\
+ <div class="feed"><h3>最近动态</h3>\
+  <div class="feed-item ok"><div class="f-t">09:44:02</div><div class="f-n">BIZ · …-0388 → store-001 已送达</div></div>\
+  <div class="feed-item bad"><div class="f-t">09:42:31</div><div class="f-n">BIZ · …-0391 → store-002 进入死信</div></div>\
+  <div class="feed-item warn"><div class="f-t">09:12:44</div><div class="f-n">BIZ · …-0001 → store-002 第 2 次重试</div></div></div>\
+</div>\
+<div class="hint" id="hint"><b>方案说明</b>：A 悬浮胶囊——导航居中，视觉重心稳定，现代产品最常见；B 图标栏——默认 64px 只剩图标，hover 展开标签，内容区最宽且日常最安静；C 分段胶囊——保持现有顶栏结构，tabs 收进胶囊与选择器风格统一。用底部切换器对比。</div>';
+var contents=document.querySelectorAll(".stageContent");
+for(var ci=0;ci<contents.length;ci++){contents[ci].innerHTML=CONTENT;}
+
+function setNav(n){
+  document.body.dataset.nav=n;
+  var btns=document.querySelectorAll(".picker button");
+  for(var i=0;i<btns.length;i++)btns[i].classList.toggle("on",btns[i].dataset.n===n);
+}
+var picker=document.createElement("div");
+picker.className="picker";
+[["A","A · 悬浮胶囊"],["B","B · 图标栏"],["C","C · 分段胶囊"]].forEach(function(p){
+  var b=document.createElement("button");
+  b.textContent=p[1];b.dataset.n=p[0];
+  b.onclick=function(){setNav(p[0])};
+  picker.appendChild(b);
+});
+document.body.appendChild(picker);
+setNav("A");
+</script>
+</body>
+</html>

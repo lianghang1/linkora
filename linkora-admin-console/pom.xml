@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.lianghang1</groupId>
+        <artifactId>linkora-parent</artifactId>
+        <version>0.4.0</version>
+    </parent>
+
+    <artifactId>linkora-admin-console</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Linkora Admin Console</name>
+    <description>嵌入式运维控制台：单页 HTML + Bearer Token 鉴权 REST 端点。可选模块，默认不装配，随宿主 Servlet 容器部署。</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.lianghang1</groupId>
+            <artifactId>linkora-server</artifactId>
+        </dependency>
+        <!-- 页面与端点挂载在宿主容器，容器由宿主提供 -->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <!-- 测试依赖 -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+        </dependency>
+        <!-- 控制台 E2E 的 MySQL 真库变体（-Dlinkora.it.mysql=true），仅测试作用域 -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.0.33</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

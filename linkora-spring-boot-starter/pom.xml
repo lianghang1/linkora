@@ -7,7 +7,7 @@
     <parent>
         <groupId>io.github.lianghang1</groupId>
         <artifactId>linkora-parent</artifactId>
-        <version>0.3.0</version>
+        <version>0.4.0</version>
     </parent>
 
     <artifactId>linkora-spring-boot-starter</artifactId>
@@ -30,6 +30,12 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- 运维控制台（可选模块）：宿主显式引入依赖 + enabled=true 才装配；optional 保证默认不传递 -->
+        <dependency>
+            <groupId>io.github.lianghang1</groupId>
+            <artifactId>linkora-admin-console</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
