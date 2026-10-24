@@ -92,7 +92,7 @@ class StuckClientDisconnectTomcatIT {
         byte[] head = new byte[2048];
         int n = in.read(head);
         String headStr = new String(head, 0, Math.max(0, n), StandardCharsets.UTF_8);
-        assertFalse(headStr.contains("404"), "订阅应成功: " + headStr.lines().findFirst().orElse(""));
+        assertFalse(headStr.contains("404"), "订阅应成功: " + headStr.split("\r\n", 2)[0]);
         boolean stuckOnline = awaitOnline("stuck-store", 15_000);
         assertTrue(stuckOnline, "慢客户端应已在服务端注册");
 

@@ -8,7 +8,7 @@
          可脱离本仓库单独构建（mvn -f 本文件），用于验证发布产物的可用性 -->
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-example-spring-mvc-client-app</artifactId>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
     <packaging>jar</packaging>
 
     <name>Linkora Example: Spring MVC Demo Client App</name>

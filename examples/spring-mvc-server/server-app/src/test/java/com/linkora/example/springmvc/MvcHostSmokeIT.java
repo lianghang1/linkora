@@ -120,7 +120,7 @@ public class MvcHostSmokeIT {
                     .openConnection();
             conn.setConnectTimeout(5_000);
             conn.setReadTimeout(5_000);
-            String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            String body = new String(readAll(conn.getInputStream()), StandardCharsets.UTF_8);
             conn.disconnect();
             if (body.contains("smoke-report")) {
                 return true;
@@ -160,9 +160,21 @@ public class MvcHostSmokeIT {
         HttpURLConnection conn = (HttpURLConnection)
                 new URL("http://127.0.0.1:" + port + path).openConnection();
         conn.setRequestProperty("Authorization", "Bearer " + token);
-        String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        String body = new String(readAll(conn.getInputStream()), StandardCharsets.UTF_8);
         conn.disconnect();
         return body;
+    }
+
+    /** JDK 8 兼容的流读取（readAllBytes 是 JDK 9+ API，项目最低 JDK 8）。 */
+    private static byte[] readAll(java.io.InputStream in) throws Exception {
+        java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+        byte[] chunk = new byte[4096];
+        int r;
+        while ((r = in.read(chunk)) != -1) {
+            buf.write(chunk, 0, r);
+        }
+        in.close();
+        return buf.toByteArray();
     }
 
     private static int freePort() throws Exception {
