@@ -23,6 +23,10 @@ public class OrderCreatedHandler implements MessageListener {
 
     private final CountDownLatch firstOrder;
 
+    /** 顺序键/死信演示：SO-9003(item=A) 已失败的次数（前两次注入故障）。 */
+    private final java.util.concurrent.atomic.AtomicInteger so9003Failures =
+            new java.util.concurrent.atomic.AtomicInteger(0);
+
     public OrderCreatedHandler(CountDownLatch firstOrder) {
         this.firstOrder = firstOrder;
     }
@@ -38,8 +42,18 @@ public class OrderCreatedHandler implements MessageListener {
                     "payload 不是合法 JSON: " + e.getMessage());
             return;
         }
-        System.out.println("[下行-新订单] 订单号=" + payload.path("orderNo").asText("")
+        String orderNo = payload.path("orderNo").asText("");
+        // 顺序键/死信演示分支：SO-9003 的 item=A 前两次到达都模拟处理失败
+        if ("SO-9003".equals(orderNo) && "A".equals(payload.path("item").asText())
+                && so9003Failures.incrementAndGet() <= 2) {
+            System.out.println("[顺序键演示] SO-9003 第 " + so9003Failures.get()
+                    + " 次处理失败（模拟门店故障）→ ack FAILED；同键后续此刻必须被门禁挡住");
+            message.ackFailed(LinkoraErrorCode.INTERNAL_ERROR, "模拟门店系统故障");
+            return;
+        }
+        System.out.println("[下行-新订单] 订单号=" + orderNo
                 + " 商品=" + payload.path("item").asText("")
+                + " 顺序键=" + message.getMessage().getSequenceKey()
                 + " id=" + message.getMessageId());
         // 业务处理成功后显式 ACK，服务端才把该条投递标记为完成
         // （失败场景改调 message.ackFailed(...)，服务端按策略重试）

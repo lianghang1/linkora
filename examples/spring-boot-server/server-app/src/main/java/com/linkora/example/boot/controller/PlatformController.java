@@ -50,6 +50,17 @@ public class PlatformController {
         return body;
     }
 
+    /** 无 sequenceKey 的下发（对照演示：不受任何顺序门禁影响）。 */
+    @PostMapping("/api/notify-nokey")
+    public Map<String, Object> placeOrderNoKey(@RequestParam String clientId,
+                                               @RequestParam String orderNo,
+                                               @RequestParam String item) {
+        PublishResult result = orderService.placeOrderNoKey(clientId, orderNo, item);
+        Map<String, Object> body = new LinkedHashMap<String, Object>();
+        body.put("messageId", result.getMessageId());
+        return body;
+    }
+
     /** 线上评价：经 ReviewService 发布 review-created 通知线下门店。 */
     @PostMapping("/api/reviews")
     public Map<String, Object> createReview(@RequestParam String clientId,
