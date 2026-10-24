@@ -98,6 +98,23 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:5px;b
 .seg button.dead.on .n{color:var(--bad)}
 
 /* 统一列表行 */
+.msg-split{display:grid;grid-template-columns:1fr 380px;gap:44px;align-items:start}
+.md{position:sticky;top:110px;max-height:calc(100vh - 150px);overflow-y:auto;border-left:1px solid var(--hair);padding-left:34px;min-height:420px}
+.md-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px}
+.md-head h3{font-size:14.5px;font-weight:600;font-family:var(--mono);color:#fff;cursor:pointer;transition:color .15s}
+.md-head h3:hover{color:var(--accent)}
+.kv{display:grid;grid-template-columns:88px 1fr;gap:8px 12px;font-size:13px;margin-bottom:22px}
+.kv dt{color:var(--ink-3)}.kv dd{color:var(--ink)}
+.sect-lbl{font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.12em;margin:24px 0 10px;display:flex;align-items:center;gap:8px}
+.sect-lbl::after{content:"";flex:1;height:1px;background:var(--hair)}
+.codeblock{background:#07070B;border:1px solid var(--hair);border-radius:var(--r-md);padding:15px 17px;font-family:var(--mono);font-size:12px;line-height:1.65;color:#A9B6FF;white-space:pre-wrap;word-break:break-all}
+.tl{position:relative;padding-left:22px}
+.tl::before{content:"";position:absolute;left:5.5px;top:6px;bottom:6px;width:1px;background:linear-gradient(180deg,var(--accent),var(--hair-2))}
+.tl-item{position:relative;padding:0 0 18px}
+.tl-item::before{content:"";position:absolute;left:-20px;top:5px;width:10px;height:10px;border-radius:50%;background:#0F0F15;border:2px solid var(--accent);box-shadow:0 0 8px rgba(139,124,248,.4)}
+.tl-item.err::before{border-color:var(--bad);box-shadow:var(--glow-bad)}
+.tl-item .t{font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
+.tl-item .n{font-size:13px;margin-top:2px}
 .rows{border-top:1px solid var(--hair)}
 .row{display:flex;align-items:center;gap:14px;padding:15px 14px;border-bottom:1px solid var(--hair);border-radius:10px;transition:background .13s;cursor:pointer}
 .row:hover{background:var(--raised)}
@@ -283,17 +300,29 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:5px;b
     <span style="flex:1"></span>
     <span class="pill mut" id="csScope" style="font-size:11.5px"><i></i>范围：全部客户端</span>
   </div>
-  <div class="batchbar" id="batchbar">
-    <span>死信处置模式 · 勾选或多选后批量操作，操作需填原因留痕</span>
-    <span class="spacer"></span>
-    <button class="btn btn-outline btn-sm">通用状态变更</button>
-    <button class="btn btn-danger-tint btn-sm">批量跳过（2）</button>
-  </div>
-  <div class="rows" id="msgList"></div>
-  <div style="display:flex;justify-content:center;gap:10px;margin-top:18px">
-    <button class="btn btn-ghost btn-sm">‹ 上一页</button>
-    <span class="num weak" style="align-self:center">第 1 页</span>
-    <button class="btn btn-ghost btn-sm">下一页 ›</button>
+  <div class="msg-split">
+    <div>
+      <div class="batchbar" id="batchbar">
+        <span>死信处置模式 · 点行看详情，操作需填原因留痕</span>
+        <span class="spacer"></span>
+        <button class="btn btn-outline btn-sm">通用状态变更</button>
+        <button class="btn btn-danger-tint btn-sm">批量跳过（2）</button>
+      </div>
+      <div class="rows" id="msgList"></div>
+      <div style="display:flex;justify-content:center;gap:10px;margin-top:18px">
+        <button class="btn btn-ghost btn-sm">‹ 上一页</button>
+        <span class="num weak" style="align-self:center">第 1 页</span>
+        <button class="btn btn-ghost btn-sm">下一页 ›</button>
+      </div>
+    </div>
+    <div class="md" id="md">
+      <div class="md-head">
+        <div><h3 id="mdTitle" onclick="copyText(this.textContent)" title="点击复制">从左侧选择消息</h3><span class="weak" id="mdSub"></span></div>
+      </div>
+      <div id="mdBody">
+        <div class="empty" style="padding:60px 0;text-align:center;color:var(--ink-3)"><p>点行在此查看 payload 与投递时间线<br>列表不被遮挡，可连续对比多条</p></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -419,25 +448,53 @@ var ICONS={
  ok:'<polyline points="20 6 9 17 4 12"/>',
  mut:'<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/>'
 };
-function rowHtml(m,acts){
+function rowHtml(m,acts,selId){
   var chip=m[6]?'<span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg>'+m[6]+'</span>':"";
   var block=m[7]?'<span class="chip block">同键阻塞 '+m[7]+' 条</span>':"";
   var stateName={bad:"死信",warn:"重试中",ok:"已完成",mut:"已过期"}[m[3]];
-  return '<div class="row"><div class="r-ico '+m[3]+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'+ICONS[m[3]]+'</svg></div>'
+  return '<div class="row'+(selId===m[0]?" sel":"")+'" onclick="openDetail(\''+m[0]+'\')"><div class="r-ico '+m[3]+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'+ICONS[m[3]]+'</svg></div>'
     +'<div class="r-main"><div class="r-title"><span class="mid">'+m[0]+'</span><span class="type">'+m[1]+'</span>'+chip+block+'</div>'
     +'<div class="r-sub"><span class="mono">'+m[2]+'</span><span>'+stateName+' · '+m[4]+'</span><span>重试 '+m[5]+' 次</span></div></div>'
     +'<span class="r-time">'+m[8]+'</span>'
-    +(acts?'<div class="r-acts"><button class="btn btn-ghost btn-sm">详情</button>'
-      +(m[3]==="bad"?'<button class="btn btn-tint btn-sm">重放</button><button class="btn btn-danger-tint btn-sm">跳过</button>':"")
-      +(m[3]==="warn"?'<button class="btn btn-outline btn-sm">跳过</button>':"")+'</div>':"")
+    +(acts?'<div class="r-acts">'
+      +(m[3]==="bad"?'<button class="btn btn-tint btn-sm" onclick="event.stopPropagation()">重放</button><button class="btn btn-danger-tint btn-sm" onclick="event.stopPropagation()">跳过</button>':"")
+      +(m[3]==="warn"?'<button class="btn btn-outline btn-sm" onclick="event.stopPropagation()">跳过</button>':"")+'</div>':"")
     +'</div>';
 }
+/* 详情：点行即在右侧渲染（宽屏主从，窄屏覆盖层） */
+var DETAILS={
+ "msg-2026-0-4":{type:"BIZ",client:"store-002",seq:"store-002-seq",exp:"不过期",size:"182 字节",
+  payload:'{\n  "orderNo": "A20261024-0391",\n  "amount": 12800,\n  "status": "PAID"\n}',
+  tl:[["09:42:17","消息发布，进入投递队列","ok"],["09:42:18","store-002 已接收","ok"],["09:43:02","客户端处理异常 STOCK_LOCK_TIMEOUT（重试 1/5）","err"],["09:52:40","达到重试上限，进入死信","err"]]},
+ "msg-2026-0-7":{type:"SYNC",client:"kiosk-001",seq:"（无顺序键）",exp:"不过期",size:"96 字节",
+  payload:'{\n  "priceListVersion": "v2026.10.3",\n  "items": 42\n}',
+  tl:[["09:28:11","消息发布，进入投递队列","ok"],["09:29:30","kiosk-001 存储写入失败 STORAGE_ERROR（重试 2/5）","err"],["09:28:00","达到重试上限，进入死信（无顺序键，不影响其他消息）","err"]]},
+ "msg-2026-0-1":{type:"BIZ",client:"store-002",seq:"store-002-seq",exp:"2026-10-25 09:12",size:"154 字节",
+  payload:'{\n  "orderNo": "A20261024-0001",\n  "amount": 4300\n}',
+  tl:[["09:12:09","消息发布，进入投递队列","ok"],["09:12:40","客户端处理异常 STOCK_LOCK_TIMEOUT（重试 1/5）","err"],["09:31:55","第 2 次重试已排队，等待补发窗口","warn"]]}
+};
+var currentDetail="";
+function openDetail(id){
+  currentDetail=id;renderMsgs();
+  var d=DETAILS[id]||{type:"BIZ",client:"—",seq:"—",exp:"—",size:"—",payload:'{ … }',tl:[]};
+  document.getElementById("mdTitle").textContent=id;
+  document.getElementById("mdSub").textContent=d.type+" · 发布于 "+(id==="msg-2026-0-4"?"09:42:17":"—");
+  var tl=d.tl.map(function(t){
+    return '<div class="tl-item'+(t[2]==="err"?" err":"")+'"><div class="t">'+t[0]+'</div><div class="n">'+t[1]+'</div></div>';
+  }).join("");
+  document.getElementById("mdBody").innerHTML='<div class="kv">'
+    +'<dt>客户端</dt><dd class="mono">'+d.client+'</dd><dt>顺序键</dt><dd class="mono">'+d.seq+'</dd>'
+    +'<dt>过期时间</dt><dd class="num">'+d.exp+'</dd><dt>大小</dt><dd class="num">'+d.size+'</dd></div>'
+    +'<div class="sect-lbl">PAYLOAD</div><div class="codeblock">'+d.payload.replace(/</g,"&lt;")+'</div>'
+    +'<div class="sect-lbl">投递时间线</div><div class="tl">'+tl+'</div>';
+}
+function copyText(s){/* 设计稿演示 */}
 function renderMsgs(){
   var seg=document.getElementById("seg").querySelector(".on").textContent.replace(/\d+/g,"").trim();
   var key={全部:"all",进行中:"run",死信:"dead",已完成:"done",已过期:"expired"}[seg];
   var list=SEGS[key].filter(function(m){return clients[ci]==="全部"||m[2]===clients[ci];});
   document.getElementById("msgList").innerHTML=list.length?list.map(function(m){
-    return rowHtml(m,key==="dead");
+    return rowHtml(m,key==="dead",currentDetail);
   }).join(""):'<div class="empty" style="padding:50px 0;text-align:center;color:var(--ink-3)">该客户端在此状态下没有消息</div>';
   document.getElementById("batchbar").classList.toggle("on",key==="dead");
 }
