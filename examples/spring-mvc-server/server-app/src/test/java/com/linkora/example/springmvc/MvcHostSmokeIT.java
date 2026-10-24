@@ -39,6 +39,8 @@ public class MvcHostSmokeIT {
     @Before
     public void setUp() throws Exception {
         port = freePort();
+        // 开启控制台（演示 AdminConsoleInstaller 在纯 MVC/手工注册 Tomcat 上的装配路径）
+        System.setProperty("linkora.admin.console.token", "mvc-it-token");
         tomcat = SpringMvcServerMain.startServer(port);
     }
 
@@ -126,6 +128,41 @@ public class MvcHostSmokeIT {
             Thread.sleep(200);
         }
         return false;
+    }
+
+    /** 控制台经 AdminConsoleInstaller 挂载在真实 Tomcat：鉴权、页面与端点全通。 */
+    @Test(timeout = 60_000)
+    public void adminConsoleViaInstallerOnTomcat() throws Exception {
+        // 无令牌 → 401；页面本身放行（浏览器首跳无 Authorization 头）
+        assertEquals(401, status("/linkora-admin/api/overview", null));
+        assertEquals(401, status("/linkora-admin/api/overview", "wrong-token"));
+        assertEquals(200, status("/linkora-admin/", null));
+
+        // 正确令牌：页面直出 + overview 含注册客户端
+        String page = get("/linkora-admin/", "mvc-it-token");
+        assertTrue("控制台单页应正常直出", page.contains("Linkora 运维控制台"));
+        String overview = get("/linkora-admin/api/overview", "mvc-it-token");
+        assertTrue("总览应包含注册客户端", overview.contains(CLIENT_ID));
+    }
+
+    private int status(String path, String token) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection)
+                new URL("http://127.0.0.1:" + port + path).openConnection();
+        if (token != null) {
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+        }
+        int code = conn.getResponseCode();
+        conn.disconnect();
+        return code;
+    }
+
+    private String get(String path, String token) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection)
+                new URL("http://127.0.0.1:" + port + path).openConnection();
+        conn.setRequestProperty("Authorization", "Bearer " + token);
+        String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        conn.disconnect();
+        return body;
     }
 
     private static int freePort() throws Exception {

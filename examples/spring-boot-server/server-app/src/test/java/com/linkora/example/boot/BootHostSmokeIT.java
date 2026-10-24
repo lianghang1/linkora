@@ -111,6 +111,57 @@ class BootHostSmokeIT {
         assertTrue(disconnect.contains("\"count\""), "写操作端点应返回执行结果");
     }
 
+    /** 控制台远程指令全链路：真实 SSE ctrl 下发 → 真实客户端执行 QUERY_OUTBOX → 上行回传结果。 */
+    @Test
+    void adminConsoleQueriesClientOutboxOverRealChannel() throws Exception {
+        context = new SpringApplicationBuilder(SpringBootServerApplication.class)
+                .properties("server.port=0",
+                        "linkora.server.register-clients." + CLIENT_ID + "=true",
+                        "linkora.admin-console.enabled=true",
+                        "linkora.admin-console.token=it-console-token")
+                .run();
+        int port = ((WebServerApplicationContext) context).getWebServer().getPort();
+        LinkoraServer linkoraServer = context.getBean(LinkoraServer.class);
+
+        // 真实客户端上线
+        Path db = Files.createTempDirectory("linkora-obx").resolve("client.db");
+        store = new SqliteClientStore(db);
+        client = LinkoraClient.builder()
+                .serverUrl("http://127.0.0.1:" + port)
+                .clientId(CLIENT_ID)
+                .clientStore(store)
+                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300).build())
+                .build();
+        client.start();
+        assertTrue(awaitOnline(linkoraServer, 20_000), "客户端应经真实 SSE 上线");
+
+        // 客户端产生本地 outbox 数据并被服务端接受
+        String uplinkId = client.publish("obx-demo", "outbox-row".getBytes(StandardCharsets.UTF_8));
+        assertTrue(awaitOutboxAccepted(uplinkId, 15_000), "上行应被服务端确认接受");
+
+        // 控制台下发 QUERY_OUTBOX（真实 ctrl 通道）
+        String query = httpPost(port, "/linkora-admin/api/actions/client-command",
+                "it-console-token",
+                "{\"clientId\":\"" + CLIENT_ID + "\",\"command\":\"QUERY_OUTBOX\",\"reason\":\"真机链路验证\"}");
+        assertTrue(query.contains("queryId"), "应返回 queryId");
+        String queryId = query.replaceAll(".*\"queryId\":\"([^\"]+)\".*", "$1");
+
+        // 轮询回执：客户端执行后经上行链路回传
+        String result = null;
+        long deadline = System.currentTimeMillis() + 20_000;
+        while (System.currentTimeMillis() < deadline) {
+            String r = httpGet(port, "/linkora-admin/api/command-result/" + queryId,
+                    "it-console-token");
+            if (r.contains("rows") && !r.contains("\"rows\":[]")) {
+                result = r;
+                break;
+            }
+            Thread.sleep(300);
+        }
+        assertTrue(result != null, "应在超时内收到客户端回执");
+        assertTrue(result.contains(uplinkId), "回执应包含本地 outbox 条目 " + uplinkId);
+    }
+
     private int httpStatus(int port, String path, String token) throws Exception {
         java.net.HttpURLConnection conn = (java.net.HttpURLConnection)
                 new java.net.URL("http://127.0.0.1:" + port + path).openConnection();

@@ -108,7 +108,26 @@ public final class SpringMvcServerMain {
                 new com.linkora.server.servlet.LinkoraEndpointServlet(
                         server.ackHttpHandler(), server.getMaxBodyBytes()),
                 "/acks");
-        tomcat.start();
+        // 可选：嵌入式运维控制台。内嵌 Tomcat 场景（Spring 刷新已触发上下文初始化）
+        // 须用 Tomcat 原生 API 注册——与上方三端点同因；war 宿主在初始化期注册
+        // 则用 AdminConsoleInstaller（规范 API）。令牌经系统属性注入，未设置不装配。
+        String consoleToken = System.getProperty("linkora.admin.console.token");
+        if (consoleToken != null && !consoleToken.trim().isEmpty()) {
+            Tomcat.addServlet(tomcatCtx, "linkoraAdminConsoleServlet",
+                            new com.linkora.adminconsole.AdminConsoleServlet(server))
+                    .setAsyncSupported(true);
+            tomcatCtx.addServletMappingDecoded("/linkora-admin/*", "linkoraAdminConsoleServlet");
+            org.apache.tomcat.util.descriptor.web.FilterDef filterDef =
+                    new org.apache.tomcat.util.descriptor.web.FilterDef();
+            filterDef.setFilterName("linkoraAdminConsoleFilter");
+            filterDef.setFilter(new com.linkora.adminconsole.AdminConsoleFilter(consoleToken.trim()));
+            tomcatCtx.addFilterDef(filterDef);
+            org.apache.tomcat.util.descriptor.web.FilterMap filterMap =
+                    new org.apache.tomcat.util.descriptor.web.FilterMap();
+            filterMap.setFilterName("linkoraAdminConsoleFilter");
+            filterMap.addURLPattern("/linkora-admin/*");
+            tomcatCtx.addFilterMap(filterMap);
+        }
         tomcat.start();
 
         // 优雅关闭：先停容器再关 Spring（容器销毁时 LinkoraServer.close()）

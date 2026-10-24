@@ -49,8 +49,7 @@ public class AdminConsoleEndToEndTest {
 
     @Before
     public void setUp() throws Exception {
-        JdbcDataSource dataSource = new JdbcDataSource();
-        dataSource.setURL("jdbc:h2:mem:linkora_admin_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+        javax.sql.DataSource dataSource = newDataSource();
         com.linkora.server.storage.jdbc.JdbcServerSchema.migrate(dataSource);
         ClientRegistry registry = new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource);
         registry.register(new ClientRegistration(CLIENT, true, System.currentTimeMillis()));
@@ -74,6 +73,78 @@ public class AdminConsoleEndToEndTest {
         jetty.setHandler(ctx);
         jetty.start();
         port = jetty.getURI().getPort();
+    }
+
+    /**
+     * 默认 H2；-Dlinkora.it.mysql=true 时切换真实 MySQL（每次清空 lk_* 表），
+     * 用于验证控制台全链路在 MySQL 存储上的行为。
+     */
+    private static javax.sql.DataSource newDataSource() throws Exception {
+        JdbcDataSource h2 = new JdbcDataSource();
+        h2.setURL("jdbc:h2:mem:linkora_admin_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+        if (!Boolean.getBoolean("linkora.it.mysql")) {
+            return h2;
+        }
+        Class.forName("com.mysql.cj.jdbc.Driver");
+        final String url = System.getProperty("linkora.it.mysql.url",
+                "jdbc:mysql://127.0.0.1:3306/linkora_it_console?useSSL=false&allowPublicKeyRetrieval=true");
+        final String user = System.getProperty("linkora.it.mysql.user", "root");
+        final String pass = System.getProperty("linkora.it.mysql.password", "");
+        try (java.sql.Connection c = java.sql.DriverManager.getConnection(url, user, pass);
+             java.sql.Statement st = c.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("SHOW TABLES LIKE 'lk_%'")) {
+            java.util.List<String> tables = new java.util.ArrayList<>();
+            while (rs.next()) {
+                tables.add(rs.getString(1));
+            }
+            for (String t : tables) {
+                st.executeUpdate("DROP TABLE IF EXISTS " + t);
+            }
+        }
+        return new javax.sql.DataSource() {
+            @Override
+            public java.sql.Connection getConnection() throws java.sql.SQLException {
+                return java.sql.DriverManager.getConnection(url, user, pass);
+            }
+
+            @Override
+            public java.sql.Connection getConnection(String u, String p) throws java.sql.SQLException {
+                return java.sql.DriverManager.getConnection(url, u, p);
+            }
+
+            @Override
+            public <T> T unwrap(Class<T> iface) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public boolean isWrapperFor(Class<?> iface) {
+                return false;
+            }
+
+            @Override
+            public java.io.PrintWriter getLogWriter() {
+                return null;
+            }
+
+            @Override
+            public void setLogWriter(java.io.PrintWriter out) {
+            }
+
+            @Override
+            public void setLoginTimeout(int seconds) {
+            }
+
+            @Override
+            public int getLoginTimeout() {
+                return 0;
+            }
+
+            @Override
+            public java.util.logging.Logger getParentLogger() {
+                return java.util.logging.Logger.getGlobal();
+            }
+        };
     }
 
     @After
