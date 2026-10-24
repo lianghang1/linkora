@@ -463,7 +463,6 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
       <div class="actions">
         <div class="switch" id="cdSwitch"></div>
         <button class="btn btn-outline btn-sm" onclick="sendCmd(cdCurrent,'PING')">PING</button>
-        <button class="btn btn-outline btn-sm" onclick="queryOutbox(cdCurrent)">QUERY_OUTBOX</button>
         <button class="btn btn-outline btn-sm" onclick="kick(cdCurrent)">断开连接</button>
       </div>
     </div>
@@ -475,6 +474,7 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
     <div class="subtabs">
       <button class="on" data-t="messages" onclick="setCdTab('messages')">该客户端的消息</button>
       <button data-t="unfinished" onclick="setCdTab('unfinished')">未完成明细</button>
+      <button data-t="outbox" onclick="setCdTab('outbox')">本地队列</button>
     </div>
     <div style="display:flex;align-items:center;gap:12px;margin:16px 0 4px" id="cdSegWrap">
       <div class="seg" id="cdSeg">
@@ -486,6 +486,24 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
     </div>
     <div class="rows" id="cdList"></div>
     <div id="cdUnfinished" style="display:none"></div>
+    <div id="cdOutbox" style="display:none">
+      <div class="filterbar">
+        <select id="obStatus">
+          <option value="">全部状态</option>
+          <option value="PENDING">待发送</option>
+          <option value="SENDING">发送中</option>
+          <option value="SERVER_ACCEPTED">服务端已接受</option>
+          <option value="FAILED">发送失败</option>
+          <option value="DEAD_LETTER">死信</option>
+        </select>
+        <button class="btn btn-primary btn-sm" id="obPullBtn" onclick="pullOutbox()">拉取本地队列</button>
+        <span class="weak" id="obHint">拉取的是客户端在线瞬间的本地快照，不会自动更新</span>
+      </div>
+      <div class="rows" id="obRows"></div>
+      <details style="margin-top:14px"><summary class="weak" style="cursor:pointer">原始回执 JSON</summary>
+        <div class="codeblock" id="obRaw" style="margin-top:10px"></div>
+      </details>
+    </div>
     <div id="cdCmdResult" class="codeblock" style="display:none;margin-top:14px"></div>
   </div>
 </div>
@@ -1043,6 +1061,8 @@ function refreshClientDetail(){
     dl.textContent = c.deadLetterCount;
     dl.style.color = c.deadLetterCount > 0 ? "var(--bad)" : "";
     document.getElementById("cdDeadSub").textContent = c.deadLetterCount > 0 ? "需人工处置" : "—";
+    var obBtn = document.getElementById("obPullBtn");
+    if (obBtn){ obBtn.disabled = !c.online; }
     renderCdBody(c);
   }).catch(showErr);
 }
@@ -1058,6 +1078,8 @@ function setCdTab(t){
   document.getElementById("cdSegWrap").style.display = t === "messages" ? "" : "none";
   document.getElementById("cdList").style.display = t === "messages" ? "" : "none";
   document.getElementById("cdUnfinished").style.display = t === "unfinished" ? "" : "none";
+  document.getElementById("cdOutbox").style.display = t === "outbox" ? "" : "none";
+  document.getElementById("cdCmdResult").style.display = "none";
   if (t === "unfinished") loadCdUnfinished();
 }
 function renderCdBody(c){
@@ -1128,24 +1150,88 @@ function sendCmd(clientId, command){
       toast(command + " 已送达 " + res.delivered + " 个连接", res.delivered ? "" : "warn");
     });
 }
-function queryOutbox(clientId){
-  confirmOp("远程查询 outbox", "下发 QUERY_OUTBOX，客户端执行后经上行回传结果（与业务消息隔离）。", "查询",
-    function(reason){
-      return api("api/actions/client-command", {method:"POST", body:{
-        clientId: clientId, command: "QUERY_OUTBOX", reason: reason}});
-    },
-    function(res){
-      if (!res.queryId){ toast("指令未送达（客户端离线）", "bad"); return; }
-      var out = document.getElementById("cdCmdResult");
-      out.style.display = ""; out.textContent = "→ 指令已下发，轮询回执中…";
-      var n = 0;
-      var timer = setInterval(function(){
-        api("api/command-result/" + encodeURIComponent(res.queryId)).then(function(r){
-          if (r.result){ clearInterval(timer); out.textContent = r.result; }
-          else if (++n >= 15){ clearInterval(timer); out.textContent = "等待回执超时（客户端可能离线或未执行）"; }
-        });
-      }, 2000);
-    });
+
+/* ═════════ 本地队列（客户端 outbox，手动快照） ═════════ */
+function obCls(statusText){
+  if (!statusText) return "mut";
+  if (statusText.indexOf("死信") >= 0) return "bad";
+  if (statusText.indexOf("已接受") >= 0) return "ok";
+  if (statusText.indexOf("失败") >= 0 || statusText.indexOf("待发送") >= 0 || statusText.indexOf("发送中") >= 0) return "warn";
+  return "mut";
+}
+function pullOutbox(){
+  var c = null;
+  for (var i = 0; i < clientCache.length; i++) if (clientCache[i].clientId === cdCurrent) c = clientCache[i];
+  if (c && !c.online){
+    toast("客户端离线，上线后才能拉取本地队列", "warn");
+    return;
+  }
+  var btn = document.getElementById("obPullBtn");
+  var hint = document.getElementById("obHint");
+  var raw = document.getElementById("obRaw");
+  btn.disabled = true; btn.textContent = "拉取中…";
+  hint.textContent = "已下发指令，等待客户端回执…（仅在线客户端生效）";
+  document.getElementById("obRows").innerHTML = '<div class="skeleton" style="width:60%"></div>';
+  api("api/actions/client-command", {method:"POST", body:{
+    clientId: cdCurrent, command: "QUERY_OUTBOX",
+    status: document.getElementById("obStatus").value || null, limit: 50,
+    reason: "控制台拉取本地队列快照"}}).then(function(res){
+    if (!res.queryId){ done(); toast("指令未送达（客户端离线）", "bad"); return; }
+    var n = 0;
+    var timer = setInterval(function(){
+      api("api/command-result/" + encodeURIComponent(res.queryId)).then(function(r){
+        if (!r.result){
+          if (++n >= 15){ clearInterval(timer); done();
+            document.getElementById("obRows").innerHTML = '<div class="empty"><p>等待回执超时（客户端可能中途离线或未执行）</p></div>';
+            hint.textContent = "回执超时，可重新拉取"; }
+          return;
+        }
+        clearInterval(timer); done();
+        var data = JSON.parse(r.result);
+        renderOutbox(data.rows || []);
+        raw.textContent = JSON.stringify(JSON.parse(r.result), null, 2);
+        hint.innerHTML = "拉取于 <b class='mono'>" + new Date().toLocaleTimeString("zh-CN", {hour12:false})
+          + "</b> · 快照不会自动更新，处置后可重新拉取确认";
+      });
+    }, 2000);
+  }).catch(function(e){ done(); toast(e.error || "拉取失败", "bad"); });
+  function done(){
+    btn.disabled = false; btn.textContent = "拉取本地队列";
+    refreshClientDetail();
+  }
+}
+function renderOutbox(rows){
+  var el = document.getElementById("obRows");
+  el.innerHTML = rows.length ? rows.map(function(r){
+    var cls = obCls(r.statusText);
+    var dead = r.statusText && r.statusText.indexOf("死信") >= 0;
+    return '<div class="row"><div class="r-ico ' + cls + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONS[cls] + '</svg></div>'
+      + '<div class="r-main"><div class="r-title"><span class="mid">' + esc(r.messageId) + '</span>'
+      + '<span class="type">' + esc(r.messageType || "—") + '</span>'
+      + stPill(dead ? "DEAD_LETTER" : "ACCEPTED", r.statusText) + '</div>'
+      + '<div class="r-sub"><span>' + esc(r.lastError || "—") + '</span>'
+      + '<span>重试 ' + r.retryCount + ' 次</span>'
+      + '<span class="num">' + r.payloadSize + ' 字节</span></div></div>'
+      + '<span class="r-time">' + esc(r.updatedAt || r.createdAt || "") + '</span>'
+      + (dead ? '<div class="r-acts">'
+        + '<button class="btn btn-tint btn-sm" onclick="retryOutbox(\'' + esc(r.messageId) + '\')">重发</button>'
+        + '<button class="btn btn-danger-tint btn-sm" onclick="discardOutbox(\'' + esc(r.messageId) + '\')">放弃</button></div>' : "")
+      + '</div>';
+  }).join("") : '<div class="empty"><p>本地队列为空（当前过滤条件下）</p></div>';
+}
+function retryOutbox(messageId){
+  confirmOp("重发上行死信", messageId + " 将由客户端从本地队列重新向上行发送。", "重发",
+    function(reason){ return api("api/actions/client-command", {method:"POST", body:{
+      clientId: cdCurrent, command: "RETRY_OUTBOX_DEAD_LETTER",
+      params: {messageId: messageId}, reason: reason}}); },
+    function(){ toast("指令已下发，重新拉取可确认最新状态"); });
+}
+function discardOutbox(messageId){
+  confirmOp("放弃上行死信", messageId + " 将在客户端本地标记为放弃，不再上行发送（留痕于客户端）。", "放弃",
+    function(reason){ return api("api/actions/client-command", {method:"POST", body:{
+      clientId: cdCurrent, command: "DISCARD_OUTBOX_DEAD_LETTER",
+      params: {messageId: messageId}, reason: reason}}); },
+    function(){ toast("指令已下发，重新拉取可确认最新状态"); });
 }
 
 /* ═════════ 命令面板（⌘K） ═════════ */
