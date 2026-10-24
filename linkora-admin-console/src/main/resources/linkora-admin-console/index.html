@@ -167,21 +167,19 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:620px}
 .tl-item .n{font-size:12.5px;margin-top:2px;color:var(--ink-2)}
 .opbox{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
 
-/* ───── 客户端卡片 ───── */
-.ccards{display:grid;grid-template-columns:repeat(auto-fill,minmax(236px,1fr));gap:12px;margin-bottom:6px}
-.ccard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;cursor:pointer;transition:border-color .15s,transform .15s}
-.ccard:hover{border-color:var(--accent-line);transform:translateY(-2px)}
-.ccard.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-line)}
-.ccard .top{display:flex;align-items:center;gap:11px}
-.ccard .avatar{flex:none}
-.ccard .nm{font-family:var(--mono);font-size:13.5px;font-weight:600;word-break:break-all}
-.ccard .reg{font-size:10.5px;color:var(--ink-3)}
-.ccard .sw{margin-left:auto;position:relative;z-index:2}
-.ccard .stats{display:flex;gap:0;margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
-.ccard .st{flex:1;text-align:center}
-.ccard .st b{display:block;font-family:var(--mono);font-size:16px;font-weight:650;font-variant-numeric:tabular-nums}
-.ccard .st span{font-size:10.5px;color:var(--ink-3)}
-.ccard .st + .st{border-left:1px solid var(--line)}
+/* ───── 客户端：窄列表 + 固定高详情 ───── */
+.cl-split{display:grid;grid-template-columns:216px 1fr;gap:14px;align-items:stretch}
+.clnav{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:8px;overflow-y:auto;max-height:calc(100vh - 170px);position:sticky;top:78px;align-self:start}
+.citem{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:9px;cursor:pointer;transition:background .12s}
+.citem:hover{background:rgba(148,163,184,.06)}
+.citem.sel{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-line)}
+.citem i{width:7px;height:7px;border-radius:50%;flex:none}
+.citem .id{font-family:var(--mono);font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.citem .dn{font-family:var(--mono);font-size:10.5px;color:var(--bad);flex:none}
+.cpanel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;height:calc(100vh - 170px);min-height:460px;overflow:hidden}
+.cpanel .side-b{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.oblist{flex:1;min-height:100px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12.5px;color:var(--ink-3)}
+.oblist .tbl td{padding:8px 10px}
 .switch{width:34px;height:19px;border-radius:99px;background:rgba(148,163,184,.22);position:relative;cursor:pointer;transition:background .16s;flex:none}
 .switch::after{content:"";position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:left .16s}
 .switch.on{background:var(--accent)}
@@ -253,6 +251,11 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:620px}
   .side.on{transform:none}
   .grid-2{grid-template-columns:1fr}
   .gsearch{display:none}
+  .cl-split{grid-template-columns:1fr;gap:10px}
+  .clnav{position:static;max-height:none;display:flex;gap:6px;overflow-x:auto;padding:6px}
+  .citem{flex:none;border:1px solid var(--line)}
+  .citem.sel{box-shadow:none;border-color:var(--accent)}
+  .cpanel{height:auto;min-height:420px}
 }
 @media (max-width:760px){
   .topbar{flex-wrap:wrap;height:auto;min-height:52px;padding:7px 12px;gap:8px}
@@ -423,41 +426,31 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:620px}
         <button class="dead" data-s="dead" onclick="setClSeg('dead')">有异常<span class="n" id="clDeadN"></span></button>
       </div>
     </div>
-    <div class="split" style="grid-template-columns:1fr 360px">
-      <div>
-        <div class="ccards" id="ccards"></div>
-        <div class="pager" id="clPager" style="display:none">
-          <span id="clPageInfo"></span><span class="sp"></span>
-          <button id="clPrev" onclick="clPageGo(-1)">‹ 上一页</button>
-          <button id="clNext" onclick="clPageGo(1)">下一页 ›</button>
-        </div>
-      </div>
-      <div class="side" id="cd">
-        <div class="side-h">
+    <div class="cl-split">
+      <div class="clnav" id="clNav"></div>
+      <div class="cpanel">
+        <div class="side-h" style="flex:none">
           <div class="row1">
             <div class="avatar" id="cdAvatar" style="width:36px;height:36px">—</div>
             <div style="min-width:0"><h3 id="cdId" style="cursor:default">—</h3><div class="weak" id="cdReg"></div></div>
             <span class="sp"></span>
-            <button class="icon-btn md-close" onclick="closeClientDetail()" title="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            <div class="switch" id="cdSwitch" title="启用/停用"></div>
           </div>
         </div>
         <div class="side-b">
-          <dl class="kv">
+          <dl class="kv" style="margin-bottom:2px">
             <dt>当前状态</dt><dd id="cdState">—</dd>
             <dt>活动连接</dt><dd class="num" id="cdConnN">0</dd>
             <dt>未完成投递</dt><dd class="num" id="cdPendingN">0</dd>
             <dt>死信</dt><dd class="num" id="cdDeadN">0</dd>
           </dl>
-          <div class="opbox">
-            <div class="switch" id="cdSwitch" title="启用/停用"></div>
+          <div class="opbox" style="margin-top:10px">
             <button class="btn btn-outline btn-sm" onclick="sendCmd(cdCurrent,'PING')">PING</button>
             <button class="btn btn-outline btn-sm" onclick="kick(cdCurrent)">断开连接</button>
             <button class="btn btn-danger-tint btn-sm" onclick="removeClientOp(cdCurrent)">注销客户端</button>
+            <a onclick="goClientMessages()" style="font-size:12px;align-self:center;margin-left:auto">查投递记录 →</a>
           </div>
-          <div class="sect">投递记录</div>
-          <a onclick="goClientMessages()" style="font-size:12.5px">在消息页查看该客户端的全部投递记录 →</a>
-          <div class="sect">本地队列（客户端设备）</div>
-          <p class="hintline" style="margin-top:0">设备本地 SQLite 队列快照 · 需主动拉取，不会自动更新</p>
+          <div class="sect" style="margin-top:14px">本地队列（客户端设备快照 · 需主动拉取，不会自动更新）</div>
           <div class="toolbar" style="margin-bottom:8px">
             <select class="fsel" id="obStatus" style="flex:1;min-width:0">
               <option value="">全部状态</option>
@@ -469,9 +462,9 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:620px}
             </select>
             <button class="btn btn-primary btn-sm" id="obPullBtn" onclick="pullOutbox()">拉取快照</button>
           </div>
-          <div id="obRows" style="font-size:12.5px;color:var(--ink-3);max-height:260px;overflow-y:auto">尚未拉取 · 点上方按钮获取设备本地队列</div>
-          <details style="margin-top:10px"><summary class="weak" style="cursor:pointer">原始回执 JSON</summary>
-            <div class="codeblock" id="obRaw" style="margin-top:8px"></div>
+          <div id="obRows" class="oblist">尚未拉取 · 点上方按钮获取设备本地队列</div>
+          <details style="margin-top:8px;flex:none"><summary class="weak" style="cursor:pointer">原始回执 JSON</summary>
+            <div class="codeblock" id="obRaw" style="margin-top:8px;max-height:160px"></div>
           </details>
         </div>
       </div>
@@ -888,44 +881,31 @@ function deliveryTimeline(deliveries){
 function closeMsgDetail(){ document.getElementById("md").classList.remove("on"); }
 
 /* ═════════ 客户端页 ═════════ */
-var clSeg = "all", clPage = 1, PER_CL = 8, cdCurrent = "", obData = [];
+var clSeg = "all", cdCurrent = "", obData = [];
 function setClSeg(s){
-  clSeg = s; clPage = 1;
+  clSeg = s;
   var btns = document.querySelectorAll("#clSeg button");
   for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].dataset.s === s);
   loadClients();
 }
-function clPageGo(delta){ clPage = Math.max(1, clPage + delta); loadClients(); }
 function loadClients(){
   refreshCounts();
-  if (!cdCurrent && clientCache.length) cdCurrent = clientCache[0].clientId;
   var list = clientCache.filter(function(c){
     if (clSeg === "online") return c.enabled && c.online;
     if (clSeg === "offline") return c.enabled && !c.online;
     if (clSeg === "dead") return (c.deadLetterCount || 0) > 0 || (!c.enabled);
     return true;
   });
-  var pages = Math.max(1, Math.ceil(list.length / PER_CL));
-  if (clPage > pages) clPage = pages;
-  var slice = list.slice((clPage - 1) * PER_CL, clPage * PER_CL);
-  document.getElementById("ccards").innerHTML = slice.length ? slice.map(function(c){
-    var deadStyle = c.deadLetterCount > 0 ? "color:var(--bad)" : "";
-    var pendStyle = c.unfinishedCount > 0 ? "color:var(--warn)" : "";
-    return '<div class="ccard' + (cdCurrent === c.clientId ? " sel" : "") + '" onclick="openClient(\'' + esc(c.clientId) + '\')">'
-      + '<div class="top"><div class="avatar">' + esc(shortId(c.clientId)) + '</div>'
-      + '<div style="min-width:0"><div class="nm">' + esc(c.clientId) + '</div>'
-      + '<div class="reg">注册于 ' + esc(c.createdAt || "—") + '</div></div>'
-      + '<div class="sw switch' + (c.enabled ? " on" : "") + '" onclick="event.stopPropagation();toggleClient(\'' + esc(c.clientId) + '\',' + c.enabled + ')"></div></div>'
-      + '<div class="stats">'
-      + '<div class="st"><b>' + (c.online ? '<span style="color:var(--ok)">在线</span>' : (c.enabled ? '<span style="color:var(--mut)">离线</span>' : '<span style="color:var(--warn)">禁用</span>')) + '</b><span>连接 ' + (c.connectionCount || 0) + '</span></div>'
-      + '<div class="st"><b class="num" style="' + pendStyle + '">' + (c.unfinishedCount || 0) + '</b><span>未完成</span></div>'
-      + '<div class="st"><b class="num" style="' + deadStyle + '">' + (c.deadLetterCount || 0) + '</b><span>死信</span></div>'
-      + '</div></div>';
-  }).join("") : '<div class="empty" style="grid-column:1/-1;background:var(--card);border:1px solid var(--line);border-radius:var(--r)"><p>' + (clientCache.length ? "该筛选条件下没有客户端" : "暂无注册客户端 · 点右上「添加客户端」") + '</p></div>';
-  document.getElementById("clPageInfo").textContent = "第 " + clPage + " / " + pages + " 页 · 共 " + list.length + " 个";
-  document.getElementById("clPager").style.display = pages > 1 ? "" : "none";
-  document.getElementById("clPrev").disabled = clPage <= 1;
-  document.getElementById("clNext").disabled = clPage >= pages;
+  if ((!cdCurrent || !list.some(function(c){ return c.clientId === cdCurrent; })) && clientCache.length){
+    cdCurrent = (list.length ? list[0] : clientCache[0]).clientId;
+  }
+  document.getElementById("clNav").innerHTML = list.length ? list.map(function(c){
+    var dot = !c.enabled ? "var(--warn)" : (c.online ? "var(--ok)" : "var(--mut)");
+    return '<div class="citem' + (cdCurrent === c.clientId ? " sel" : "") + '" onclick="selectClient(\'' + esc(c.clientId) + '\')">'
+      + '<i style="background:' + dot + '"></i><span class="id">' + esc(c.clientId) + '</span>'
+      + (c.deadLetterCount > 0 ? '<span class="dn">' + c.deadLetterCount + '</span>' : '')
+      + '</div>';
+  }).join("") : '<div class="empty" style="padding:26px 4px"><p>暂无注册客户端<br>点右上「添加客户端」</p></div>';
   var counts = {all: clientCache.length, online: 0, offline: 0, dead: 0};
   clientCache.forEach(function(c){
     if (c.enabled && c.online) counts.online++;
@@ -936,19 +916,14 @@ function loadClients(){
   document.getElementById("clOnN").textContent = counts.online ? " " + counts.online : "";
   document.getElementById("clOffN").textContent = counts.offline ? " " + counts.offline : "";
   document.getElementById("clDeadN").textContent = counts.dead ? " " + counts.dead : "";
-  if (cdCurrent) refreshClientDetail();
+  refreshClientDetail();
 }
+function selectClient(id){ cdCurrent = id; loadClients(); }
+function openClient(id){ selectClient(id); }
 function shortId(id){
   var digits = String(id).replace(/[^0-9]/g, "");
   return digits.length >= 2 ? digits.slice(-2) : String(id).slice(0, 2).toUpperCase();
 }
-function openClient(id){
-  cdCurrent = id;
-  renderClientSel();
-  refreshClientDetail();
-  if (window.matchMedia("(max-width:1100px)").matches) document.getElementById("cd").classList.add("on");
-}
-function closeClientDetail(){ document.getElementById("cd").classList.remove("on"); }
 function refreshClientDetail(){
   var c = null;
   for (var i = 0; i < clientCache.length; i++) if (clientCache[i].clientId === cdCurrent) c = clientCache[i];
@@ -983,7 +958,7 @@ function removeClientOp(clientId){
     "将把 " + clientId + " 移出白名单：立即失去接入资格，历史数据保留。建议先断开其连接。此操作不可撤销。", "注销",
     function(reason){ return api("api/actions/remove-client",
       {method:"POST", body:{clientId: clientId, reason: reason}}); },
-    function(){ closeClientDetail(); refreshCurrent(); });
+    function(){ refreshCurrent(); });
 }
 function sendCmd(clientId, command){
   confirmOp("下发指令 " + command, "指令经 SSE ctrl 通道实时下发，仅在线客户端生效。", "下发",
