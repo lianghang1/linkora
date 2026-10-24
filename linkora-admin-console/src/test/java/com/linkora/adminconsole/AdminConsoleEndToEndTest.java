@@ -105,6 +105,16 @@ public class AdminConsoleEndToEndTest {
         assertTrue(r.body.contains("</html>"));
     }
 
+    /** 页面本身必须无凭据可直达（浏览器首跳不带 Authorization 头），鉴权由页面内的 API 调用承担。 */
+    @Test
+    public void indexPageServedWithoutToken() throws Exception {
+        HttpResult r = http("/linkora-admin/", null, "GET", null);
+        assertEquals(200, r.status);
+        assertTrue(r.body.contains("Linkora 运维控制台"));
+        // API 仍然拦截
+        assertEquals(401, http("/linkora-admin/api/overview", null, "GET", null).status);
+    }
+
     // ---------------- 查询端点 ----------------
 
     @Test

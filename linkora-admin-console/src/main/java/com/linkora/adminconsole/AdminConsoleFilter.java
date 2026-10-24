@@ -43,17 +43,25 @@ public class AdminConsoleFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest) request;
         HttpServletResponse resp = (HttpServletResponse) response;
 
-        String header = req.getHeader("Authorization");
-        boolean authorized = false;
-        if (header != null && header.startsWith("Bearer ")) {
-            byte[] provided = header.substring(7).trim().getBytes(StandardCharsets.UTF_8);
-            authorized = MessageDigest.isEqual(expectedToken, provided);
-        }
-        if (!authorized) {
-            resp.setStatus(401);
-            resp.setContentType("application/json;charset=UTF-8");
-            resp.getWriter().write("{\"error\":\"未授权：令牌缺失或错误\"}");
-            return;
+        // 控制台单页本身放行：页面 JS 调用 API 收到 401 后展示令牌输入页。
+        // 否则浏览器首跳无法携带 Authorization 头，页面永远无法打开。
+        String pathInfo = req.getPathInfo();
+        boolean isPageRequest = "GET".equals(req.getMethod())
+                && (pathInfo == null || "/".equals(pathInfo) || "/index.html".equals(pathInfo));
+
+        if (!isPageRequest) {
+            String header = req.getHeader("Authorization");
+            boolean authorized = false;
+            if (header != null && header.startsWith("Bearer ")) {
+                byte[] provided = header.substring(7).trim().getBytes(StandardCharsets.UTF_8);
+                authorized = MessageDigest.isEqual(expectedToken, provided);
+            }
+            if (!authorized) {
+                resp.setStatus(401);
+                resp.setContentType("application/json;charset=UTF-8");
+                resp.getWriter().write("{\"error\":\"未授权：令牌缺失或错误\"}");
+                return;
+            }
         }
         chain.doFilter(request, response);
     }
