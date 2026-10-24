@@ -217,22 +217,26 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
             if (localTx) {
                 connection.setAutoCommit(false);
             }
+            // 种子行确保标记：首次尝试会 INSERT 种子行；重试时行必然已存在（并发方创建），
+            // 跳过 INSERT 直接 UPDATE——避免反复触发"INSERT 重复键间隙锁 + UPDATE"
+            // 的 InnoDB 死锁组合（纯 UPDATE 走单行锁等待队列，不会死锁）
+            boolean seqRowEnsured = false;
             try {
                 for (int attempt = 1; ; attempt++) {
                     try {
-                        long allocated = allocateSeqOnce(connection, clientId);
+                        long allocated = allocateSeqOnce(connection, clientId, seqRowEnsured);
                         if (localTx) {
                             connection.commit();
                         }
                         return allocated;
                     } catch (SQLException e) {
-                        // MySQL/InnoDB 并发首次分配会走"INSERT 重复键 + 间隙锁"路径，
-                        // 可能死锁（1213）或锁等待超时（1205）。死锁时 InnoDB 已自动回滚，
-                        // 本地事务下显式回滚兜底后换新事务重试（官方推荐做法）；
-                        // 宿主事务接管时不可本地重试，直接上抛交由宿主处理。
+                        // MySQL/InnoDB 并发首次分配可能死锁（1213）或锁等待超时（1205）。
+                        // 死锁时 InnoDB 已自动回滚，本地事务下显式回滚兜底后换新事务重试
+                        // （官方推荐做法）；宿主事务接管时不可本地重试，直接上抛交由宿主处理。
                         boolean retryable = e.getErrorCode() == 1213 || e.getErrorCode() == 1205;
-                        if (retryable && localTx && attempt < 5) {
+                        if (retryable && localTx && attempt < 8) {
                             connection.rollback();
+                            seqRowEnsured = true;   // 死锁说明并发方已插入种子行，重试不再 INSERT
                             continue;
                         }
                         throw e;
@@ -257,15 +261,18 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
     }
 
     /** 单次分配（调用方在事务内）：确保序号行存在 → 行锁内自增 → 同事务读回。 */
-    private long allocateSeqOnce(Connection connection, String clientId) throws SQLException {
-        // 1. 确保序号行存在（已存在则忽略，幂等）
-        try (PreparedStatement init = connection.prepareStatement(
-                "INSERT INTO lk_client_seq (client_id, last_seq) VALUES (?, 0)")) {
-            init.setString(1, clientId);
-            try {
-                init.executeUpdate();
-            } catch (SQLIntegrityConstraintViolationException alreadyExists) {
-                // 行已存在，继续
+    private long allocateSeqOnce(Connection connection, String clientId,
+                                 boolean seqRowEnsured) throws SQLException {
+        // 1. 确保序号行存在（已存在则忽略，幂等）；重试时跳过（见 nextDeliverySeq 重试逻辑）
+        if (!seqRowEnsured) {
+            try (PreparedStatement init = connection.prepareStatement(
+                    "INSERT INTO lk_client_seq (client_id, last_seq) VALUES (?, 0)")) {
+                init.setString(1, clientId);
+                try {
+                    init.executeUpdate();
+                } catch (SQLIntegrityConstraintViolationException alreadyExists) {
+                    // 行已存在，继续
+                }
             }
         }
         // 2. 行锁内自增：并发分配在此串行化
