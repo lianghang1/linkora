@@ -71,8 +71,9 @@ classpath 中存在**多个版本**的 sqlite-jdbc，native 库加载冲突。
 1. `server.getBacklog(clientId)` 确认是哪个客户端积压；
    **单客户端离线不阻塞其他客户端**（按 clientId 独立队列）；
 2. 该客户端是否长期离线：离线消息持久化等待其上线；
-3. 客户端在线但投递慢：检查该客户端 `sweepIntervalMs` 期间 ACK 回报是否
-   正常（PROCESS 卡住→业务监听器是否漏调 ackProcessed/ackFailed）；
+3. 客户端在线但投递慢：检查业务监听器是否长期阻塞
+   （worker 为单线程串行，一个慢监听器会延迟本客户端的后续消息），
+   以及是否抛出异常进入重试循环；
 4. 运维补投后可调 `server.sweepOnce()` 立即触发扫描。
 
 ### 服务端重启后 nonce/锁定状态丢失
