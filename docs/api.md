@@ -124,7 +124,6 @@ ACK 因终态被静默拒绝），会出现"已跳过但客户端收到一次"�
 |---|---|
 | CREATED | 已创建 |
 | ACCEPTED | 已接受，等待推送 |
-| DELIVERED | 已推送，等待确认 |
 | RECEIVED | 客户端已接收 |
 | RETRYING | 重试中 |
 | DEAD_LETTER | 死信，等待人工介入 |

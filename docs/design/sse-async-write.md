@@ -74,9 +74,10 @@ close() → 置 closed、清队列、asyncContext.complete()（不再有阻塞�
 断开不丢数据的依据：客户端重连带 Last-Event-ID → backfill 补发；重连报文也丢还有周期 sweep 兜底。
 备选"阻塞入队"等于把现状问题搬回编排线程，排除。
 
-**D2. delivered 语义 = 入队即推进 DELIVERED（推荐）**
+**D2. delivered 语义 = 入队即返回（推荐）**
+入队成功即视为投递尝试完成，投递记录保持既有 ACCEPTED 状态（不新增状态值）；
 状态 CAS 全部留在编排线程，容器回调线程只碰字节不碰状态——并发面最小。
-正确性：DELIVERED 非终态，客户端未收到则重连补发/sweep 重推，at-least-once 兜底。
+正确性：ACCEPTED 非终态，客户端未收到则由重推节奏与断线补发兜底，at-least-once 语义不变。
 
 **D3. 容器异步总超时 setTimeout(0) 禁用（推荐）**
 超时按请求总时长计，30s 必杀长连接，必须禁。连接活性靠心跳帧探测：

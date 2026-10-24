@@ -54,14 +54,15 @@ ProcessStatus:  PENDING → PROCESSING → PROCESSED(终态)
 
 ## 重试与退避
 
-| 参数 | 默认值 | 说明 |
-|---|---|---|
-| 初始退避 | 1s | 指数退避 |
-| 最大退避 | 60s | 加随机抖动 |
-| 重试上限 | 可配置 | 超限进入死信，不删除 |
+两类重推节奏（均为指数退避，默认值可配，见 `ServerConfig`）：
 
-- 不可重试错误（认证失败、参数错误）不高速重试。
-- 429/5xx/连接超时/读取超时分类处理；遵守 `Retry-After`。
+| 节奏 | 参数（默认值） | 触发场景 |
+|---|---|---|
+| 失败重试 | `retryBackoffBaseMs/MaxMs`（2s / 300s） | 客户端回 FAILED ACK 后的重试 |
+| 未确认重推 | `pushPacingBaseMs/MaxMs`（5s / 60s） | 已写出但未收到 ACK 的周期性重推 |
+
+- 重试上限 `maxDeliveryRetries`（默认 10）：FAILED 累计超限进入死信，不删除。
+- 不可重试错误（认证失败、参数错误）不高速重试；429/5xx/连接超时/读取超时分类处理。
 - 过期规则服从业务语义，不为清理队列删除未完成消息。
 
 ## 顺序保证（sequenceKey）
@@ -126,8 +127,8 @@ SDK 才发送 PROCESSED ACK——保证"业务成功 ⇒ 至少标记处理成�
 - **入队即返回**：编排线程/心跳线程入队微秒级完成，任何客户端的写出问题只影响它自己；
 - **背压策略**：单连接队列字节量超过 `max-outbound-bytes-per-connection`（默认 8MB，
   `ServerConfig` 可调）时**主动断开该连接**——客户端自动重连并按 Last-Event-ID 补发，零丢失；
-- **delivered 语义**：入队成功即记 DELIVERED（非终态），未实际到达由重连补发/周期
-  sweep 兜底，至少一次语义不变；
+- **写出语义**：入队成功即返回（投递记录保持 ACCEPTED，不等待网络写出结果）；
+  客户端未实际收到时由重推节奏与断线补发兜底，至少一次语义不变；
 - **顺序不变**：同一连接所有帧（业务/心跳）走同一条队列，SSE 帧序严格保持。
 
 验收基线（`StuckClientDisconnectTomcatIT` / `SseIsolationAcceptanceTest`）：
