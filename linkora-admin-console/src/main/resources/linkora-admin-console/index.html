@@ -154,6 +154,7 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:5px;b
 .tl-item.err::before{border-color:var(--bad);box-shadow:var(--glow-bad)}
 .tl-item .t{font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
 .tl-item .n{font-size:13px;margin-top:2px}
+.md-close{display:none;margin-left:auto}
 @media (max-width:1100px){
   .msg-split{grid-template-columns:1fr}
   .md{position:fixed;inset:0;z-index:45;background:#0D0D10;padding:22px 26px;max-height:none;border-left:none;transform:translateX(100%);transition:transform .28s cubic-bezier(.3,.9,.3,1);min-height:0}
@@ -161,7 +162,6 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:5px;b
   .md-close{display:flex}
   .metrics{flex-wrap:wrap;gap:18px 0}.metric{padding:0 24px}
 }
-.md-close{display:none;margin-left:auto}
 
 /* ───── 按钮 ───── */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 15px;border-radius:var(--r-sm);font-size:13px;font-weight:550;transition:all .16s;border:1px solid transparent;white-space:nowrap}
@@ -290,6 +290,55 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 @keyframes shakeX{0%,100%{transform:none}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
 .login-card.shake{animation:shakeX .38s}
 @media (max-width:1100px){.login-side{display:none}.login-panel{width:100%}.pillnav a{padding:7px 12px}}
+
+/* ───── 移动端适配（<760px） ───── */
+@media (max-width:760px){
+  /* 顶栏：logo 一行 + 页签一行，不再挤压 */
+  .topbar{flex-wrap:wrap;height:auto;min-height:54px;padding:8px 14px;gap:6px}
+  .pillnav{position:static;transform:none;order:3;width:100%;justify-content:space-between}
+  .pillnav a{flex:1;justify-content:center;padding:7px 4px;font-size:12px}
+  .pillnav a .num{margin-left:3px}
+  .cswitch{margin-left:auto;max-width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* 页面画布与标题 */
+  .page{padding:20px 14px 48px}
+  .page-head h1{font-size:22px}
+  .page-head .desc{font-size:12.5px}
+
+  /* 指标条 2×2 */
+  .metrics{display:grid;grid-template-columns:1fr 1fr;gap:16px 0;margin-bottom:22px}
+  .metric{padding:0 16px}
+  .metric .m-val{font-size:28px}
+
+  /* 驾驶舱双栏（图表+动态流）改单栏 */
+  .page div[style*="1fr 350px"]{grid-template-columns:1fr !important;gap:26px !important;margin-top:22px !important}
+
+  /* 分段器/筛选/批量条可换行 */
+  .seg{flex-wrap:wrap}
+  .filterbar{gap:8px}
+  .filterbar input,.filterbar select{flex:1 1 44%;min-width:0}
+  .batchbar{flex-wrap:wrap}
+
+  /* 列表行：操作按钮常显、副信息换行 */
+  .r-acts{opacity:1}
+  .r-title{flex-wrap:wrap;gap:5px}
+  .r-sub{flex-wrap:wrap;gap:4px 10px}
+  .r-time{display:none}
+
+  /* 客户端卡片单列 */
+  .client-grid{grid-template-columns:1fr}
+
+  /* 详情区（覆盖层态）与弹窗适配屏宽 */
+  .md{padding:18px 14px}
+  .md .codeblock,.codeblock{font-size:11px;overflow-x:auto}
+  .kv{grid-template-columns:76px 1fr}
+  .modal .m-box{width:calc(100vw - 24px);max-height:86vh;overflow-y:auto}
+  #cmdk .k-box{width:calc(100vw - 24px)}
+
+  /* 登录页 */
+  .login-panel{padding:20px}
+  .login-card{padding:26px 22px}
+}
 </style>
 </head>
 <body>
