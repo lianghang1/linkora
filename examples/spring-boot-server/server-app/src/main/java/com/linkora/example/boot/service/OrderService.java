@@ -38,4 +38,15 @@ public class OrderService {
         return linkoraServer.publish(clientId, TOPIC_ORDER_CREATED,
                 payload.toString().getBytes(StandardCharsets.UTF_8), orderNo);
     }
+
+    /**
+     * 无 sequenceKey 的下行通知（对照演示用）：与带键消息混排时不受任何门禁影响。
+     */
+    public PublishResult placeOrderNoKey(String clientId, String orderNo, String item) {
+        ObjectNode payload = LinkoraJsonUtil.getObjectMapper().createObjectNode();
+        payload.put("orderNo", orderNo);
+        payload.put("item", item);
+        return linkoraServer.publish(clientId, TOPIC_ORDER_CREATED,
+                payload.toString().getBytes(StandardCharsets.UTF_8));
+    }
 }

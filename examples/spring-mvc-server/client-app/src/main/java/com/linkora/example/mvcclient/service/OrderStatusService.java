@@ -30,7 +30,8 @@ public class OrderStatusService {
         ObjectNode payload = LinkoraJsonUtil.getObjectMapper().createObjectNode();
         payload.put("orderNo", orderNo);
         payload.put("status", status);
-        return publisher.publish(TOPIC, payload);
+        // sequenceKey = orderNo：同一订单的状态变更严格按发布顺序被线上接收
+        return publisher.publish(TOPIC, payload, orderNo);
     }
 
     /** 等待该消息被服务端确认（转发 {@link UplinkPublisher#awaitServerAccepted}）。 */

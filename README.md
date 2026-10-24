@@ -278,7 +278,7 @@ linkora.client.db-path=data/client.db
 
 ## 管理接口：监控与人工处置
 
-出状况时不用翻库。注入 `LinkoraServer` 后即可调用，全部返回**人类可读视图**：
+出状况时不用翻库。完整方法签名、入参表与返回字段说明见 [docs/api.md](docs/api.md)。注入 `LinkoraServer` 后即可调用，全部返回**人类可读视图**：
 时间一律 `yyyy-MM-dd HH:mm:ss`（无裸时间戳），payload 一律 UTF-8 文本预览（超长截断、
 二进制只标注字节数，**绝不输出 Base64**），状态附中文描述（"重试中"、"死信，等待人工介入"…）。
 

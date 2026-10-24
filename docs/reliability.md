@@ -114,3 +114,22 @@ clientId，要么给每个项目独立 clientId（推荐），要么业务侧自
 SQLite（SDK）与业务数据库是独立事务。业务方在业务监听器内提交业务事务后，
 SDK 才发送 PROCESSED ACK——保证"业务成功 ⇒ 至少标记处理成功"。
 反向（SDK 落盘 ⇒ 业务一定成功）不成立，由重试与死信兜底。
+
+## 推送写模型（非阻塞 + 每连接队列）
+
+推送写出的隔离模型（设计详见 [design/sse-async-write.md](design/sse-async-write.md)）：
+
+服务端推送不再由编排线程同步写网络（同步写模型下一个"假在线"客户端会把推送线程
+卡死、拖累全部客户端——Tomcat 下实测无自愈手段），而是每连接维护**有界出站队列**，
+由容器的非阻塞写回调（Servlet 3.1 `WriteListener`）泵出：
+
+- **入队即返回**：编排线程/心跳线程入队微秒级完成，任何客户端的写出问题只影响它自己；
+- **背压策略**：单连接队列字节量超过 `max-outbound-bytes-per-connection`（默认 8MB，
+  `ServerConfig` 可调）时**主动断开该连接**——客户端自动重连并按 Last-Event-ID 补发，零丢失；
+- **delivered 语义**：入队成功即记 DELIVERED（非终态），未实际到达由重连补发/周期
+  sweep 兜底，至少一次语义不变；
+- **顺序不变**：同一连接所有帧（业务/心跳）走同一条队列，SSE 帧序严格保持。
+
+验收基线（`StuckClientDisconnectTomcatIT` / `SseIsolationAcceptanceTest`）：
+慢客户端被 8×1MB 消息灌满期间，其他客户端接收延迟 <1s（实测 22~44ms）；
+慢客户端被水位断开后重连，积压消息补发完整。

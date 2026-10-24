@@ -51,20 +51,35 @@ public final class SsePushServlet extends HttpServlet {
     private final SseConnectionRegistry registry;
     private final long heartbeatIntervalMs;
     private final long reconnectHintMs;
+    private final long maxOutboundBytes;
     private final ScheduledExecutorService heartbeatScheduler;
 
     public SsePushServlet(SseSubscribeHandler handler, SseConnectionRegistry registry,
                           long heartbeatIntervalMs, long reconnectHintMs) {
+        this(handler, registry, heartbeatIntervalMs, reconnectHintMs,
+                SseClientConnection.DEFAULT_MAX_OUTBOUND_BYTES);
+    }
+
+    /**
+     * 完整构造：maxOutboundBytes 为每连接出站队列字节水位（超限断开慢客户端），
+     * 建议传 {@code ServerConfig#getMaxOutboundBytesPerConnection()}。
+     */
+    public SsePushServlet(SseSubscribeHandler handler, SseConnectionRegistry registry,
+                          long heartbeatIntervalMs, long reconnectHintMs, long maxOutboundBytes) {
         if (handler == null || registry == null) {
             throw new IllegalArgumentException("handler 与 registry 不能为 null");
         }
         if (heartbeatIntervalMs < 0 || reconnectHintMs < 0) {
             throw new IllegalArgumentException("心跳与重连提示间隔不得为负数");
         }
+        if (maxOutboundBytes <= 0) {
+            throw new IllegalArgumentException("maxOutboundBytes 必须 > 0");
+        }
         this.handler = handler;
         this.registry = registry;
         this.heartbeatIntervalMs = heartbeatIntervalMs;
         this.reconnectHintMs = reconnectHintMs;
+        this.maxOutboundBytes = maxOutboundBytes;
         this.heartbeatScheduler = Executors.newScheduledThreadPool(1, new ThreadFactory() {
             private final AtomicInteger seq = new AtomicInteger(0);
 
@@ -102,7 +117,7 @@ public final class SsePushServlet extends HttpServlet {
         asyncContext.setTimeout(0L); // SSE 长连接不受容器异步超时约束
 
         SseClientConnection connection = new SseClientConnection(
-                clientId, asyncContext, response, new DisconnectAdapter());
+                clientId, asyncContext, response, new DisconnectAdapter(), maxOutboundBytes);
 
         // 先注册再交给 handler（handler 会在订阅成功后提交重连补发）：
         // 保证补发首推时连接已在注册表内，否则首推落空需等一个扫描周期

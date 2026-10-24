@@ -762,6 +762,11 @@ public final class LinkoraServer {
         return config.getMessageSizeLimitBytes();
     }
 
+    /** 每连接 SSE 出站队列字节水位（透传 ServerConfig，供宿主装配 Servlet 时使用）。 */
+    public long getMaxOutboundBytesPerConnection() {
+        return config.getMaxOutboundBytesPerConnection();
+    }
+
     /** SSE 连接注册表（接到 SsePushServlet；使用默认网关时非 null）。 */
     public SseConnectionRegistry sseConnectionRegistry() {
         return sseRegistry;
