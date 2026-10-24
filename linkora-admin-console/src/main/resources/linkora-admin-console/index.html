@@ -476,33 +476,48 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
       <button data-t="unfinished" onclick="setCdTab('unfinished')">未完成明细</button>
       <button data-t="outbox" onclick="setCdTab('outbox')">本地队列</button>
     </div>
-    <div style="display:flex;align-items:center;gap:12px;margin:16px 0 4px" id="cdSegWrap">
-      <div class="seg" id="cdSeg">
-        <button class="on" onclick="setCdSeg('all')">全部</button>
-        <button onclick="setCdSeg('run')">待处理</button>
-        <button class="dead" onclick="setCdSeg('dead')">死信</button>
+    <div class="msg-split" style="margin-top:4px">
+      <div>
+        <div id="cdSegWrap" style="display:flex;align-items:center;gap:12px;margin:0 0 4px">
+          <div class="seg" id="cdSeg">
+            <button class="on" onclick="setCdSeg('all')">全部</button>
+            <button onclick="setCdSeg('run')">待处理</button>
+            <button class="dead" onclick="setCdSeg('dead')">死信</button>
+          </div>
+          <span class="weak">点行在右侧查看详情</span>
+        </div>
+        <div class="rows" id="cdList"></div>
+        <div id="cdUnfinished" style="display:none"></div>
+        <div id="cdOutbox" style="display:none">
+          <div class="filterbar">
+            <select id="obStatus">
+              <option value="">全部状态</option>
+              <option value="PENDING">待发送</option>
+              <option value="SENDING">发送中</option>
+              <option value="SERVER_ACCEPTED">服务端已接受</option>
+              <option value="FAILED">发送失败</option>
+              <option value="DEAD_LETTER">死信</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="obPullBtn" onclick="pullOutbox()">拉取本地队列</button>
+            <span class="weak" id="obHint">拉取的是客户端在线瞬间的本地快照，不会自动更新</span>
+          </div>
+          <div class="rows" id="obRows"></div>
+          <details style="margin-top:14px"><summary class="weak" style="cursor:pointer">原始回执 JSON</summary>
+            <div class="codeblock" id="obRaw" style="margin-top:10px"></div>
+          </details>
+        </div>
       </div>
-      <span class="weak">点行跳转到消息页查看详情</span>
-    </div>
-    <div class="rows" id="cdList"></div>
-    <div id="cdUnfinished" style="display:none"></div>
-    <div id="cdOutbox" style="display:none">
-      <div class="filterbar">
-        <select id="obStatus">
-          <option value="">全部状态</option>
-          <option value="PENDING">待发送</option>
-          <option value="SENDING">发送中</option>
-          <option value="SERVER_ACCEPTED">服务端已接受</option>
-          <option value="FAILED">发送失败</option>
-          <option value="DEAD_LETTER">死信</option>
-        </select>
-        <button class="btn btn-primary btn-sm" id="obPullBtn" onclick="pullOutbox()">拉取本地队列</button>
-        <span class="weak" id="obHint">拉取的是客户端在线瞬间的本地快照，不会自动更新</span>
+      <div class="md" id="cdMd">
+        <div class="md-head">
+          <div><h3 id="cdMdTitle" onclick="copyText(this.textContent)" title="点击复制">从左侧选择</h3><span class="weak" id="cdMdSub"></span></div>
+          <button class="icon-btn md-close" onclick="closeCdDetail()" title="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div id="cdMdBody">
+          <div class="empty"><p>点行在此查看详情</p></div>
+        </div>
       </div>
-      <div class="rows" id="obRows"></div>
-      <details style="margin-top:14px"><summary class="weak" style="cursor:pointer">原始回执 JSON</summary>
-        <div class="codeblock" id="obRaw" style="margin-top:10px"></div>
-      </details>
     </div>
     <div id="cdCmdResult" class="codeblock" style="display:none;margin-top:14px"></div>
   </div>
@@ -848,7 +863,8 @@ function rowHtml(d, opts){
   } else if (d.state === "RETRYING" || d.state === "FAILED"){
     actions = '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();skipTask(\'' + esc(d.clientId) + '\',\'' + esc(d.messageId) + '\')">跳过</button>';
   }
-  return '<div class="row' + (currentMsgId === d.messageId ? " sel" : "") + '" onclick="openMessage(\'' + esc(d.messageId) + '\')">'
+  var clickFn = opts.clickFn || "openMessage";
+  return '<div class="row' + (currentMsgId === d.messageId ? " sel" : "") + '" onclick="' + clickFn + '(\'' + esc(d.messageId) + '\')">'
     + '<div class="r-ico ' + cls + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONS[cls] + '</svg></div>'
     + '<div class="r-main"><div class="r-title"><span class="mid">' + esc(d.messageId) + '</span>'
     + '<span class="type">' + esc(d.messageType || "—") + '</span>' + chips + blk + '</div>'
@@ -932,6 +948,23 @@ function loadMessages(){
     blockedChips(rows);
   }).catch(showErr);
 }
+function renderDetailInto(prefix, m){
+  document.getElementById(prefix + "Title").textContent = m.messageId;
+  document.getElementById(prefix + "Sub").textContent = (m.messageType || "") + " · 发布于 " + (m.createdAt || "");
+  var pretty = m.payload || "";
+  if (pretty && pretty.indexOf("{") === 0){
+    try { pretty = JSON.stringify(JSON.parse(pretty), null, 2); } catch (e) { /* 保持原文 */ }
+  }
+  var html = '<div class="kv">'
+    + "<dt>客户端</dt><dd class='mono'>" + esc(m.clientId) + "</dd>"
+    + "<dt>类型</dt><dd>" + esc(m.messageType) + "</dd>"
+    + "<dt>顺序键</dt><dd class='mono'>" + esc(m.sequenceKey || "（无顺序键）") + "</dd>"
+    + "<dt>过期时间</dt><dd class='num'>" + esc(m.expiresAt || "不过期") + "</dd>"
+    + "<dt>大小</dt><dd class='num'>" + m.payloadSize + " 字节</dd></div>"
+    + '<div class="sect-lbl">PAYLOAD</div><div class="codeblock">' + esc(pretty) + "</div>"
+    + '<div class="sect-lbl">投递记录</div>' + deliveryTimeline(m.deliveries || []);
+  document.getElementById(prefix + "Body").innerHTML = html;
+}
 function openMessage(id){
   currentMsgId = id;
   var rows = document.querySelectorAll("#msgList .row");
@@ -944,23 +977,33 @@ function openMessage(id){
   document.getElementById("mdBody").innerHTML = '<div class="skeleton" style="width:80%"></div>';
   if (window.matchMedia("(max-width:1100px)").matches) document.getElementById("md").classList.add("on");
   api("api/messages/" + encodeURIComponent(id)).then(function(m){
-    document.getElementById("mdSub").textContent = (m.messageType || "") + " · 发布于 " + (m.createdAt || "");
-    var pretty = m.payload || "";
-    if (pretty && pretty.indexOf("{") === 0){
-      try { pretty = JSON.stringify(JSON.parse(pretty), null, 2); } catch (e) { /* 保持原文 */ }
-    }
-    var html = '<div class="kv">'
-      + "<dt>客户端</dt><dd class='mono'>" + esc(m.clientId) + "</dd>"
-      + "<dt>类型</dt><dd>" + esc(m.messageType) + "</dd>"
-      + "<dt>顺序键</dt><dd class='mono'>" + esc(m.sequenceKey || "（无顺序键）") + "</dd>"
-      + "<dt>过期时间</dt><dd class='num'>" + esc(m.expiresAt || "不过期") + "</dd>"
-      + "<dt>大小</dt><dd class='num'>" + m.payloadSize + " 字节</dd></div>"
-      + '<div class="sect-lbl">PAYLOAD</div><div class="codeblock">' + esc(pretty) + "</div>"
-      + '<div class="sect-lbl">投递记录</div>' + deliveryTimeline(m.deliveries || []);
-    document.getElementById("mdBody").innerHTML = html;
+    renderDetailInto("md", m);
   }).catch(function(e){
     document.getElementById("mdBody").innerHTML = '<div class="empty"><p>' + esc(e.error || "加载失败") + "</p></div>";
   });
+}
+/* 客户端详情页内查看消息详情（不跳页） */
+function openMessageHere(id){
+  currentMsgId = id;
+  var rows = document.querySelectorAll("#cdList .row");
+  for (var i = 0; i < rows.length; i++){
+    var oc = rows[i].getAttribute("onclick") || "";
+    rows[i].classList.toggle("sel", oc.indexOf("'" + id + "'") >= 0);
+  }
+  document.getElementById("cdMdTitle").textContent = id;
+  document.getElementById("cdMdSub").textContent = "";
+  document.getElementById("cdMdBody").innerHTML = '<div class="skeleton" style="width:80%"></div>';
+  if (window.matchMedia("(max-width:1100px)").matches) document.getElementById("cdMd").classList.add("on");
+  api("api/messages/" + encodeURIComponent(id)).then(function(m){
+    renderDetailInto("cdMd", m);
+  }).catch(function(e){
+    document.getElementById("cdMdBody").innerHTML = '<div class="empty"><p>' + esc(e.error || "加载失败") + "</p></div>";
+  });
+}
+function closeCdDetail(){
+  if (window.matchMedia("(max-width:1100px)").matches){
+    document.getElementById("cdMd").classList.remove("on");
+  }
 }
 function viewMessage(id){
   go("messages");
@@ -1079,8 +1122,10 @@ function setCdTab(t){
   document.getElementById("cdList").style.display = t === "messages" ? "" : "none";
   document.getElementById("cdUnfinished").style.display = t === "unfinished" ? "" : "none";
   document.getElementById("cdOutbox").style.display = t === "outbox" ? "" : "none";
+  document.getElementById("cdMd").style.visibility = "hidden";
   document.getElementById("cdCmdResult").style.display = "none";
   if (t === "unfinished") loadCdUnfinished();
+  if (t === "messages" || t === "outbox") document.getElementById("cdMd").style.visibility = "visible";
 }
 function renderCdBody(c){
   var listEl = document.getElementById("cdList");
@@ -1109,7 +1154,7 @@ function renderCdBody(c){
   Promise.all(jobs).then(function(groups){
     var rows = [].concat.apply([], groups);
     rows.sort(function(a, b){ return (b.updatedAt || "").localeCompare(a.updatedAt || ""); });
-    listEl.innerHTML = rows.length ? rows.map(function(d){ return rowHtml(d, {blocked:cdSeg !== "all"}); }).join("")
+    listEl.innerHTML = rows.length ? rows.map(function(d){ return rowHtml(d, {blocked:cdSeg !== "all", clickFn:"openMessageHere"}); }).join("")
       : '<div class="empty"><p>没有符合条件的记录</p></div>';
     blockedChips(rows.filter(function(d){ return d.sequenceKey; }));
   }).catch(showErr);
@@ -1119,7 +1164,7 @@ function loadCdUnfinished(){
   box.innerHTML = '<div class="skeleton" style="width:60%"></div>';
   api("api/clients/" + encodeURIComponent(cdCurrent) + "/unfinished").then(function(list){
     box.innerHTML = list.length ? "<table style='width:100%;border-collapse:collapse'><tbody>" + list.map(function(d){
-      return "<tr style='border-bottom:1px solid var(--hair)'><td style='padding:12px' class='mono'>" + esc(d.messageId) + "</td><td style='padding:12px'>"
+      return "<tr style='border-bottom:1px solid var(--hair);cursor:pointer' onclick=\"openMessageHere('" + esc(d.messageId) + "')\"><td style='padding:12px' class='mono'>" + esc(d.messageId) + "</td><td style='padding:12px'>"
         + stPill(d.state, d.stateText || d.state) + "</td>"
         + "<td style='padding:12px' class='num'>" + d.retryCount + " 次</td>"
         + "<td style='padding:12px' class='weak num'>" + esc(d.updatedAt || "") + "</td></tr>";
@@ -1201,11 +1246,12 @@ function pullOutbox(){
   }
 }
 function renderOutbox(rows){
+  obData = rows || [];
   var el = document.getElementById("obRows");
-  el.innerHTML = rows.length ? rows.map(function(r){
+  el.innerHTML = obData.length ? obData.map(function(r, idx){
     var cls = obCls(r.statusText);
     var dead = r.statusText && r.statusText.indexOf("死信") >= 0;
-    return '<div class="row"><div class="r-ico ' + cls + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONS[cls] + '</svg></div>'
+    return '<div class="row' + (currentMsgId === r.messageId ? " sel" : "") + '" onclick="openOutboxDetail(' + idx + ')"><div class="r-ico ' + cls + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONS[cls] + '</svg></div>'
       + '<div class="r-main"><div class="r-title"><span class="mid">' + esc(r.messageId) + '</span>'
       + '<span class="type">' + esc(r.messageType || "—") + '</span>'
       + stPill(dead ? "DEAD_LETTER" : "ACCEPTED", r.statusText) + '</div>'
@@ -1214,10 +1260,36 @@ function renderOutbox(rows){
       + '<span class="num">' + r.payloadSize + ' 字节</span></div></div>'
       + '<span class="r-time">' + esc(r.updatedAt || r.createdAt || "") + '</span>'
       + (dead ? '<div class="r-acts">'
-        + '<button class="btn btn-tint btn-sm" onclick="retryOutbox(\'' + esc(r.messageId) + '\')">重发</button>'
-        + '<button class="btn btn-danger-tint btn-sm" onclick="discardOutbox(\'' + esc(r.messageId) + '\')">放弃</button></div>' : "")
+        + '<button class="btn btn-tint btn-sm" onclick="event.stopPropagation();retryOutbox(\'' + esc(r.messageId) + '\')">重发</button>'
+        + '<button class="btn btn-danger-tint btn-sm" onclick="event.stopPropagation();discardOutbox(\'' + esc(r.messageId) + '\')">放弃</button></div>' : "")
       + '</div>';
   }).join("") : '<div class="empty"><p>本地队列为空（当前过滤条件下）</p></div>';
+}
+var obData = [];
+function openOutboxDetail(idx){
+  var r = obData[idx];
+  if (!r) return;
+  currentMsgId = r.messageId;
+  var orows = document.querySelectorAll("#obRows .row");
+  for (var i = 0; i < orows.length; i++) orows[i].classList.toggle("sel", i === idx);
+  document.getElementById("cdMdTitle").textContent = r.messageId;
+  document.getElementById("cdMdSub").textContent = (r.messageType || "") + " · 本地队列快照";
+  var pretty = r.payloadPreview || "";
+  if (pretty.indexOf("{") === 0){
+    try { pretty = JSON.stringify(JSON.parse(pretty), null, 2); } catch (e) { /* 保持原文 */ }
+  }
+  document.getElementById("cdMdBody").innerHTML = '<div class="kv">'
+    + "<dt>客户端</dt><dd class='mono'>" + esc(cdCurrent) + "</dd>"
+    + "<dt>类型</dt><dd>" + esc(r.messageType || "—") + "</dd>"
+    + "<dt>状态</dt><dd>" + stPill(r.statusText.indexOf("死信") >= 0 ? "DEAD_LETTER" : "ACCEPTED", r.statusText) + "</dd>"
+    + "<dt>重试</dt><dd class='num'>" + r.retryCount + " 次</dd>"
+    + "<dt>大小</dt><dd class='num'>" + r.payloadSize + " 字节</dd>"
+    + "<dt>创建时间</dt><dd class='num'>" + esc(r.createdAt || "—") + "</dd>"
+    + "<dt>更新时间</dt><dd class='num'>" + esc(r.updatedAt || "—") + "</dd></div>"
+    + (r.lastError && r.lastError !== "—" ? '<div class="sect-lbl">最近错误</div><div class="codeblock">' + esc(r.lastError) + "</div>" : "")
+    + '<div class="sect-lbl">PAYLOAD 预览</div><div class="codeblock">' + esc(pretty) + "</div>"
+    + '<div class="weak" style="margin-top:14px">以上为客户端本地队列快照数据（拉取于本次拉取时间），无服务端投递时间线。</div>';
+  if (window.matchMedia("(max-width:1100px)").matches) document.getElementById("cdMd").classList.add("on");
 }
 function retryOutbox(messageId){
   confirmOp("重发上行死信", messageId + " 将由客户端从本地队列重新向上行发送。", "重发",
@@ -1276,7 +1348,7 @@ document.addEventListener("keydown", function(e){
     document.getElementById("cmdk").classList.contains("on") ? closeCmdk() : openCmdk();
     return;
   }
-  if (e.key === "Escape"){ closeCmdk(); closeMsgDetail(); closeModal(); return; }
+  if (e.key === "Escape"){ closeCmdk(); closeMsgDetail(); closeCdDetail(); closeModal(); return; }
   var cmdkOn = document.getElementById("cmdk").classList.contains("on");
   if (cmdkOn && (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter")){
     e.preventDefault();
@@ -1331,6 +1403,10 @@ function copyText(s){
 document.getElementById("mdTitle").addEventListener("click", function(){
   var id = this.textContent;
   if (id && id !== "从左侧选择消息") copyText(id);
+});
+document.getElementById("cdMdTitle").addEventListener("click", function(){
+  var id = this.textContent;
+  if (id && id !== "从左侧选择") copyText(id);
 });
 function toast(msg, kind){
   var t = document.createElement("div");
