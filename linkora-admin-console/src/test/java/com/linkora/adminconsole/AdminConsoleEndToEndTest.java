@@ -309,6 +309,30 @@ public class AdminConsoleEndToEndTest {
     }
 
     @Test
+    public void registerAndRemoveClientLifecycle() throws Exception {
+        // 注册：成功；重复注册：ok=false
+        assertEquals(true, mapper.readTree(http("/linkora-admin/api/actions/register-client", TOKEN,
+                "POST", "{\"newClientId\":\"store-999\",\"enabled\":true,\"reason\":\"新门店上线\"}")
+                .body).get("ok").asBoolean());
+        assertEquals(false, mapper.readTree(http("/linkora-admin/api/actions/register-client", TOKEN,
+                "POST", "{\"newClientId\":\"store-999\",\"reason\":\"重复注册应拒绝\"}")
+                .body).get("ok").asBoolean());
+        // 注册后立即可用（出现在 overview）
+        assertTrue(mapper.readTree(http("/linkora-admin/api/overview", TOKEN, "GET", null).body)
+                .toString().contains("store-999"));
+        // 缺 newClientId：400
+        assertEquals(400, http("/linkora-admin/api/actions/register-client", TOKEN,
+                "POST", "{\"reason\":\"缺ID\"}").status);
+        // 注销：成功；再注销：ok=false
+        assertEquals(true, mapper.readTree(http("/linkora-admin/api/actions/remove-client", TOKEN,
+                "POST", "{\"clientId\":\"store-999\",\"reason\":\"门店撤点\"}")
+                .body).get("ok").asBoolean());
+        assertEquals(false, mapper.readTree(http("/linkora-admin/api/actions/remove-client", TOKEN,
+                "POST", "{\"clientId\":\"store-999\",\"reason\":\"已不存在\"}")
+                .body).get("ok").asBoolean());
+    }
+
+    @Test
     public void forceTransitionRejectsIllegalMove() throws Exception {
         String messageId = publishOne("x");
         // ACCEPTED → PROCESSED 为非法转移（跳过 RECEIVED/FAILED 链），应 400

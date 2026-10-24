@@ -107,6 +107,19 @@ public final class JdbcClientRegistry implements ClientRegistry {
     }
 
     @Override
+    public boolean removeClient(String clientId) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "DELETE FROM lk_client WHERE client_id = ?")) {
+            ps.setString(1, clientId);
+            return ps.executeUpdate() == 1;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "注销客户端失败: " + clientId, e);
+        }
+    }
+
+    @Override
     public void updateConnectionState(String clientId, ConnectionState state, long lastActiveAt) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(

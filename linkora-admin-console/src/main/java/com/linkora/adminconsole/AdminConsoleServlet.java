@@ -203,6 +203,18 @@ public class AdminConsoleServlet extends HttpServlet {
                 writeJson(resp, 200, result(server.disableClient(clientId)));
                 return;
             }
+            if ("/api/actions/register-client".equals(path)) {
+                String newId = requireText(body, "newClientId");
+                audit("注册客户端", newId, null, reason);
+                writeJson(resp, 200, result(server.registerClient(
+                        newId, body.path("enabled").asBoolean(true))));
+                return;
+            }
+            if ("/api/actions/remove-client".equals(path)) {
+                audit("注销客户端", clientId, null, reason);
+                writeJson(resp, 200, result(server.removeClient(clientId)));
+                return;
+            }
             if ("/api/actions/force-transition".equals(path)) {
                 MessageState target = MessageState.valueOf(requireText(body, "target"));
                 audit("状态变更→" + target, clientId, messageId, reason);

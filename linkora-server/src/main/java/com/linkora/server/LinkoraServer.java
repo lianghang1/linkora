@@ -603,6 +603,32 @@ public final class LinkoraServer {
         return Math.max(0, total - 1);
     }
 
+    /** 管理接口：注册新客户端（白名单添加）。已存在时返回 false。 */
+    public boolean registerClient(String clientId, boolean enabled) {
+        requireNotBlank(clientId, "clientId");
+        String id = clientId.trim();
+        if (clientRegistry.findByClientId(id).isPresent()) {
+            return false;
+        }
+        clientRegistry.register(new ClientRegistration(id, enabled, System.currentTimeMillis()));
+        log.info("管理接口注册客户端: clientId={}, enabled={}", id, enabled);
+        return true;
+    }
+
+    /**
+     * 管理接口：注销客户端（移出白名单）。历史消息与投递数据保留；注销前应先断开其连接。
+     *
+     * @return true 表示注销成功；false 表示客户端不存在或仓储不支持注销
+     */
+    public boolean removeClient(String clientId) {
+        requireNotBlank(clientId, "clientId");
+        boolean ok = clientRegistry.removeClient(clientId.trim());
+        if (ok) {
+            log.info("管理接口注销客户端: clientId={}", clientId.trim());
+        }
+        return ok;
+    }
+
     /** 运行时启用客户端（恢复收发）。 */
     public boolean enableClient(String clientId) {
         requireNotBlank(clientId, "clientId");

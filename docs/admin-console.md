@@ -74,6 +74,8 @@ REST 端点（全部位于 `<path>/api/**`，JSON）：
 | `/api/actions/batch-skip` | POST | 批量跳过指定客户端死信 |
 | `/api/actions/batch-retry` | POST | 批量重放指定客户端死信 |
 | `/api/actions/enable` / `disable` | POST | 启用/禁用客户端 |
+| `/api/actions/register-client` | POST | 注册新客户端（加入白名单，`newClientId`/`enabled`/`reason`） |
+| `/api/actions/remove-client` | POST | 注销客户端（移出白名单；历史数据保留，建议先断开连接） |
 | `/api/actions/disconnect` | POST | 断开 SSE 连接 |
 | `/api/actions/force-transition` | POST | 人工状态变更（仅合法转移，reason 必填） |
 | `/api/actions/client-command` | POST | 下发远程指令（白名单见 ClientCommands） |

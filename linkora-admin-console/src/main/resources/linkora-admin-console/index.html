@@ -228,6 +228,7 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 .m-box label b{color:var(--bad)}
 .m-box textarea,.m-box input,.m-box select{width:100%;resize:none;border:1px solid var(--hair-2);border-radius:var(--r-sm);padding:9.5px 13px;font-size:13px;font-family:inherit;background:rgba(255,255,255,.03);color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
 .m-box textarea{height:66px}
+.m-box input[type="checkbox"]{width:auto;accent-color:var(--accent)}
 .m-box textarea:focus,.m-box input:focus,.m-box select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
 .m-box select option{background:#131318}
 .m-acts{display:flex;justify-content:flex-end;gap:9px;margin-top:19px}
@@ -450,6 +451,7 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
     <div class="page-head">
       <h1>客户端</h1>
       <p class="desc">点卡片进入客户端详情（指标 / 远程指令 / 该客户端的消息）</p>
+      <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="openRegisterModal()">＋ 注册新客户端</button>
     </div>
     <div class="client-grid" id="clientGrid"></div>
     <footer class="ver">Linkora Admin Console · v0.4.0 · 数据每 10 秒自动刷新</footer>
@@ -464,6 +466,7 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
         <div class="switch" id="cdSwitch"></div>
         <button class="btn btn-outline btn-sm" onclick="sendCmd(cdCurrent,'PING')">PING</button>
         <button class="btn btn-outline btn-sm" onclick="kick(cdCurrent)">断开连接</button>
+        <button class="btn btn-danger-tint btn-sm" onclick="removeClientOp(cdCurrent)">注销客户端</button>
       </div>
     </div>
     <div class="metrics" style="margin-top:16px">
@@ -1186,6 +1189,30 @@ function kick(clientId){
     function(reason){ return api("api/actions/disconnect",
       {method:"POST", body:{clientId: clientId, reason: reason}}); },
     function(){ refreshCurrent(); });
+}
+function openRegisterModal(){
+  confirmOp("注册新客户端", "新客户端 ID 加入服务端白名单后即可接入（SSE 连接 / 上下行消息）。", "注册",
+    function(reason){
+      var id = document.getElementById("regId").value.trim();
+      if (!id){ toast("请填写客户端 ID", "warn"); return Promise.reject({error:"客户端 ID 不能为空"}); }
+      var enabled = document.getElementById("regEnabled").checked;
+      return api("api/actions/register-client",
+        {method:"POST", body:{newClientId: id, enabled: enabled, reason: reason}});
+    },
+    function(){ refreshCurrent(); loadClientMenu(); });
+  document.getElementById("mExtra").innerHTML =
+    '<label style="display:block;margin-bottom:10px">客户端 ID <b>*</b></label>'
+    + '<input id="regId" class="mono" style="width:100%" placeholder="例如 store-003 或 kiosk-001" autocomplete="off">'
+    + '<label style="display:flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer">'
+    + '<input type="checkbox" id="regEnabled" checked style="accent-color:var(--accent)"> 注册后立即启用</label>';
+  document.getElementById("regId").focus();
+}
+function removeClientOp(clientId){
+  confirmOp("注销客户端 " + clientId,
+    "将把 " + clientId + " 移出白名单：立即失去接入资格，历史消息与投递数据保留。注销前建议先断开其连接。此操作不可撤销。", "注销",
+    function(reason){ return api("api/actions/remove-client",
+      {method:"POST", body:{clientId: clientId, reason: reason}}); },
+    function(){ go("clients"); refreshCurrent(); });
 }
 function sendCmd(clientId, command){
   confirmOp("下发指令 " + command, "指令经 SSE ctrl 通道实时下发，仅在线客户端生效。", "下发",

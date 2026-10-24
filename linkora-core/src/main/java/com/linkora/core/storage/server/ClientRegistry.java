@@ -33,4 +33,15 @@ public interface ClientRegistry {
     default boolean setEnabled(String clientId, boolean enabled) {
         return false;
     }
+
+    /**
+     * 管理接口：从白名单注销客户端（删除注册记录；历史消息与投递数据保留）。
+     * 供运维控制台的「注销客户端」操作使用；注销前应先断开其连接。
+     * 默认返回 false（不支持注销），自实现仓储不覆盖不会破坏编译。
+     *
+     * @return true 表示注销成功；false 表示客户端不存在或不支持注销
+     */
+    default boolean removeClient(String clientId) {
+        return false;
+    }
 }
