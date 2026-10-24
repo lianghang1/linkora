@@ -44,7 +44,7 @@
         <!-- 非 web 应用：仅引入基础 starter（web-application-type=none） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.lianghang1</groupId>

@@ -44,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 @SpringBootApplication
 public class ClientDemoApplication {
 
-    private static final String SERVER_BASE = "http://127.0.0.1:8082";
+    private static final String SERVER_BASE = System.getProperty("demo.server-base", "http://127.0.0.1:8082");
     private static final String CLIENT_ID = "demo-client";
 
     public static void main(String[] args) {

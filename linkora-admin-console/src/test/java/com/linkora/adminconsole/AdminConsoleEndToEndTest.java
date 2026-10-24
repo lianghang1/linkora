@@ -208,6 +208,12 @@ public class AdminConsoleEndToEndTest {
         JsonNode items = mapper.readTree(list.body);
         assertEquals(1, items.size());
         assertEquals(messageId, items.get(0).get("messageId").asText());
+        // 列表必须携带真实投递状态（而非文字摘要猜测）
+        assertEquals("ACCEPTED", items.get(0).get("state").asText());
+        assertEquals("已接受，等待推送", items.get(0).get("stateText").asText());
+        assertEquals(0, items.get(0).get("retryCount").asInt());
+        assertTrue(items.get(0).has("lastError"));
+        assertTrue(items.get(0).has("updatedAt"));
 
         HttpResult detail = http("/linkora-admin/api/messages/" + messageId, TOKEN, "GET", null);
         assertEquals(200, detail.status);

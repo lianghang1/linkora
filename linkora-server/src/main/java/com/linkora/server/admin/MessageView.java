@@ -21,8 +21,19 @@ public final class MessageView {
     private final String traceId;
     /** 各目标投递状态摘要，形如 "store-001:已接受，等待推送"；多目标以 "；" 分隔。 */
     private final String deliverySummary;
+    /** 聚合投递状态（最需关注的那条投递的状态名，如 RETRYING）。 */
+    private final String state;
+    /** 聚合投递状态的中文描述。 */
+    private final String stateText;
+    /** 投递已重试次数（取各投递中的最大值）。 */
+    private final int retryCount;
+    /** 最近一次投递错误（无错误为 "—"）。 */
+    private final String lastError;
+    /** 最近投递推进时间（已格式化）。 */
+    private final String updatedAt;
 
-    public MessageView(LinkoraMessage message, String deliverySummary) {
+    public MessageView(LinkoraMessage message, String deliverySummary, String state,
+                       String stateText, int retryCount, String lastError, String updatedAt) {
         this.messageId = message.getMessageId();
         this.clientId = message.getClientId();
         this.messageType = message.getMessageType();
@@ -33,6 +44,11 @@ public final class MessageView {
         this.payloadSize = message.getPayloadSize();
         this.traceId = message.getTraceId() == null ? "—" : message.getTraceId();
         this.deliverySummary = deliverySummary;
+        this.state = state;
+        this.stateText = stateText;
+        this.retryCount = retryCount;
+        this.lastError = lastError;
+        this.updatedAt = updatedAt;
     }
 
     public String getMessageId() {
@@ -80,6 +96,31 @@ public final class MessageView {
     /** 各目标投递状态摘要。 */
     public String getDeliverySummary() {
         return deliverySummary;
+    }
+
+    /** 聚合投递状态名。 */
+    public String getState() {
+        return state;
+    }
+
+    /** 聚合投递状态中文描述。 */
+    public String getStateText() {
+        return stateText;
+    }
+
+    /** 已重试次数（各投递最大值）。 */
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    /** 最近一次投递错误（"—" 表示无）。 */
+    public String getLastError() {
+        return lastError;
+    }
+
+    /** 最近投递推进时间（已格式化）。 */
+    public String getUpdatedAt() {
+        return updatedAt;
     }
 
     @Override

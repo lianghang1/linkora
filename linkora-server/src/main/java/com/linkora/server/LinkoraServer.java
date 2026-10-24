@@ -3,6 +3,7 @@ package com.linkora.server;
 import com.linkora.core.error.LinkoraErrorCode;
 import com.linkora.core.error.LinkoraException;
 import com.linkora.core.message.LinkoraMessage;
+import com.linkora.core.message.MessageState;
 import com.linkora.core.serialize.PayloadSerializer;
 import com.linkora.core.storage.server.ClientRegistry;
 import com.linkora.core.storage.server.ClientCursorRepository;
@@ -518,10 +519,57 @@ public final class LinkoraServer {
                 beginTime, endTime, (safePage - 1) * safeSize, safeSize);
         List<com.linkora.server.admin.MessageView> result = new ArrayList<>();
         for (LinkoraMessage message : messages) {
+            Object[] agg = aggregateDelivery(message.getMessageId());
             result.add(new com.linkora.server.admin.MessageView(message,
-                    deliverySummary(message.getMessageId())));
+                    deliverySummary(message.getMessageId()),
+                    (String) agg[0], (String) agg[1], (Integer) agg[2],
+                    (String) agg[3], (String) agg[4]));
         }
         return result;
+    }
+
+    /**
+     * 聚合一条消息的全部投递记录为最需关注的状态：
+     * 死信 &gt; 重试中 &gt; 失败 &gt; 已过期 &gt; 推进中（CREATED/ACCEPTED/RECEIVED）&gt; 已完成。
+     *
+     * @return [state 名, 中文描述, 最大重试次数, 最近错误, 最近推进时间（格式化）]
+     */
+    private Object[] aggregateDelivery(String messageId) {
+        List<DeliveryRecord> records = deliveryRepository.findAllByMessageId(messageId);
+        MessageState worst = null;
+        int worstPriority = -1;
+        int retryCount = 0;
+        String lastError = "—";
+        long latestUpdatedAt = 0;
+        for (DeliveryRecord record : records) {
+            int priority = deliveryAttentionPriority(record.getState());
+            if (priority > worstPriority) {
+                worstPriority = priority;
+                worst = record.getState();
+            }
+            retryCount = Math.max(retryCount, record.getRetryCount());
+            if (record.getLastError() != null && !record.getLastError().trim().isEmpty()) {
+                lastError = record.getLastError();
+            }
+            latestUpdatedAt = Math.max(latestUpdatedAt, record.getUpdatedAt());
+        }
+        MessageState state = worst == null ? MessageState.CREATED : worst;
+        return new Object[]{state.name(), com.linkora.server.admin.AdminViews.stateText(state),
+                retryCount, lastError, com.linkora.server.admin.AdminViews.formatTime(latestUpdatedAt)};
+    }
+
+    private int deliveryAttentionPriority(MessageState state) {
+        switch (state) {
+            case DEAD_LETTER: return 7;
+            case RETRYING:    return 6;
+            case FAILED:      return 5;
+            case EXPIRED:     return 4;
+            case CREATED:     return 3;
+            case ACCEPTED:    return 2;
+            case RECEIVED:    return 1;
+            case PROCESSED:   return 0;
+            default:          return 0;
+        }
     }
 
     /**

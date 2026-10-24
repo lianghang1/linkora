@@ -415,6 +415,7 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
       <span style="flex:1"></span>
       <span class="pill mut"><i></i>范围：<span id="csScope">全部客户端</span></span>
     </div>
+    <p class="weak" style="margin:-6px 0 12px">状态含义：已接受=服务端已收，待推送 · 重试中/失败=推送遇到问题在自动重试 · 死信=重试耗尽需人工处置 · 处理成功=客户端已确认（终态）</p>
     <div class="batchbar" id="batchbar">
       <span id="batchHint"></span>
       <span style="flex:1"></span>
@@ -454,6 +455,10 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
       <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="openRegisterModal()">＋ 注册新客户端</button>
     </div>
     <div class="client-grid" id="clientGrid"></div>
+    <div class="pager" id="clientPager" style="display:none"><span class="num" id="clientPageInfo"></span>
+      <button id="clPrev" onclick="clientPageGo(-1)">‹ 上一页</button>
+      <button id="clNext" onclick="clientPageGo(1)">下一页 ›</button>
+    </div>
     <footer class="ver">Linkora Admin Console · v0.4.1 · 数据每 10 秒自动刷新</footer>
   </div>
 
@@ -475,10 +480,10 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
       <div class="metric"><div class="m-lbl"><i style="background:var(--bad);box-shadow:var(--glow-bad)"></i>死信</div><div class="m-val num" id="cdDead">0</div><div class="m-sub" id="cdDeadSub">—</div></div>
     </div>
     <div class="subtabs">
-      <button class="on" data-t="messages" onclick="setCdTab('messages')">该客户端的消息</button>
-      <button data-t="unfinished" onclick="setCdTab('unfinished')">未完成明细</button>
-      <button data-t="outbox" onclick="setCdTab('outbox')">本地队列</button>
+      <button class="on" data-t="messages" onclick="setCdTab('messages')">投递消息（服务端）</button>
+      <button data-t="outbox" onclick="setCdTab('outbox')">本地队列（客户端设备）</button>
     </div>
+    <p class="weak" id="cdTabHint" style="margin:8px 0 0">服务端数据库中该客户端名下的每条消息及其投递状态 · 点行在右侧看详情</p>
     <div class="msg-split" style="margin-top:4px">
       <div>
         <div id="cdSegWrap" style="display:flex;align-items:center;gap:12px;margin:0 0 4px">
@@ -490,7 +495,10 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
           <span class="weak">点行在右侧查看详情</span>
         </div>
         <div class="rows" id="cdList"></div>
-        <div id="cdUnfinished" style="display:none"></div>
+        <div class="pager" id="cdPager" style="display:none"><span class="num" id="cdPageInfo"></span>
+          <button id="cdPrev" onclick="cdPageGo(-1)">‹ 上一页</button>
+          <button id="cdNext" onclick="cdPageGo(1)">下一页 ›</button>
+        </div>
         <div id="cdOutbox" style="display:none">
           <div class="filterbar">
             <select id="obStatus">
@@ -872,7 +880,7 @@ function rowHtml(d, opts){
     + '<div class="r-main"><div class="r-title"><span class="mid">' + esc(d.messageId) + '</span>'
     + '<span class="type">' + esc(d.messageType || "—") + '</span>' + chips + blk + '</div>'
     + '<div class="r-sub"><span class="mono">' + esc(d.clientId) + '</span>'
-    + '<span>' + esc(stateName) + ' · ' + esc(d.lastError && d.lastError !== "—" ? d.lastError : "投递推进中") + '</span>'
+    + '<span>' + esc(stateName) + (d.lastError && d.lastError !== "—" ? ' · ' + esc(d.lastError) : '') + '</span>'
     + '<span>重试 ' + d.retryCount + ' 次</span></div></div>'
     + '<span class="r-time">' + esc(d.updatedAt || d.createdAt || "") + '</span>'
     + (actions ? '<div class="r-acts">' + actions + '</div>' : "")
@@ -887,13 +895,6 @@ function blockedChips(rows){
       if (el && r.blocked > 0){ el.style.display = ""; el.textContent = "同键阻塞 " + r.blocked + " 条"; }
     }).catch(function(){});
   });
-}
-function parseSummaryState(summary){
-  var s = summary || "";
-  if (s.indexOf("死信") >= 0) return "死信待处置";
-  if (s.indexOf("重试") >= 0) return "重试中";
-  if (s.indexOf("已完成") >= 0 || s.indexOf("确认") >= 0) return "已完成";
-  return "进行中";
 }
 function loadMessages(){
   document.getElementById("segRunN").textContent = sumPending() ? " " + sumPending() : "";
@@ -916,10 +917,10 @@ function loadMessages(){
       list = list || [];
       listEl.innerHTML = list.length ? list.map(function(m){
         return rowHtml({messageId:m.messageId, clientId:m.clientId, messageType:m.messageType,
-          state:"ACCEPTED", stateText:parseSummaryState(m.deliverySummary), retryCount:0,
-          sequenceKey:m.sequenceKey, updatedAt:m.createdAt}, {blocked:false});
+          state:m.state, stateText:m.stateText, retryCount:m.retryCount, lastError:m.lastError,
+          sequenceKey:m.sequenceKey, updatedAt:m.updatedAt || m.createdAt}, {blocked:false});
       }).join("") : '<div class="empty"><p>没有符合条件的消息</p></div>';
-      document.getElementById("mPageInfo").textContent = "第 " + msgPage + " 页";
+      document.getElementById("mPageInfo").textContent = "第 " + msgPage + " 页 · 每页 20 条";
       document.getElementById("mPrev").disabled = msgPage <= 1;
       document.getElementById("mNext").disabled = list.length < 20;
     }).catch(showErr);
@@ -1063,7 +1064,10 @@ function loadClients(){
   api("api/clients").then(function(clients){
     clientCache = clients || [];
     document.getElementById("deadBadge").textContent = sumDead() > 0 ? sumDead() : "";
-    document.getElementById("clientGrid").innerHTML = clientCache.length ? clientCache.map(function(c){
+    var PER = 8, pages = Math.max(1, Math.ceil(clientCache.length / PER));
+    if (clientPage > pages) clientPage = pages;
+    var slice = clientCache.slice((clientPage - 1) * PER, clientPage * PER);
+    document.getElementById("clientGrid").innerHTML = slice.length ? slice.map(function(c){
       return '<div class="client-card" onclick="openClient(\'' + esc(c.clientId) + '\')">'
         + '<div class="cc-top"><div class="avatar">' + esc(shortId(c.clientId)) + "</div>"
         + "<div><h4>" + esc(c.clientId) + "</h4>"
@@ -1075,9 +1079,15 @@ function loadClients(){
         + '<div><b class="num" style="' + (c.deadLetterCount > 0 ? "color:var(--bad)" : "") + '">' + c.deadLetterCount + "</b><span>死信</span></div></div>"
         + "</div>";
     }).join("") : '<div class="empty"><p>暂无注册客户端</p></div>';
+    var pg = document.getElementById("clientPager");
+    pg.style.display = pages > 1 ? "" : "none";
+    document.getElementById("clientPageInfo").textContent = "第 " + clientPage + " / " + pages + " 页 · 共 " + clientCache.length + " 个客户端";
+    document.getElementById("clPrev").disabled = clientPage <= 1;
+    document.getElementById("clNext").disabled = clientPage >= pages;
   }).catch(showErr);
 }
-var cdCurrent = "", cdSeg = "all";
+function clientPageGo(delta){ clientPage = Math.max(1, clientPage + delta); loadClients(); }
+var cdCurrent = "", cdSeg = "all", cdPage = 1, clientPage = 1;
 function openClient(id){
   cdCurrent = id; cdSeg = "all";
   go("clientDetail");
@@ -1112,22 +1122,25 @@ function refreshClientDetail(){
     renderCdBody(c);
   }).catch(showErr);
 }
-function setCdSeg(s){ cdSeg = s;
+function setCdSeg(s){ cdSeg = s; cdPage = 1;
   var btns = document.querySelectorAll("#cdSeg button");
   var names = {all:"全部", run:"待处理", dead:"死信"};
   for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].textContent.trim() === names[s]);
   refreshClientDetail();
 }
+function cdPageGo(delta){ cdPage = Math.max(1, cdPage + delta); refreshClientDetail(); }
 function setCdTab(t){
   var btns = document.querySelectorAll(".subtabs button");
   for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].dataset.t === t);
+  document.getElementById("cdTabHint").textContent = t === "messages"
+    ? "服务端数据库中该客户端名下的每条消息及其投递状态 · 点行在右侧看详情"
+    : "客户端设备本地 SQLite 队列的快照 · 需主动拉取，不会自动更新";
   document.getElementById("cdSegWrap").style.display = t === "messages" ? "" : "none";
   document.getElementById("cdList").style.display = t === "messages" ? "" : "none";
-  document.getElementById("cdUnfinished").style.display = t === "unfinished" ? "" : "none";
+  document.getElementById("cdPager").style.display = (t === "messages" && cdSeg === "all") ? "" : "none";
   document.getElementById("cdOutbox").style.display = t === "outbox" ? "" : "none";
   document.getElementById("cdMd").style.visibility = "hidden";
   document.getElementById("cdCmdResult").style.display = "none";
-  if (t === "unfinished") loadCdUnfinished();
   if (t === "messages" || t === "outbox") document.getElementById("cdMd").style.visibility = "visible";
 }
 function renderCdBody(c){
@@ -1147,10 +1160,11 @@ function renderCdBody(c){
       return (l || []).filter(function(d){ return d.state !== "DEAD_LETTER"; });
     }));
   } else {
-    jobs.push(api("api/messages?page=1&size=20&clientId=" + encodeURIComponent(c.clientId)).then(function(l){
+    jobs.push(api("api/messages?page=" + cdPage + "&size=20&clientId=" + encodeURIComponent(c.clientId)).then(function(l){
       return (l || []).map(function(m){
-        return {messageId:m.messageId, clientId:m.clientId, messageType:m.messageType, state:"ACCEPTED",
-          stateText:parseSummaryState(m.deliverySummary), retryCount:0, sequenceKey:m.sequenceKey, updatedAt:m.createdAt};
+        return {messageId:m.messageId, clientId:m.clientId, messageType:m.messageType,
+          state:m.state, stateText:m.stateText, retryCount:m.retryCount, lastError:m.lastError,
+          sequenceKey:m.sequenceKey, updatedAt:m.updatedAt || m.createdAt};
       });
     }));
   }
@@ -1159,21 +1173,14 @@ function renderCdBody(c){
     rows.sort(function(a, b){ return (b.updatedAt || "").localeCompare(a.updatedAt || ""); });
     listEl.innerHTML = rows.length ? rows.map(function(d){ return rowHtml(d, {blocked:cdSeg !== "all", clickFn:"openMessageHere"}); }).join("")
       : '<div class="empty"><p>没有符合条件的记录</p></div>';
+    document.getElementById("cdPager").style.display = cdSeg === "all" ? "" : "none";
+    if (cdSeg === "all"){
+      document.getElementById("cdPageInfo").textContent = "第 " + cdPage + " 页 · 每页 20 条";
+      document.getElementById("cdPrev").disabled = cdPage <= 1;
+      document.getElementById("cdNext").disabled = rows.length < 20;
+    }
     blockedChips(rows.filter(function(d){ return d.sequenceKey; }));
   }).catch(showErr);
-}
-function loadCdUnfinished(){
-  var box = document.getElementById("cdUnfinished");
-  box.innerHTML = '<div class="skeleton" style="width:60%"></div>';
-  api("api/clients/" + encodeURIComponent(cdCurrent) + "/unfinished").then(function(list){
-    box.innerHTML = list.length ? "<table style='width:100%;border-collapse:collapse'><tbody>" + list.map(function(d){
-      return "<tr style='border-bottom:1px solid var(--hair);cursor:pointer' onclick=\"openMessageHere('" + esc(d.messageId) + "')\"><td style='padding:12px' class='mono'>" + esc(d.messageId) + "</td><td style='padding:12px'>"
-        + stPill(d.state, d.stateText || d.state) + "</td>"
-        + "<td style='padding:12px' class='num'>" + d.retryCount + " 次</td>"
-        + "<td style='padding:12px' class='weak num'>" + esc(d.updatedAt || "") + "</td></tr>";
-    }).join("") + "</tbody></table>"
-      : '<div class="empty"><p>没有未完成投递</p></div>';
-  }).catch(function(e){ box.innerHTML = '<div class="weak">' + esc(e.error || "加载失败") + "</div>"; });
 }
 function toggleClient(clientId, enabled){
   var next = !enabled;
