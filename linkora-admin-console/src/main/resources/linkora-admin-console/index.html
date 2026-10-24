@@ -168,9 +168,10 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:620px}
 .opbox{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center}
 
 /* ───── 客户端卡片 ───── */
-.ccards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-bottom:6px}
-.ccard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 17px;cursor:pointer;transition:border-color .15s,transform .15s}
+.ccards{display:grid;grid-template-columns:repeat(auto-fill,minmax(236px,1fr));gap:12px;margin-bottom:6px}
+.ccard{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;cursor:pointer;transition:border-color .15s,transform .15s}
 .ccard:hover{border-color:var(--accent-line);transform:translateY(-2px)}
+.ccard.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent-line)}
 .ccard .top{display:flex;align-items:center;gap:11px}
 .ccard .avatar{flex:none}
 .ccard .nm{font-family:var(--mono);font-size:13.5px;font-weight:600;word-break:break-all}
@@ -422,56 +423,59 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:620px}
         <button class="dead" data-s="dead" onclick="setClSeg('dead')">有异常<span class="n" id="clDeadN"></span></button>
       </div>
     </div>
-    <div class="ccards" id="ccards"></div>
-    <div class="pager" id="clPager" style="display:none">
-      <span id="clPageInfo"></span><span class="sp"></span>
-      <button id="clPrev" onclick="clPageGo(-1)">‹ 上一页</button>
-      <button id="clNext" onclick="clPageGo(1)">下一页 ›</button>
+    <div class="split" style="grid-template-columns:1fr 360px">
+      <div>
+        <div class="ccards" id="ccards"></div>
+        <div class="pager" id="clPager" style="display:none">
+          <span id="clPageInfo"></span><span class="sp"></span>
+          <button id="clPrev" onclick="clPageGo(-1)">‹ 上一页</button>
+          <button id="clNext" onclick="clPageGo(1)">下一页 ›</button>
+        </div>
+      </div>
+      <div class="side" id="cd">
+        <div class="side-h">
+          <div class="row1">
+            <div class="avatar" id="cdAvatar" style="width:36px;height:36px">—</div>
+            <div style="min-width:0"><h3 id="cdId" style="cursor:default">—</h3><div class="weak" id="cdReg"></div></div>
+            <span class="sp"></span>
+            <button class="icon-btn md-close" onclick="closeClientDetail()" title="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+        </div>
+        <div class="side-b">
+          <dl class="kv">
+            <dt>当前状态</dt><dd id="cdState">—</dd>
+            <dt>活动连接</dt><dd class="num" id="cdConnN">0</dd>
+            <dt>未完成投递</dt><dd class="num" id="cdPendingN">0</dd>
+            <dt>死信</dt><dd class="num" id="cdDeadN">0</dd>
+          </dl>
+          <div class="opbox">
+            <div class="switch" id="cdSwitch" title="启用/停用"></div>
+            <button class="btn btn-outline btn-sm" onclick="sendCmd(cdCurrent,'PING')">PING</button>
+            <button class="btn btn-outline btn-sm" onclick="kick(cdCurrent)">断开连接</button>
+            <button class="btn btn-danger-tint btn-sm" onclick="removeClientOp(cdCurrent)">注销客户端</button>
+          </div>
+          <div class="sect">投递记录</div>
+          <a onclick="goClientMessages()" style="font-size:12.5px">在消息页查看该客户端的全部投递记录 →</a>
+          <div class="sect">本地队列（客户端设备）</div>
+          <p class="hintline" style="margin-top:0">设备本地 SQLite 队列快照 · 需主动拉取，不会自动更新</p>
+          <div class="toolbar" style="margin-bottom:8px">
+            <select class="fsel" id="obStatus" style="flex:1;min-width:0">
+              <option value="">全部状态</option>
+              <option value="PENDING">待发送</option>
+              <option value="SENDING">发送中</option>
+              <option value="SERVER_ACCEPTED">服务端已接受</option>
+              <option value="FAILED">发送失败</option>
+              <option value="DEAD_LETTER">死信</option>
+            </select>
+            <button class="btn btn-primary btn-sm" id="obPullBtn" onclick="pullOutbox()">拉取快照</button>
+          </div>
+          <div id="obRows" style="font-size:12.5px;color:var(--ink-3);max-height:260px;overflow-y:auto">尚未拉取 · 点上方按钮获取设备本地队列</div>
+          <details style="margin-top:10px"><summary class="weak" style="cursor:pointer">原始回执 JSON</summary>
+            <div class="codeblock" id="obRaw" style="margin-top:8px"></div>
+          </details>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
-
-<!-- 客户端详情弹窗 -->
-<div class="modal" id="clientModal">
-  <div class="m-mask" onclick="closeClientDetail()"></div>
-  <div class="m-box" style="width:560px">
-    <button class="icon-btn close" onclick="closeClientDetail()" title="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    <h3 style="gap:12px">
-      <div class="avatar" id="cdAvatar" style="width:38px;height:38px;font-size:13px">—</div>
-      <div><span class="mono" id="cdId" style="font-size:16px">—</span><div class="weak" id="cdReg" style="font-weight:400"></div></div>
-      <span class="sp" style="flex:1"></span>
-      <div class="switch" id="cdSwitch" title="启用/停用"></div>
-    </h3>
-    <dl class="kv" style="margin-top:18px">
-      <dt>当前状态</dt><dd id="cdState">—</dd>
-      <dt>活动连接</dt><dd class="num" id="cdConnN">0</dd>
-      <dt>未完成投递</dt><dd class="num" id="cdPendingN">0</dd>
-      <dt>死信</dt><dd class="num" id="cdDeadN">0</dd>
-    </dl>
-    <div class="opbox" style="margin-top:14px">
-      <button class="btn btn-outline btn-sm" onclick="sendCmd(cdCurrent,'PING')">PING</button>
-      <button class="btn btn-outline btn-sm" onclick="kick(cdCurrent)">断开连接</button>
-      <button class="btn btn-danger-tint btn-sm" onclick="removeClientOp(cdCurrent)">注销客户端</button>
-    </div>
-    <div class="sect">投递记录</div>
-    <a onclick="goClientMessages()" style="font-size:12.5px">在消息页查看该客户端的全部投递记录 →</a>
-    <div class="sect">本地队列（客户端设备）</div>
-    <p class="hintline" style="margin-top:0">设备本地 SQLite 队列快照 · 需主动拉取，不会自动更新</p>
-    <div class="toolbar" style="margin-bottom:8px">
-      <select class="fsel" id="obStatus" style="flex:1;min-width:0">
-        <option value="">全部状态</option>
-        <option value="PENDING">待发送</option>
-        <option value="SENDING">发送中</option>
-        <option value="SERVER_ACCEPTED">服务端已接受</option>
-        <option value="FAILED">发送失败</option>
-        <option value="DEAD_LETTER">死信</option>
-      </select>
-      <button class="btn btn-primary btn-sm" id="obPullBtn" onclick="pullOutbox()">拉取快照</button>
-    </div>
-    <div id="obRows" style="font-size:12.5px;color:var(--ink-3);max-height:280px;overflow-y:auto">尚未拉取 · 点上方按钮获取设备本地队列</div>
-    <details style="margin-top:10px"><summary class="weak" style="cursor:pointer">原始回执 JSON</summary>
-      <div class="codeblock" id="obRaw" style="margin-top:8px"></div>
-    </details>
   </div>
 </div>
 
@@ -894,6 +898,7 @@ function setClSeg(s){
 function clPageGo(delta){ clPage = Math.max(1, clPage + delta); loadClients(); }
 function loadClients(){
   refreshCounts();
+  if (!cdCurrent && clientCache.length) cdCurrent = clientCache[0].clientId;
   var list = clientCache.filter(function(c){
     if (clSeg === "online") return c.enabled && c.online;
     if (clSeg === "offline") return c.enabled && !c.online;
@@ -906,7 +911,7 @@ function loadClients(){
   document.getElementById("ccards").innerHTML = slice.length ? slice.map(function(c){
     var deadStyle = c.deadLetterCount > 0 ? "color:var(--bad)" : "";
     var pendStyle = c.unfinishedCount > 0 ? "color:var(--warn)" : "";
-    return '<div class="ccard" onclick="openClient(\'' + esc(c.clientId) + '\')">'
+    return '<div class="ccard' + (cdCurrent === c.clientId ? " sel" : "") + '" onclick="openClient(\'' + esc(c.clientId) + '\')">'
       + '<div class="top"><div class="avatar">' + esc(shortId(c.clientId)) + '</div>'
       + '<div style="min-width:0"><div class="nm">' + esc(c.clientId) + '</div>'
       + '<div class="reg">注册于 ' + esc(c.createdAt || "—") + '</div></div>'
@@ -931,6 +936,7 @@ function loadClients(){
   document.getElementById("clOnN").textContent = counts.online ? " " + counts.online : "";
   document.getElementById("clOffN").textContent = counts.offline ? " " + counts.offline : "";
   document.getElementById("clDeadN").textContent = counts.dead ? " " + counts.dead : "";
+  if (cdCurrent) refreshClientDetail();
 }
 function shortId(id){
   var digits = String(id).replace(/[^0-9]/g, "");
@@ -938,10 +944,11 @@ function shortId(id){
 }
 function openClient(id){
   cdCurrent = id;
-  document.getElementById("clientModal").classList.add("on");
+  renderClientSel();
   refreshClientDetail();
+  if (window.matchMedia("(max-width:1100px)").matches) document.getElementById("cd").classList.add("on");
 }
-function closeClientDetail(){ document.getElementById("clientModal").classList.remove("on"); }
+function closeClientDetail(){ document.getElementById("cd").classList.remove("on"); }
 function refreshClientDetail(){
   var c = null;
   for (var i = 0; i < clientCache.length; i++) if (clientCache[i].clientId === cdCurrent) c = clientCache[i];
@@ -1133,7 +1140,13 @@ document.addEventListener("keydown", function(e){
   if (e.key === "Escape"){
     closeModal();
     document.getElementById("md").classList.remove("on");
-    document.getElementById("clientModal").classList.remove("on");
+    document.getElementById("cd").classList.remove("on");
+  }
+});
+window.addEventListener("resize", function(){
+  if (window.innerWidth > 1100){
+    document.getElementById("md").classList.remove("on");
+    document.getElementById("cd").classList.remove("on");
   }
 });
 
