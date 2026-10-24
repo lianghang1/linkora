@@ -76,7 +76,8 @@ public interface DeliveryRepository {
      * @param sequenceKey 顺序键，null 表示不参与顺序约束（实现应直接返回 false）
      * @param seq         当前记录的投递序号
      */
-    default boolean hasEarlierUnsettled(String clientId, String sequenceKey, long seq) {        return false;
+    default boolean hasEarlierUnsettled(String clientId, String sequenceKey, long seq) {
+        return false;
     }
 
     /**
