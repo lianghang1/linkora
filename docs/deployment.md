@@ -41,8 +41,9 @@ context.addServlet(new ServletHolder(
   **任意时刻崩溃重启后自动续跑**，重复调用幂等；
 - 表前缀 `lk_*`（lk_client、lk_client_seq、lk_client_cursor、lk_message、
   lk_delivery），不触碰业务表；
-- 当前已在 H2 2.2 完成验证；SQL 为方言中立的 ANSI 语法，MySQL 8 /
-  PostgreSQL 接入前请先在测试库跑一次 `migrate`（见 compatibility.md）。
+- 已在 H2 2.2 与 MySQL 8.0 真库完成验证（迁移幂等、并发投递序号分配、
+  事务接管，见 `JdbcServerStorageMySqlIT`）；PostgreSQL 接入前请先在测试库
+  跑一次 `migrate`（见 compatibility.md）。
 
 ### 3. 发放客户端凭据（启用 HMAC 时）
 
@@ -63,7 +64,8 @@ context.addServlet(new ServletHolder(
 | `maxDeliveryRetries` | 10 | FAILED ACK 累计次数上限，超过进入死信 |
 | `retryBackoffBaseMs/MaxMs` | 2000 / 300000 | 失败重试指数退避 |
 | `pushPacingBaseMs/MaxMs` | 5000 / 60000 | 在线客户端重推节奏（防风暴） |
-| `messageSizeLimitBytes` | 1MB | 上行 **HTTP body** 上限（≤16MB）。原始 payload ≈ 该值 × 0.75（Base64 膨胀 4/3 + 信封开销），默认约 786KB。Servlet 读取闸门直接取此值，不再另设默认上限；要传更大的 payload 只改这一处 |
+| `messageSizeLimitBytes` | 1MB | 上行 **HTTP body** 上限。原始 payload ≈ 该值 × 0.75（Base64 膨胀 4/3 + 信封开销），默认约 786KB |
+| `maxOutboundBytesPerConnection` | 8MB | 单连接 SSE 推送队列字节水位，超限主动断开慢客户端（见 reliability.md"推送写模型"） |
 
 ## 客户端部署
 
@@ -95,12 +97,12 @@ context.addServlet(new ServletHolder(
 
 ## 升级与备份
 
-- **升级**：新版本若含 schema 变更，启动时 `migrate` 自动增量应用；
-  先在测试库验证迁移脚本，再对生产库做常规备份后升级；
-- **备份**：按普通业务表备份 `lk_*` 五张表；客户端侧备份 SQLite
+- **升级**：新版本若含 schema 变更，启动时自动增量应用；
+  先在测试库验证，再对生产库做常规备份后升级；
+- **备份**：按普通业务表备份 `lk_*` 六张表；客户端侧备份 SQLite
   `.db`（及 WAL）文件；恢复后各端按持久化状态自动续跑，无需人工对账；
-- **死信处置**：`getMessageStatus` 看到 DEAD_LETTER 后，修复业务原因，
-  用同一 messageType 重新 `publish` 即可产生新投递（原记录保留作审计）。
+- **死信处置**：通过管理接口查询死信并人工重放（`retryDeadLetter`）或跳过
+  （`skipMessage`），方法与边界见 [api.md](api.md)。
 
 ## 数据库表
 

@@ -3,7 +3,7 @@
 > 全部管理接口返回**人类可读视图**：时间一律 `yyyy-MM-dd HH:mm:ss`（无值显示 `—`），
 > payload 一律 UTF-8 文本预览（超 200 字符截断、二进制只标注字节数，**绝不输出 Base64**），
 > 状态附中文描述。SDK 只提供方法、不做鉴权；HTTP 暴露由宿主实现并**必须加访问控制**
-> （示例见 `examples/*/controller/AdminController.java`，仅演示用）。
+> HTTP 透出示例见 `examples/*/controller/AdminController.java`。
 
 ---
 

@@ -17,19 +17,20 @@
 | expiresAt | int64 | 否 | 过期时间，epoch 毫秒 |
 | schemaVersion | int32 | 是 | 负载结构版本，默认 1 |
 | traceId | string | 否 | 链路追踪 ID |
+| sequenceKey | string | 否 | 顺序键（≤128 字符；null/空白 = 无键，不参与顺序约束） |
 
-## 接口清单（阶段 3 逐步实现）
+## HTTP 接口
+
+三个核心端点由框架提供（`LinkoraServlets` 统一注册 / starter 自动注册），路径前缀可配：
 
 | 接口 | 方法 | 说明 | 幂等性 |
 |---|---|---|---|
-| `/linkora/stream` | GET (SSE) | 事件流；Header 携带凭据与 `Last-Event-ID` | 连接级 |
-| `/linkora/messages` | POST | 客户端上行消息 | messageId 唯一约束去重 |
-| `/linkora/acks` | POST | 统一 ACK（RECEIVED / PROCESSED / FAILED） | 幂等，支持重复提交 |
-| `/linkora/pending` | GET | 查询待补发消息（重连恢复） | 只读 |
-| `/linkora/clients/{id}/status` | GET | 客户端连接与积压状态 | 只读 |
-| `/linkora/messages/{id}` | GET | 消息投递状态查询 | 只读 |
-| `/linkora/health` | GET | 健康检查 | 只读 |
-| `/linkora/admin/messages/{id}/retry` | POST | 人工重试（死信复活） | 幂等 |
+| `/events` | GET (SSE) | 下行事件流；Header 携带凭据与 `Last-Event-ID` | 连接级 |
+| `/messages` | POST | 客户端上行消息 | messageId 唯一约束去重 |
+| `/acks` | POST | 统一 ACK（RECEIVED / PROCESSED / FAILED） | 幂等，支持重复提交 |
+
+监控与人工处置不在线路协议内，而是 `LinkoraServer` 的管理方法
+（可由宿主选择性透出为 HTTP），见 [api.md](api.md)。
 
 错误响应统一结构：`{"errorCode": "AUTH_FAILED", "message": "...", "messageId": "..."}`。
 错误码见 `LinkoraErrorCode`；错误响应不泄露凭据、堆栈与敏感数据。
@@ -37,17 +38,23 @@
 ## SSE 事件格式
 
 ```
-event: message
+event: msg
 id: <投递 seq，即 Last-Event-ID>
 data: <消息信封 JSON>
 
-event: heartbeat
+event: hb
 data: <epoch 毫秒>
+
+event: ctrl
+data: <管理指令 JSON（{"cmd":...,"params":{...}}，不落库不补发）>
 ```
 
-- `id` 为服务端 per-client 递增投递 seq；客户端可凭跳号检测消息空洞。
-- 心跳间隔可配置（默认 15s）；客户端心跳超时（默认 2 倍间隔）触发重连。
-- 恢复依据是持久化投递记录与 ACK 状态，`Last-Event-ID` 仅是辅助加速手段。
+- 业务事件类型为 `msg`；`id` 为服务端 per-client 递增投递 seq，客户端可凭
+  跳号检测消息空洞。
+- 心跳事件类型为 `hb`，间隔可配置（默认 15s）；客户端心跳超时触发重连。
+- 管理指令事件类型为 `ctrl`（白名单见 `com.linkora.core.admin.ClientCommands`），
+  仅对在线客户端实时生效，不参与 `Last-Event-ID` 补发。
+- 断线恢复依据是持久化投递记录与 ACK 状态，`Last-Event-ID` 仅是辅助加速手段。
 
 ## ACK 语义
 

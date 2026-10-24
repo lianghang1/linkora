@@ -25,7 +25,7 @@ linkora:
 
 Spring MVC 宿主同样读取 `linkora.server.allow-anonymous`（默认 false）。
 
-## 已实现的认证机制（阶段 5 交付）
+## 认证机制：HMAC 请求签名
 
 ### 请求签名算法
 

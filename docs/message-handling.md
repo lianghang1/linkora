@@ -31,7 +31,7 @@
     │ ◄───── 200 ACCEPTED ──────────────────────────── │                        │
 ```
 
-| 步骤 | 代码位置 | 谁写的 |
+| 步骤 | 代码位置 | 实现方 |
 |---|---|---|
 | 1. 客户端 outbox 后台线程 POST `/messages` | `linkora-client` 发送调度 | 框架 |
 | 2. 端点 Servlet 接收 → `LinkoraServer.ingestHttpHandler()` | `linkora-server`（servlet 包）/ `LinkoraServer` | 框架 |

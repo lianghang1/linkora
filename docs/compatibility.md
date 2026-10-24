@@ -38,8 +38,8 @@
 | 数据库 | 状态 | 说明 |
 |---|---|---|
 | H2 2.2.x | **已验证**（全部自动化测试 + testkit） | SQL 为方言中立 ANSI |
-| MySQL 8 | 代码就绪，**待真实库回归** | 接入前在测试库执行 `JdbcServerSchema.migrate` 验证；关注 `TEXT` 类型与索引长度限制 |
-| PostgreSQL | 代码就绪，**待真实库回归** | 同上 |
+| MySQL 8.0 | **已验证**（MySQL 8.0.46 真库 IT：schema 迁移幂等、二进制 payload 往返、CAS 竞争、并发投递序号分配、事务接管发件箱） | 迁移语句经真库回归；并发序号分配含 InnoDB 死锁重试处理 |
+| PostgreSQL | 代码就绪，**待真实库回归** | 接入前在测试库执行 `JdbcServerSchema.migrate` 验证方言差异 |
 
 服务端存储通过 Repository 抽象隔离，新库接入只需提供 `DataSource`，
 无需改代码。
