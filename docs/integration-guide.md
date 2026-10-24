@@ -7,7 +7,7 @@
 | 语义 | 业务侧责任 |
 |---|---|
 | 投递是**至少一次**（at-least-once） | 同一条消息可能重复送达——所有副作用必须幂等（推荐用 messageId 去重） |
-| 下行必须**显式 ACK** | 处理成功调 `message.ackProcessed()`，失败调 `ackFailed(code, msg)`；不 ACK 服务端会重试 |
+| 下行确认默认自动 | 监听器正常返回即自动确认成功；失败时抛异常或显式调用 `ackFailed(code, msg)`，服务端按策略重试。`ackProcessed()` 仅在需要提前确认时使用 |
 | 重试耗尽进**死信** | 死信不会自动恢复，需人工通过管理接口重放或跳过（见 [api.md](api.md)） |
 
 详见 [reliability.md](reliability.md)。
@@ -82,7 +82,7 @@ linkora.publish(clientId, type, payload, expiresAtMillis, traceId);
 
 ## 9. 上线前检查清单
 
-- [ ] 业务监听器全部显式 ACK，副作用幂等
+- [ ] 业务监听器失败路径明确（抛异常或显式 ackFailed），副作用幂等
 - [ ] 服务端已配置 HMAC 认证，`allow-anonymous` 未出现在生产配置
 - [ ] clientId 规划完成并预注册；需顺序的业务已确定键粒度
 - [ ] 下行消息统一设置 expiresAt；payload 控制在 8KB 内

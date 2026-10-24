@@ -52,8 +52,7 @@ linkora:
 // 下发：注入 LinkoraServer
 linkora.publish(clientId, "order-created", payload);
 
-// 接收：实现 MessageListener 并注册，处理后显式 ACK
-message.ackProcessed();
+// 接收：实现 MessageListener 并注册（正常返回自动确认，抛异常自动进重试）
 
 // 上行：注入 UplinkPublisher，写本地队列后自动发送与重试
 uplinkPublisher.publish("order-status-updated", payload);
@@ -76,8 +75,8 @@ uplinkPublisher.publish("order-status-updated", payload);
 ## 使用前必读
 
 1. **投递语义是至少一次**：同一条消息可能被重复送达，业务处理必须幂等（用消息 ID 去重）。
-2. **下行消息必须显式 ACK**：处理完调用 `message.ackProcessed()`（失败调 `ackFailed(...)`），
-   不 ACK 服务端会按策略重试。
+2. **业务处理失败要主动上报**：监听器正常返回即自动确认成功（无需调用 ACK）；
+   失败时抛出异常或显式调用 `message.ackFailed(code, msg)`，服务端将按策略重试。
 3. **生产必须配 HMAC 认证**：不提供 `ClientAuthenticator` 时服务端直接启动失败。
    本地开发需显式设置 `linkora.server.allow-anonymous=true`（启动日志留痕），
    该开关不应出现在生产配置。接入步骤见 [docs/security.md](docs/security.md)。

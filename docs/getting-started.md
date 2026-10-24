@@ -88,14 +88,15 @@ linkora:
 
 ### 2. 接收下行
 
-实现 `MessageListener` 并注册。业务处理后必须显式 ACK，不 ACK 服务端会按策略重试：
+实现 `MessageListener` 并注册。监听器正常返回即自动确认处理成功（无需调用 ACK）；
+处理失败时抛出异常（或显式调用 `message.ackFailed(code, msg)`），服务端按策略重试：
 
 ```java
 @Service
 public class OrderHandler implements MessageListener {
     @Override
     public void onMessage(LinkoraReceivedMessage message) {
-        message.ackProcessed();
+        // 正常返回 = 自动确认；失败直接抛异常即可
     }
 }
 

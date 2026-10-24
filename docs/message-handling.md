@@ -64,9 +64,10 @@
 要点：
 
 - `publish()` 先持久化：客户端离线时等上线补投，在线时经 SSE 实时送达。
-- 客户端在 `MessageListener.onMessage` 里处理消息后**必须显式 ACK**：
-  成功调 `message.ackProcessed()`；业务失败调 `message.ackFailed(错误码, 原因)`，
-  服务端按策略重试。未 ACK 的消息会在重连/重启后补投。
+- 监听器处理完成后的确认是**自动的**：所有监听器正常返回且未显式 ACK 时，
+  SDK 自动标记处理成功（幂等，重复调用无效）。
+- 业务失败两种上报方式：抛出 RuntimeException，或显式调用
+  `message.ackFailed(错误码, 原因)`——服务端均按策略重试，重连/重启后补投。
 - **解码失败不静默丢弃**：payload 损坏、JSON 不完整等导致 `decodeMessage` 失败时，
   客户端会回一条 `FAILED` ACK（错误码 `INVALID_MESSAGE`），由服务端按重试策略计数，
   达到 `maxDeliveryRetries`（默认 10）后进死信。否则服务端会按 pacing 无限重推。
