@@ -41,6 +41,9 @@ public class MvcHostSmokeIT {
         port = freePort();
         // 开启控制台（演示 AdminConsoleInstaller 在纯 MVC/手工注册 Tomcat 上的装配路径）
         System.setProperty("linkora.admin.console.token", "mvc-it-token");
+        // IT 数据固定走 H2 内存库，避免污染远程 MySQL（AppConfig 默认连生产库）
+        System.setProperty("linkora.datasource.url",
+                "jdbc:h2:mem:linkora_mvc_it_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
         tomcat = SpringMvcServerMain.startServer(port);
     }
 
@@ -52,6 +55,7 @@ public class MvcHostSmokeIT {
         if (store != null) {
             store.close();
         }
+        System.clearProperty("linkora.datasource.url");
         if (tomcat != null) {
             tomcat.stop();
         }

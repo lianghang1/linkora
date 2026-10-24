@@ -84,6 +84,13 @@
             <version>${h2.version}</version>
             <scope>compile</scope>
         </dependency>
+        <!-- 生产数据源：远程 MySQL 8 -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <version>8.0.33</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-simple</artifactId>

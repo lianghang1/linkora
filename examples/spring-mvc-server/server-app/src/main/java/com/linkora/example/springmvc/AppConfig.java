@@ -12,7 +12,6 @@ import com.linkora.server.storage.jdbc.JdbcDeliveryRepository;
 import com.linkora.server.storage.jdbc.JdbcMessageRepository;
 import com.linkora.server.storage.jdbc.JdbcServerSchema;
 import com.linkora.spring.LinkoraServerConfiguration;
-import org.h2.jdbcx.JdbcDataSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -20,11 +19,14 @@ import org.springframework.context.annotation.Import;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import java.nio.file.Paths;
+import javax.sql.DataSource;
 
 /**
  * Spring MVC 宿主装配：宿主只需提供四个存储 SPI bean，
  * {@link LinkoraServerConfiguration} 负责组装 LinkoraServer 并管理生命周期。
+ *
+ * <p>数据源默认连接远程 MySQL（生产部署）；测试可用系统属性
+ * {@code linkora.datasource.url} 指向 H2 内存库覆盖，避免污染真实库。</p>
  *
  * @author lianghang
  */
@@ -34,12 +36,28 @@ import java.nio.file.Paths;
 @Import(LinkoraServerConfiguration.class)
 public class AppConfig implements WebMvcConfigurer {
 
+    private static final String DEFAULT_URL =
+            "jdbc:mysql://115.159.41.195:3306/linkora?useSSL=false"
+                    + "&allowPublicKeyRetrieval=true&characterEncoding=UTF-8"
+                    + "&serverTimezone=Asia/Shanghai";
+    private static final String DEFAULT_USER = "linkora";
+    private static final String DEFAULT_PASSWORD = "b5YiM6Axm7zKX3ZD";
+
     @Bean
-    public JdbcDataSource linkoraDataSource() {
-        JdbcDataSource ds = new JdbcDataSource();
-        ds.setURL("jdbc:h2:file:"
-                + Paths.get("data", "linkora-spring-mvc").toAbsolutePath()
-                + ";AUTO_SERVER=FALSE");
+    public DataSource linkoraDataSource() {
+        String url = System.getProperty("linkora.datasource.url", DEFAULT_URL);
+        DataSource ds;
+        if (url.startsWith("jdbc:h2:")) {
+            org.h2.jdbcx.JdbcDataSource h2 = new org.h2.jdbcx.JdbcDataSource();
+            h2.setURL(url);
+            ds = h2;
+        } else {
+            com.mysql.cj.jdbc.MysqlDataSource mysql = new com.mysql.cj.jdbc.MysqlDataSource();
+            mysql.setURL(url);
+            mysql.setUser(System.getProperty("linkora.datasource.user", DEFAULT_USER));
+            mysql.setPassword(System.getProperty("linkora.datasource.password", DEFAULT_PASSWORD));
+            ds = mysql;
+        }
         // 启动前完成 schema 迁移（幂等，崩溃续跑）
         JdbcServerSchema.migrate(ds);
         return ds;
@@ -52,22 +70,22 @@ public class AppConfig implements WebMvcConfigurer {
     }
 
     @Bean
-    public ClientRegistry linkoraClientRegistry(JdbcDataSource linkoraDataSource) {
+    public ClientRegistry linkoraClientRegistry(DataSource linkoraDataSource) {
         return new JdbcClientRegistry(linkoraDataSource);
     }
 
     @Bean
-    public MessageRepository linkoraMessageRepository(JdbcDataSource linkoraDataSource) {
+    public MessageRepository linkoraMessageRepository(DataSource linkoraDataSource) {
         return new JdbcMessageRepository(linkoraDataSource);
     }
 
     @Bean
-    public DeliveryRepository linkoraDeliveryRepository(JdbcDataSource linkoraDataSource) {
+    public DeliveryRepository linkoraDeliveryRepository(DataSource linkoraDataSource) {
         return new JdbcDeliveryRepository(linkoraDataSource);
     }
 
     @Bean
-    public ClientCursorRepository linkoraCursorRepository(JdbcDataSource linkoraDataSource) {
+    public ClientCursorRepository linkoraCursorRepository(DataSource linkoraDataSource) {
         return new JdbcClientCursorRepository(linkoraDataSource);
     }
 }
