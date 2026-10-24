@@ -481,8 +481,9 @@ public final class LinkoraServer {
         String messageType = message == null ? "（正文缺失）" : message.getMessageType();
         return new com.linkora.server.admin.DeliveryView(
                 record.getMessageId(), record.getClientId(), messageType, record.getSeq(),
-                record.getState(), record.getRetryCount(), record.getNextRetryAt(),
-                record.getLastError(), payload, record.getCreatedAt(), record.getUpdatedAt());
+                record.getSequenceKey(), record.getState(), record.getRetryCount(),
+                record.getNextRetryAt(), record.getLastError(), payload,
+                record.getCreatedAt(), record.getUpdatedAt());
     }
 
     private static int clampLimit(int limit) {
@@ -584,6 +585,22 @@ public final class LinkoraServer {
             }
         }
         return moved;
+    }
+
+    /**
+     * 同键阻塞统计：同客户端、同顺序键下，除指定消息外仍处于非终态的投递条数。
+     * 消息无顺序键或记录不存在时返回 0。仅供运维界面提示，不参与投递链路。
+     */
+    public int countBlockedBySequenceKey(String clientId, String messageId) {
+        requireNotBlank(clientId, "clientId");
+        requireNotBlank(messageId, "messageId");
+        DeliveryRecord record = deliveryRepository.find(messageId, clientId).orElse(null);
+        if (record == null || record.getSequenceKey() == null
+                || record.getSequenceKey().trim().isEmpty()) {
+            return 0;
+        }
+        int total = deliveryRepository.countUnfinishedBySequenceKey(clientId, record.getSequenceKey());
+        return Math.max(0, total - 1);
     }
 
     /** 运行时启用客户端（恢复收发）。 */

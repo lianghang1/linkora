@@ -157,6 +157,35 @@ public class AdminConsoleEndToEndTest {
         assertTrue(r.body.contains("clientId"));
     }
 
+    /** 顺序键可视 + 同键阻塞统计：同键两条，第一条进死信后应报 1 条被阻塞。 */
+    @Test
+    public void sequenceKeyVisibleAndBlockedCounted() throws Exception {
+        long now = System.currentTimeMillis();
+        server.publish(com.linkora.core.message.LinkoraMessage.builder()
+                .messageId("seq-key-a").clientId(CLIENT).messageType("BIZ")
+                .payload("a".getBytes(StandardCharsets.UTF_8))
+                .createdAt(now).sequenceKey("order-seq").build());
+        server.publish(com.linkora.core.message.LinkoraMessage.builder()
+                .messageId("seq-key-b").clientId(CLIENT).messageType("BIZ")
+                .payload("b".getBytes(StandardCharsets.UTF_8))
+                .createdAt(now).sequenceKey("order-seq").build());
+        server.forceTransition(CLIENT, "seq-key-a", MessageState.DEAD_LETTER, "测试构造");
+
+        HttpResult dead = http("/linkora-admin/api/dead-letters?clientId=" + CLIENT, TOKEN, "GET", null);
+        assertTrue("死信视图应携带顺序键", dead.body.contains("order-seq"));
+
+        HttpResult blocked = http("/linkora-admin/api/seq-blocked?clientId=" + CLIENT
+                + "&messageId=seq-key-a", TOKEN, "GET", null);
+        assertEquals(1, mapper.readTree(blocked.body).get("blocked").asInt());
+
+        // 无顺序键的消息恒为 0
+        String plain = server.publish(CLIENT, "BIZ", "plain".getBytes(StandardCharsets.UTF_8))
+                .getMessageId();
+        HttpResult noKey = http("/linkora-admin/api/seq-blocked?clientId=" + CLIENT
+                + "&messageId=" + plain, TOKEN, "GET", null);
+        assertEquals(0, mapper.readTree(noKey.body).get("blocked").asInt());
+    }
+
     // ---------------- 写操作端点 ----------------
 
     @Test

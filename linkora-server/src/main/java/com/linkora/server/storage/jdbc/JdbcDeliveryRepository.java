@@ -299,6 +299,28 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
     }
 
     @Override
+    public int countUnfinishedBySequenceKey(String clientId, String sequenceKey) {
+        if (sequenceKey == null || sequenceKey.trim().isEmpty()) {
+            return 0;
+        }
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT COUNT(*) FROM lk_delivery "
+                             + "WHERE client_id = ? AND sequence_key = ? "
+                             + "AND state NOT IN ('" + MessageState.PROCESSED.name() + "', '"
+                             + MessageState.EXPIRED.name() + "')")) {
+            ps.setString(1, clientId);
+            ps.setString(2, sequenceKey);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "统计同键未完成记录失败: " + clientId + "/" + sequenceKey, e);
+        }
+    }
+
     public boolean hasEarlierUnsettled(String clientId, String sequenceKey, long seq) {
         if (sequenceKey == null || sequenceKey.trim().isEmpty()) {
             return false;

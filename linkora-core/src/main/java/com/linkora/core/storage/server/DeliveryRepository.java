@@ -76,8 +76,17 @@ public interface DeliveryRepository {
      * @param sequenceKey 顺序键，null 表示不参与顺序约束（实现应直接返回 false）
      * @param seq         当前记录的投递序号
      */
-    default boolean hasEarlierUnsettled(String clientId, String sequenceKey, long seq) {
-        return false;
+    default boolean hasEarlierUnsettled(String clientId, String sequenceKey, long seq) {        return false;
+    }
+
+    /**
+     * 统计同客户端、同顺序键下处于非终态（未到 PROCESSED/EXPIRED）的投递记录数（含自身）。
+     *
+     * <p>仅供运维界面提示「同键阻塞」（一条卡住、同键后续全部排队），不参与投递主链路。
+     * 顺序键为 null/空白时应返回 0；自实现仓储不覆盖该方法也返回 0，仅表现为不提示。</p>
+     */
+    default int countUnfinishedBySequenceKey(String clientId, String sequenceKey) {
+        return 0;
     }
 
     // ---------------- 管理/观测查询（可选能力） ----------------

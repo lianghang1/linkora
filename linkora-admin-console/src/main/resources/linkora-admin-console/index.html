@@ -22,7 +22,6 @@
   --mono:ui-monospace,"SF Mono","JetBrains Mono",Consolas,monospace;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%}
 body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
 .num{font-variant-numeric:tabular-nums}
 .mono{font-family:var(--mono);font-size:12.5px}
@@ -32,40 +31,52 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 ::selection{background:rgba(139,124,248,.25)}
 kbd{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:5px;border:1px solid var(--hair-2);background:rgba(255,255,255,.04);color:var(--ink-3)}
 
-/* ───── 顶栏：唯一的全局 chrome ───── */
-.topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:26px;height:58px;padding:0 32px;border-bottom:1px solid var(--hair);background:rgba(11,12,18,.78);backdrop-filter:blur(16px)}
+/* ───── 顶栏：方案 A 悬浮胶囊 ───── */
+.topbar{display:flex;align-items:center;height:64px;padding:0 28px;border-bottom:1px solid var(--hair);position:sticky;top:0;z-index:30;background:rgba(11,12,18,.8);backdrop-filter:blur(16px)}
 .brand{display:flex;align-items:center;gap:10px;cursor:pointer}
 .brand-mark{width:28px;height:28px;border-radius:9px;background:var(--accent-grad);display:flex;align-items:center;justify-content:center;color:#14102E;box-shadow:0 4px 18px rgba(139,124,248,.35)}
 .brand b{font-size:15px;font-weight:650;letter-spacing:-.01em}
-.tabs{display:flex;gap:2px;height:100%}
-.tabs a{display:flex;align-items:center;gap:7px;padding:0 15px;font-size:13.5px;font-weight:500;color:var(--ink-2);text-decoration:none;position:relative;transition:color .15s}
-.tabs a svg{width:14px;height:14px;flex:none}
-.tabs a:hover{color:var(--ink)}
-.tabs a.on{color:#fff;font-weight:600}
-.tabs a.on::after{content:"";position:absolute;left:14px;right:14px;bottom:-1px;height:2px;border-radius:2px 2px 0 0;background:var(--accent-grad);box-shadow:0 -2px 12px rgba(139,124,248,.5)}
-.tabs .badge{background:var(--bad);color:#fff;font-size:10px;padding:0 6px;border-radius:99px;margin-left:6px;font-weight:650;box-shadow:var(--glow-bad)}
-.tabs .badge:empty{display:none}
-.top-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-.cmdk-btn{display:flex;align-items:center;gap:9px;padding:6px 12px;border-radius:8px;border:1px solid var(--hair-2);background:rgba(255,255,255,.03);color:var(--ink-3);font-size:12.5px;transition:all .15s}
-.cmdk-btn:hover{color:var(--ink-2);border-color:rgba(255,255,255,.2)}
+.pillnav{position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:3px;padding:4px;border-radius:99px;background:var(--raised);border:1px solid var(--hair)}
+.pillnav a{display:flex;align-items:center;gap:7px;padding:7px 17px;border-radius:99px;font-size:13px;font-weight:500;color:var(--ink-2);transition:all .18s;cursor:pointer}
+.pillnav a svg{width:14px;height:14px}
+.pillnav a:hover{color:var(--ink)}
+.pillnav a.on{background:var(--accent-grad);color:#14102E;font-weight:650;box-shadow:0 4px 14px rgba(139,124,248,.35)}
+.pillnav a .badge{background:var(--bad);color:#fff;font-size:10px;padding:0 6px;border-radius:99px;font-weight:650;box-shadow:var(--glow-bad)}
+.pillnav a .badge:empty{display:none}
+.pillnav a.on .badge{background:#14102E;color:#fff;box-shadow:none}
+.top-right{margin-left:auto;display:flex;align-items:center;gap:11px;position:relative}
+.cswitch{display:flex;align-items:center;gap:9px;padding:6.5px 13px;border-radius:9px;border:1px solid var(--hair-2);background:rgba(255,255,255,.03);font-size:12.5px;color:var(--ink-2);cursor:pointer;transition:border-color .15s}
+.cswitch:hover{border-color:rgba(255,255,255,.22)}
+.cswitch b{color:var(--ink);font-weight:550}
+.cswitch svg{width:12px;height:12px;color:var(--ink-3)}
+.cs-menu{position:absolute;top:calc(100% + 8px);right:0;width:220px;background:#131318;border:1px solid var(--hair-2);border-radius:12px;box-shadow:var(--shadow-lift);padding:6px;display:none;z-index:40}
+.cs-menu.on{display:block}
+.cs-item{padding:9px 12px;border-radius:8px;font-size:13px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;justify-content:space-between}
+.cs-item:hover{background:rgba(255,255,255,.05);color:var(--ink)}
+.cs-item.on{background:var(--accent-tint);color:#fff;box-shadow:inset 0 0 0 1px var(--accent-border)}
+.cs-item .dl{font-size:10.5px;color:var(--bad);font-family:var(--mono)}
 .icon-btn{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink-3);transition:all .15s}
 .icon-btn:hover{background:rgba(255,255,255,.06);color:var(--ink)}
 .icon-btn svg{width:15px;height:15px}
+.cmdk-btn{display:flex;align-items:center;gap:8px;padding:6px 11px;border-radius:8px;border:1px solid var(--hair-2);background:rgba(255,255,255,.03);color:var(--ink-3);font-size:12px;transition:all .15s}
+.cmdk-btn:hover{color:var(--ink-2);border-color:rgba(255,255,255,.22)}
 .refresh-ind{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink-3)}
 .dot-live{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:var(--glow-ok);display:inline-block;animation:pulse 2.4s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 
 /* ───── 页面骨架 ───── */
-.page{display:none;max-width:1240px;margin:0 auto;padding:34px 32px 60px}
+.page{display:none;max-width:1240px;margin:0 auto;padding:32px 32px 70px}
 .page.on{display:block;animation:fadeUp .32s cubic-bezier(.22,.8,.35,1)}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.page-head{margin-bottom:26px}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.page-head{margin-bottom:24px}
+.crumb{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3);cursor:pointer;margin-bottom:10px;width:fit-content}
+.crumb:hover{color:var(--ink-2)}
 .page-head h1{font-size:27px;font-weight:680;letter-spacing:-.025em}
 .page-head .desc{margin-top:5px;font-size:13.5px;color:var(--ink-2)}
 
-/* ───── 内联指标条（无卡片） ───── */
-.metrics{display:flex;align-items:stretch;margin-bottom:38px}
-.metric{padding:0 44px;border-left:1px solid var(--hair)}
+/* ───── 内联指标条 ───── */
+.metrics{display:flex;margin-bottom:32px}
+.metric{padding:0 40px;border-left:1px solid var(--hair)}
 .metric:first-child{padding-left:0;border-left:none}
 .metric .m-lbl{font-size:11px;font-weight:550;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:7px}
 .metric .m-lbl i{width:6px;height:6px;border-radius:50%}
@@ -73,133 +84,64 @@ kbd{font-family:var(--mono);font-size:10.5px;padding:2px 6px;border-radius:5px;b
 .metric .m-val small{font-size:16px;-webkit-text-fill-color:var(--ink-3);font-weight:450}
 .metric .m-sub{font-size:11.5px;color:var(--ink-3)}
 
-/* ───── 待办工单流 ───── */
-.sect-head{display:flex;align-items:baseline;gap:12px;margin:34px 0 4px}
-.sect-head h2{font-size:16.5px;font-weight:650;letter-spacing:-.01em}
-.sect-head .count{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+/* ───── 统一列表行 ───── */
+.rows{border-top:1px solid var(--hair)}
+.row{display:flex;align-items:center;gap:14px;padding:15px 14px;border-bottom:1px solid var(--hair);border-radius:10px;transition:background .13s;cursor:pointer}
+.row:hover{background:var(--raised)}
+.row.sel{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border)}
+.r-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+.r-ico svg{width:15px;height:15px}
+.r-ico.ok{background:rgba(52,211,153,.09);color:var(--ok);box-shadow:inset 0 0 0 1px rgba(52,211,153,.22)}
+.r-ico.bad{background:rgba(251,111,106,.1);color:var(--bad);box-shadow:inset 0 0 0 1px rgba(251,111,106,.26)}
+.r-ico.warn{background:rgba(251,191,36,.1);color:var(--warn);box-shadow:inset 0 0 0 1px rgba(251,191,36,.24)}
+.r-ico.mut{background:rgba(126,134,148,.08);color:var(--mut);box-shadow:inset 0 0 0 1px rgba(126,134,148,.2)}
+.r-main{min-width:0;flex:1}
+.r-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.r-title .mid{font-family:var(--mono);font-size:12.5px;font-weight:550;color:var(--ink)}
+.r-title .type{font-size:11px;color:var(--ink-2);background:var(--raised-2);padding:1.5px 8px;border-radius:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:7px;border:1px solid var(--hair-2);background:rgba(255,255,255,.03);font-family:var(--mono);font-size:11px;color:var(--ink-2)}
+.chip svg{width:10px;height:10px;color:var(--ink-3)}
+.chip.block{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.08);color:var(--warn)}
+.r-sub{margin-top:3px;font-size:12px;color:var(--ink-3);display:flex;gap:13px;flex-wrap:wrap;align-items:center}
+.r-sub .mono{color:var(--ink-3)}
+.r-time{font-family:var(--mono);font-size:11px;color:var(--ink-3);flex:none}
+.r-acts{display:flex;gap:7px;flex:none;opacity:0;transition:opacity .15s}
+.row:hover .r-acts,.row.sel .r-acts{opacity:1}
+.sect-head{display:flex;align-items:baseline;gap:12px;margin:30px 0 4px}
+.sect-head h2{font-size:16.5px;font-weight:650}
+.sect-head .cnt{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
 .sect-head .link{margin-left:auto;font-size:12.5px;color:var(--accent);cursor:pointer;opacity:.9}
 .sect-head .link:hover{opacity:1}
-.task{display:flex;align-items:center;gap:16px;padding:17px 14px;border-bottom:1px solid var(--hair);border-radius:10px;transition:background .14s;cursor:default}
-.task:hover{background:var(--raised)}
-.t-ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:none}
-.t-ico svg{width:17px;height:17px}
-.t-ico.bad{background:rgba(240,84,79,.1);color:var(--bad);box-shadow:inset 0 0 0 1px rgba(240,84,79,.25),0 0 18px rgba(240,84,79,.12)}
-.t-ico.warn{background:rgba(245,165,36,.1);color:var(--warn);box-shadow:inset 0 0 0 1px rgba(245,165,36,.25),0 0 18px rgba(245,165,36,.1)}
-.t-ico.ok{background:var(--accent-tint);color:var(--ok);box-shadow:inset 0 0 0 1px rgba(52,211,153,.25),0 0 18px rgba(52,211,153,.1)}
-.t-main{min-width:0;flex:1}
-.t-title{font-size:13.5px;font-weight:550;color:var(--ink)}
-.t-title .mono{color:var(--ink-2)}
-.t-meta{margin-top:2px;font-size:12px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap}
-.t-meta .mono{color:var(--ink-3)}
-.t-acts{display:flex;gap:8px;flex:none}
+.empty{padding:56px 0;text-align:center;color:var(--ink-3)}
+.empty svg{width:36px;height:36px;margin-bottom:12px;opacity:.4;color:var(--accent)}
+.empty p{font-size:13px}
+.skeleton{height:14px;border-radius:5px;background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.1) 45%,rgba(255,255,255,.04) 65%);background-size:200% 100%;animation:sk 1.3s infinite}
+@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
 .all-clear{padding:44px 0;text-align:center;color:var(--ink-3)}
-.all-clear .ac-ico{width:52px;height:52px;border-radius:16px;background:var(--accent-tint);box-shadow:inset 0 0 0 1px rgba(52,211,153,.3),0 0 30px rgba(52,211,153,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:var(--ok)}
+.all-clear .ac-ico{width:52px;height:52px;border-radius:16px;background:var(--accent-tint);box-shadow:inset 0 0 0 1px rgba(139,124,248,.3),0 0 30px rgba(139,124,248,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:var(--accent)}
 .all-clear b{display:block;font-size:15px;color:var(--ink-2);font-weight:600;margin-bottom:4px}
 .all-clear span{font-size:12.5px}
 
-/* ───── 双栏：大图 + 动态流 ───── */
-.duo{display:grid;grid-template-columns:1fr 350px;gap:56px;margin-top:14px}
-.chartwrap h3,.feed h3{font-size:13px;font-weight:600;color:var(--ink-2);letter-spacing:.02em;margin-bottom:16px}
-.chartwrap svg{width:100%;height:210px;display:block}
-.chart-x{display:flex;justify-content:space-around;font-size:10.5px;color:var(--ink-3);font-family:var(--mono);margin-top:10px}
-.feed{border-left:1px solid var(--hair);padding-left:30px}
-.feed-item{position:relative;padding:0 0 20px 20px}
-.feed-item::before{content:"";position:absolute;left:3px;top:6px;width:6px;height:6px;border-radius:50%;background:var(--ink-3)}
-.feed-item.ok::before{background:var(--ok);box-shadow:var(--glow-ok)}
-.feed-item.bad::before{background:var(--bad);box-shadow:var(--glow-bad)}
-.feed-item.warn::before{background:var(--warn);box-shadow:var(--glow-warn)}
-.feed-item::after{content:"";position:absolute;left:5.5px;top:16px;bottom:-2px;width:1px;background:var(--hair)}
-.feed-item:last-child::after{display:none}
-.feed-item .f-t{font-size:10.5px;color:var(--ink-3);font-family:var(--mono)}
-.feed-item .f-n{font-size:12.5px;color:var(--ink-2);margin-top:1px}
-.feed-item .f-n .mono{color:var(--ink-3)}
+/* ───── 分段器 ───── */
+.seg{display:inline-flex;gap:4px;padding:4px;border-radius:11px;background:var(--raised);border:1px solid var(--hair)}
+.seg button{padding:6px 14px;border-radius:8px;font-size:12.5px;color:var(--ink-2);transition:all .15s}
+.seg button .n{font-family:var(--mono);font-size:11px;margin-left:5px;color:var(--ink-3)}
+.seg button.on{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border);color:#fff;font-weight:600}
+.seg button.on .n{color:var(--accent)}
+.seg button.dead.on{box-shadow:inset 0 0 0 1px rgba(251,111,106,.4);background:rgba(251,111,106,.1)}
+.seg button.dead.on .n{color:var(--bad)}
 
-/* ───── 通用按钮 ───── */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 15px;border-radius:var(--r-sm);font-size:13px;font-weight:550;transition:all .16s;border:1px solid transparent;white-space:nowrap}
-.btn-primary{background:var(--accent-grad);color:#14102E;font-weight:650;box-shadow:0 4px 16px rgba(139,124,248,.28),inset 0 1px 0 rgba(255,255,255,.3)}
-.btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
-.btn-ghost{border-color:var(--hair-2);color:var(--ink);background:rgba(255,255,255,.03)}
-.btn-ghost:hover{border-color:rgba(255,255,255,.24)}
-.btn-sm{padding:5.5px 12px;font-size:12px;border-radius:7px}
-.btn-outline{border-color:var(--hair-2);color:var(--ink);background:rgba(255,255,255,.03)}
-.btn-outline:hover{border-color:var(--accent-border);color:var(--accent)}
-.btn-tint{background:var(--accent-tint);color:var(--accent);border-color:var(--accent-border)}
-.btn-tint:hover{background:rgba(139,124,248,.15)}
-.btn-danger-tint{background:rgba(240,84,79,.1);color:var(--bad);border-color:rgba(240,84,79,.28)}
-.btn-danger-tint:hover{background:rgba(240,84,79,.16)}
-
-/* ───── 列表页（无边框行式） ───── */
-.filterbar{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
-select,.filterbar input{padding:8px 13px;border:1px solid var(--hair-2);border-radius:var(--r-sm);background:rgba(255,255,255,.03);font-size:13px;font-family:inherit;color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
-select:focus,.filterbar input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
-select option{background:#131318;color:var(--ink)}
-.search{padding-left:32px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23787E8A' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:10px center;width:220px}
-table{width:100%;border-collapse:collapse}
-th{font-size:10.5px;font-weight:550;color:var(--ink-3);text-align:left;padding:12px 14px;border-bottom:1px solid var(--hair-2);letter-spacing:.09em;text-transform:uppercase}
-td{padding:14px;border-bottom:1px solid var(--hair);font-size:13.5px}
-tr:last-child td{border-bottom:none}
-tbody tr.rowlink{cursor:pointer;transition:background .12s}
-tbody tr.rowlink:hover{background:var(--raised)}
-.weak{font-size:12px;color:var(--ink-3)}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:2.5px 10px;border-radius:99px;font-size:11px;font-weight:550;white-space:nowrap;border:1px solid transparent}
-.pill i{width:5.5px;height:5.5px;border-radius:50%;flex:none}
-.pill.ok{background:rgba(52,211,153,.1);color:var(--ok);border-color:rgba(52,211,153,.24)}.pill.ok i{background:var(--ok);box-shadow:var(--glow-ok)}
-.pill.warn{background:rgba(245,165,36,.1);color:var(--warn);border-color:rgba(245,165,36,.24)}.pill.warn i{background:var(--warn);box-shadow:var(--glow-warn)}
-.pill.bad{background:rgba(240,84,79,.1);color:var(--bad);border-color:rgba(240,84,79,.26)}.pill.bad i{background:var(--bad);box-shadow:var(--glow-bad)}
-.pill.mut{background:rgba(130,138,152,.1);color:var(--mut);border-color:rgba(130,138,152,.22)}.pill.mut i{background:var(--mut)}
-.pager{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:14px;font-size:12.5px;color:var(--ink-3)}
-.pager button{border:1px solid var(--hair-2);background:rgba(255,255,255,.03);border-radius:7px;padding:4.5px 12px;font-size:12.5px;color:var(--ink-2)}
-.pager button:not(:disabled):hover{border-color:var(--accent-border);color:var(--accent)}
-.skeleton{height:14px;border-radius:5px;background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.1) 45%,rgba(255,255,255,.04) 65%);background-size:200% 100%;animation:sk 1.3s infinite}
-@keyframes sk{from{background-position:200% 0}to{background-position:-200% 0}}
-.empty{padding:60px 0;text-align:center;color:var(--ink-3)}
-.empty svg{width:36px;height:36px;margin-bottom:12px;opacity:.4;color:var(--accent)}
-.empty p{font-size:13px}
-
-/* ───── 客户端 ───── */
-.client-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px}
-.client-card{padding:19px 21px;border:1px solid var(--hair);border-radius:14px;background:var(--raised);transition:border-color .18s,transform .18s}
-.client-card:hover{border-color:var(--hair-2);transform:translateY(-2px)}
-.cc-top{display:flex;align-items:flex-start;gap:13px}
-.avatar{width:40px;height:40px;border-radius:11px;background:var(--accent-tint);box-shadow:inset 0 0 0 1px rgba(139,124,248,.25);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:650;font-size:13px;font-family:var(--mono);flex:none}
-.cc-top h4{font-size:14px;font-weight:600;font-family:var(--mono)}
-.cc-top .switch{margin-left:auto;margin-top:3px}
-.switch{width:34px;height:19px;border-radius:99px;background:rgba(255,255,255,.14);position:relative;transition:background .15s;cursor:pointer;flex:none}
-.switch::after{content:"";position:absolute;top:2.5px;left:2.5px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .16s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
-.switch.on{background:var(--accent)}
-.switch.on::after{left:17.5px}
-.cc-stats{display:flex;gap:30px;margin:16px 0 15px;padding:12px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
-.cc-stats div b{display:block;font-size:18px;font-weight:650;font-family:var(--mono)}
-.cc-stats div span{font-size:11px;color:var(--ink-3);letter-spacing:.04em}
-.cc-acts{display:flex;gap:8px;flex-wrap:wrap}
-.cc-acts .spacer{flex:1}
-.detail-rows{margin-top:12px;display:none}
-.detail-rows.on{display:block}
-footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)}
+/* ───── 批量条 ───── */
+.batchbar{display:none;align-items:center;gap:10px;margin:14px 0 8px;padding:10px 16px;border-radius:11px;background:rgba(251,111,106,.06);border:1px solid rgba(251,111,106,.22);font-size:12.5px;color:var(--ink-2)}
+.batchbar.on{display:flex}
+.batchbar .spacer{flex:1}
 
 /* ───── 消息主从双栏 ───── */
-.msg-split{display:grid;grid-template-columns:400px 1fr;gap:44px;align-items:start}
-.vstack{flex-direction:column;align-items:stretch;gap:9px}
-.mlist{margin-top:4px}
-.mrow{padding:13px 14px;border-bottom:1px solid var(--hair);border-radius:10px;cursor:pointer;transition:background .13s}
-.mrow:hover{background:var(--raised)}
-.mrow.sel{background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border)}
-.mrow-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.mrow-top .mid{font-family:var(--mono);font-size:12.5px;color:var(--accent)}
-.mrow-sub{margin-top:3px;font-size:12px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mrow-sub .mono{color:var(--ink-3)}
-.msg-detail{position:sticky;top:86px;max-height:calc(100vh - 130px);overflow-y:auto;border-left:1px solid var(--hair);padding-left:36px;min-height:420px}
+.msg-split{display:grid;grid-template-columns:1fr 380px;gap:44px;align-items:start}
+.md{position:sticky;top:96px;max-height:calc(100vh - 140px);overflow-y:auto;border-left:1px solid var(--hair);padding-left:36px;min-height:420px}
 .md-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:20px}
-.md-head h3{font-size:14.5px;font-weight:600;font-family:var(--mono);color:#fff}
-.md-close{display:none;margin-left:auto}
-@media (max-width:1100px){
-  .msg-split{grid-template-columns:1fr}
-  .msg-detail{position:fixed;inset:0;z-index:45;background:#0D0D10;padding:22px 26px;max-height:none;border-left:none;transform:translateX(100%);transition:transform .28s cubic-bezier(.3,.9,.3,1);min-height:0}
-  .msg-detail.on{transform:none}
-  .md-close{display:flex}
-}
-
-/* ───── 详情内容组件 ───── */
+.md-head h3{font-size:14.5px;font-weight:600;font-family:var(--mono);color:#fff;cursor:pointer;transition:color .15s}
+.md-head h3:hover{color:var(--accent)}
 .kv{display:grid;grid-template-columns:88px 1fr;gap:8px 12px;font-size:13px;margin-bottom:22px}
 .kv dt{color:var(--ink-3)}.kv dd{color:var(--ink)}
 .sect-lbl{font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.12em;margin:24px 0 10px;display:flex;align-items:center;gap:8px}
@@ -212,6 +154,66 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 .tl-item.err::before{border-color:var(--bad);box-shadow:var(--glow-bad)}
 .tl-item .t{font-size:11.5px;color:var(--ink-3);font-family:var(--mono)}
 .tl-item .n{font-size:13px;margin-top:2px}
+@media (max-width:1100px){
+  .msg-split{grid-template-columns:1fr}
+  .md{position:fixed;inset:0;z-index:45;background:#0D0D10;padding:22px 26px;max-height:none;border-left:none;transform:translateX(100%);transition:transform .28s cubic-bezier(.3,.9,.3,1);min-height:0}
+  .md.on{transform:none}
+  .md-close{display:flex}
+  .metrics{flex-wrap:wrap;gap:18px 0}.metric{padding:0 24px}
+}
+.md-close{display:none;margin-left:auto}
+
+/* ───── 按钮 ───── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 15px;border-radius:var(--r-sm);font-size:13px;font-weight:550;transition:all .16s;border:1px solid transparent;white-space:nowrap}
+.btn-sm{padding:5.5px 12px;font-size:12px;border-radius:7px}
+.btn-primary{background:var(--accent-grad);color:#14102E;font-weight:650;box-shadow:0 4px 16px rgba(139,124,248,.28),inset 0 1px 0 rgba(255,255,255,.3)}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-primary:disabled,.btn-ghost:disabled{opacity:.55;cursor:default}
+.btn-ghost{border-color:var(--hair-2);color:var(--ink);background:rgba(255,255,255,.03)}
+.btn-ghost:hover{border-color:rgba(255,255,255,.24)}
+.btn-outline{border-color:var(--hair-2);color:var(--ink);background:rgba(255,255,255,.03)}
+.btn-outline:hover{border-color:var(--accent-border);color:var(--accent)}
+.btn-tint{background:var(--accent-tint);color:var(--accent);border-color:var(--accent-border)}
+.btn-tint:hover{background:rgba(139,124,248,.16)}
+.btn-danger-tint{background:rgba(251,111,106,.1);color:var(--bad);border-color:rgba(251,111,106,.28)}
+.btn-danger-tint:hover{background:rgba(251,111,106,.16)}
+.filterbar{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+select,.filterbar input{padding:8px 13px;border:1px solid var(--hair-2);border-radius:var(--r-sm);background:rgba(255,255,255,.03);font-size:13px;font-family:inherit;color:var(--ink);outline:none;transition:border-color .15s,box-shadow .15s}
+select:focus,.filterbar input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
+select option{background:#131318}
+.pager{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px 0 4px;font-size:12.5px;color:var(--ink-3)}
+.pager button{border:1px solid var(--hair-2);background:rgba(255,255,255,.03);border-radius:7px;padding:4.5px 12px;font-size:12.5px;color:var(--ink-2)}
+.pager button:not(:disabled):hover{border-color:var(--accent-border);color:var(--accent)}
+.weak{font-size:12px;color:var(--ink-3)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2.5px 10px;border-radius:99px;font-size:11px;font-weight:550;border:1px solid transparent;white-space:nowrap}
+.pill i{width:5.5px;height:5.5px;border-radius:50%}
+.pill.ok{background:rgba(52,211,153,.1);color:var(--ok);border-color:rgba(52,211,153,.24)}.pill.ok i{background:var(--ok);box-shadow:var(--glow-ok)}
+.pill.warn{background:rgba(251,191,36,.1);color:var(--warn);border-color:rgba(251,191,36,.24)}.pill.warn i{background:var(--warn);box-shadow:var(--glow-warn)}
+.pill.bad{background:rgba(251,111,106,.1);color:var(--bad);border-color:rgba(251,111,106,.26)}.pill.bad i{background:var(--bad);box-shadow:var(--glow-bad)}
+.pill.mut{background:rgba(126,134,148,.1);color:var(--mut);border-color:rgba(126,134,148,.22)}.pill.mut i{background:var(--mut)}
+
+/* ───── 客户端 ───── */
+.client-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.client-card{padding:19px 21px;border:1px solid var(--hair);border-radius:14px;background:var(--raised);transition:border-color .18s,transform .18s;cursor:pointer}
+.client-card:hover{border-color:var(--accent-border);transform:translateY(-2px)}
+.cc-top{display:flex;align-items:flex-start;gap:13px}
+.avatar{width:40px;height:40px;border-radius:11px;background:var(--accent-tint);box-shadow:inset 0 0 0 1px var(--accent-border);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:650;font-size:13px;font-family:var(--mono);flex:none}
+.cc-top h4{font-size:14px;font-weight:600;font-family:var(--mono)}
+.cc-top .switch{margin-left:auto;margin-top:3px}
+.switch{width:34px;height:19px;border-radius:99px;background:rgba(255,255,255,.14);position:relative;cursor:pointer;flex:none;transition:background .15s}
+.switch::after{content:"";position:absolute;top:2.5px;left:2.5px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .16s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.switch.on{background:var(--accent)}
+.switch.on::after{left:17.5px}
+.cc-stats{display:flex;gap:30px;margin:16px 0 15px;padding:12px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.cc-stats div b{display:block;font-size:18px;font-weight:650;font-family:var(--mono)}
+.cc-stats div span{font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+.cd-head{display:flex;align-items:center;gap:16px;padding:16px 0;margin-bottom:6px;border-bottom:1px solid var(--hair)}
+.cd-head h1{font-size:24px;font-weight:680;font-family:var(--mono);letter-spacing:-.02em}
+.cd-head .actions{margin-left:auto;display:flex;gap:9px;align-items:center}
+.subtabs{display:flex;gap:2px;margin:22px 0 4px;border-bottom:1px solid var(--hair)}
+.subtabs button{padding:10px 16px;font-size:13px;color:var(--ink-3);border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+.subtabs button.on{color:#fff;font-weight:600;border-bottom-color:var(--accent)}
+footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)}
 
 /* ───── 弹窗 / Toast ───── */
 .modal{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center}
@@ -232,8 +234,8 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 #toasts{position:fixed;top:18px;right:22px;z-index:70;display:flex;flex-direction:column;gap:9px}
 .toast{display:flex;align-items:center;gap:10px;background:rgba(19,19,24,.92);backdrop-filter:blur(10px);border:1px solid var(--hair-2);color:var(--ink);padding:11px 17px;border-radius:11px;font-size:13px;box-shadow:var(--shadow-lift);animation:slideIn .24s cubic-bezier(.3,1.1,.4,1)}
 .toast svg{width:15px;height:15px;color:var(--accent);flex:none}
-.toast.warn{border-color:rgba(245,165,36,.4)}.toast.warn svg{color:var(--warn)}
-.toast.bad{border-color:rgba(240,84,79,.4)}.toast.bad svg{color:var(--bad)}
+.toast.warn{border-color:rgba(251,191,36,.4)}.toast.warn svg{color:var(--warn)}
+.toast.bad{border-color:rgba(251,111,106,.4)}.toast.bad svg{color:var(--bad)}
 @keyframes slideIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
 
 /* ───── 命令面板 ───── */
@@ -271,7 +273,6 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 .s-metric span{display:block;font-size:10.5px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px}
 .s-metric b{font-family:var(--mono);font-size:20px;font-weight:650;color:var(--ink-2)}
 .login-panel{width:460px;flex:none;display:flex;align-items:center;justify-content:center;padding:40px;background:rgba(255,255,255,.012)}
-@media (max-width:1100px){.login-side{display:none}.login-panel{width:100%;border-left:none}}
 .login-card{position:relative;width:392px;background:rgba(15,15,18,.85);backdrop-filter:blur(18px);border:1px solid var(--hair-2);border-radius:20px;box-shadow:var(--shadow-lift);padding:42px 36px 34px;text-align:center}
 .login-mark{width:56px;height:56px;border-radius:16px;background:var(--accent-grad);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;color:#14102E;box-shadow:0 8px 32px rgba(139,124,248,.4)}
 .login-card h1{font-size:20px;font-weight:650}
@@ -287,10 +288,7 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 .eye svg{width:15px;height:15px;display:block}
 @keyframes shakeX{0%,100%{transform:none}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
 .login-card.shake{animation:shakeX .38s}
-#mdTitle{cursor:pointer;transition:color .15s}
-#mdTitle:hover{color:var(--accent)}
-
-@media (max-width:1100px){.duo{grid-template-columns:1fr}.feed{border-left:none;padding-left:0}.client-grid{grid-template-columns:1fr}.metric{padding:0 26px}}
+@media (max-width:1100px){.login-side{display:none}.login-panel{width:100%}.pillnav a{padding:7px 12px}}
 </style>
 </head>
 <body>
@@ -325,20 +323,20 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
   </div>
   <div class="login-panel">
     <div class="login-card">
-    <div class="login-mark">
-      <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg>
-    </div>
-    <h1>Linkora 运维控制台</h1>
-    <p class="sub">输入访问令牌以继续 · 凭证仅保存在本会话</p>
-    <div class="pwd">
-      <input id="token" type="password" placeholder="Bearer Token" autocomplete="off">
-      <button class="eye" type="button" onclick="togglePwd()" title="显示/隐藏">
-        <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-      </button>
-    </div>
-    <div class="login-err" id="loginErr"></div>
-    <button class="btn btn-primary btn-block" onclick="doLogin()">进入控制台</button>
-    <p class="login-tip">令牌由服务端 linkora.admin-console.token 配置</p>
+      <div class="login-mark">
+        <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg>
+      </div>
+      <h1>Linkora 运维控制台</h1>
+      <p class="sub">输入访问令牌以继续 · 凭证仅保存在本会话</p>
+      <div class="pwd">
+        <input id="token" type="password" placeholder="Bearer Token" autocomplete="off">
+        <button class="eye" type="button" onclick="togglePwd()" title="显示/隐藏">
+          <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <div class="login-err" id="loginErr"></div>
+      <button class="btn btn-primary btn-block" onclick="doLogin()">进入控制台</button>
+      <p class="login-tip">令牌由服务端 linkora.admin-console.token 配置</p>
     </div>
   </div>
 </div>
@@ -349,19 +347,23 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
       <div class="brand-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2z"/><path d="M12 11l8-4.5M12 11v9M12 11L4 6.5"/></svg></div>
       <b>Linkora</b>
     </div>
-    <nav class="tabs">
-      <a class="on" data-v="cockpit" href="#" onclick="go('cockpit');return false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>驾驶舱</a>
-      <a data-v="messages" href="#" onclick="go('messages');return false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>消息</a>
-      <a data-v="dead" href="#" onclick="go('dead');return false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>死信 <span class="badge num" id="deadBadge"></span></a>
-      <a data-v="clients" href="#" onclick="go('clients');return false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>客户端</a>
+    <nav class="pillnav">
+      <a class="on" data-v="cockpit" onclick="go('cockpit')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>驾驶舱</a>
+      <a data-v="messages" onclick="go('messages')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>消息 <span class="badge num" id="deadBadge"></span></a>
+      <a data-v="clients" onclick="go('clients')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>客户端</a>
     </nav>
     <div class="top-right">
-      <div class="refresh-ind"><span class="dot-live"></span><span id="nextTick" class="num">10s</span></div>
+      <div class="cswitch" id="csBtn" onclick="toggleCsMenu(event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        客户端：<b id="csLabel">全部</b>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="cs-menu" id="csMenu"></div>
       <button class="cmdk-btn" onclick="openCmdk()"><kbd>⌘K</kbd></button>
+      <div class="refresh-ind"><span class="dot-live"></span><span class="num" id="nextTick">10s</span></div>
       <button class="icon-btn" title="立即刷新" onclick="refreshCurrent()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
       </button>
@@ -371,58 +373,65 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
     </div>
   </div>
 
-  <div class="page on" id="v-cockpit">
+  <div class="page on" id="p-cockpit">
     <div class="page-head">
       <h1>驾驶舱</h1>
-      <p class="desc">全链路实时概览 · 需要人工介入的事项优先呈现</p>
+      <p class="desc">全局健康度 · 需要人工介入的事项优先呈现（本页不受客户端筛选影响）</p>
     </div>
     <div class="metrics">
       <div class="metric"><div class="m-lbl"><i style="background:var(--ok);box-shadow:var(--glow-ok)"></i>在线客户端</div><div class="m-val num" id="kpiOnline">0</div><div class="m-sub num" id="kpiOnlineSub">—</div></div>
       <div class="metric"><div class="m-lbl"><i style="background:var(--warn);box-shadow:var(--glow-warn)"></i>未完成投递</div><div class="m-val num" id="kpiPending">0</div><div class="m-sub">全部客户端合计</div></div>
       <div class="metric"><div class="m-lbl"><i style="background:var(--bad);box-shadow:var(--glow-bad)"></i>死信</div><div class="m-val num" id="kpiDead">0</div><div class="m-sub" id="kpiDeadSub">—</div></div>
-      <div class="metric"><div class="m-lbl"><i style="background:var(--accent);box-shadow:0 0 9px rgba(139,124,248,.55)"></i>今日发布</div><div class="m-val num" id="kpiPub">0</div><div class="m-sub num" id="kpiPubSub">—</div></div>
+      <div class="metric"><div class="m-lbl"><i style="background:var(--accent);box-shadow:0 0 9px rgba(139,124,248,.5)"></i>今日发布</div><div class="m-val num" id="kpiPub">0</div><div class="m-sub num" id="kpiPubSub">—</div></div>
     </div>
-
-    <div class="sect-head"><h2>需要你处理</h2><span class="count num" id="taskCount"></span>
-      <span class="link" onclick="go('dead')">进入死信处置 →</span></div>
-    <div id="taskList"></div>
-
-    <div class="duo">
-      <div class="chartwrap">
-        <h3>近 7 日发布量</h3>
+    <div class="sect-head"><h2>需要你处理</h2><span class="cnt" id="taskCount"></span>
+      <span class="link" onclick="goMessagesDead()">进入消息页死信视图 →</span></div>
+    <div class="rows" id="taskList"></div>
+    <div style="display:grid;grid-template-columns:1fr 350px;gap:56px;margin-top:36px">
+      <div>
+        <h3 style="font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:16px">近 7 日发布量</h3>
         <div id="chartArea"></div>
-        <div class="chart-x" id="chartX"></div>
+        <div id="chartX" style="display:flex;justify-content:space-around;font-size:10.5px;color:var(--ink-3);font-family:var(--mono);margin-top:8px"></div>
       </div>
-      <div class="feed">
-        <h3>最近动态</h3>
+      <div style="border-left:1px solid var(--hair);padding-left:30px">
+        <h3 style="font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:16px">最近动态</h3>
         <div id="feedList"></div>
       </div>
     </div>
   </div>
 
-  <div class="page" id="v-messages">
+  <div class="page" id="p-messages">
     <div class="page-head">
       <h1>消息</h1>
-      <p class="desc">按条件检索全部上下行消息，点行在右侧查看完整 payload 与投递时间线</p>
+      <p class="desc">一个列表看所有状态 · 点行在右侧查看 payload 与投递时间线 · 受顶栏客户端筛选影响</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px">
+      <div class="seg" id="msgSeg">
+        <button class="on" data-s="all" onclick="setMsgSeg('all')">全部</button>
+        <button data-s="run" onclick="setMsgSeg('run')">待处理<span class="n" id="segRunN"></span></button>
+        <button class="dead" data-s="dead" onclick="setMsgSeg('dead')">死信<span class="n" id="segDeadN"></span></button>
+      </div>
+      <span style="flex:1"></span>
+      <span class="pill mut"><i></i>范围：<span id="csScope">全部客户端</span></span>
+    </div>
+    <div class="batchbar" id="batchbar">
+      <span id="batchHint"></span>
+      <span style="flex:1"></span>
+      <button class="btn btn-outline btn-sm" onclick="forceTransitionModal()">通用状态变更</button>
+      <button class="btn btn-danger-tint btn-sm" id="batchSkipBtn" onclick="batchSkip()" style="display:none">批量跳过本客户端死信</button>
     </div>
     <div class="msg-split">
-      <div class="msg-list">
-        <div class="filterbar vstack">
-          <input class="search" style="width:100%" id="mSearch" placeholder="客户端 ID 精确筛选…" onkeydown="if(event.key==='Enter')loadMessages()">
-          <select id="mType"><option value="">全部类型</option><option>NOTICE</option><option>BIZ</option><option>SYNC</option><option>linkora.admin.result</option></select>
-          <input type="date" id="mBegin" onchange="loadMessages()">
-          <button class="btn btn-ghost btn-sm" onclick="loadMessages()">查询</button>
-        </div>
-        <div id="msgRows" class="mlist"></div>
-        <div class="pager" style="justify-content:center">
+      <div>
+        <div class="rows" id="msgList"></div>
+        <div class="pager" id="msgPager" style="display:none">
           <button id="mPrev" onclick="pageMsgs(-1)">‹ 上一页</button>
           <span class="num" id="mPageInfo"></span>
           <button id="mNext" onclick="pageMsgs(1)">下一页 ›</button>
         </div>
       </div>
-      <div class="msg-detail" id="msgDetail">
+      <div class="md" id="md">
         <div class="md-head">
-          <div><h3 class="mono" id="mdTitle" onclick="copyText(this.textContent)" title="点击复制">—</h3><span class="weak" id="mdSub"></span></div>
+          <div><h3 id="mdTitle" onclick="copyText(this.textContent)" title="点击复制">从左侧选择消息</h3><span class="weak" id="mdSub"></span></div>
           <button class="icon-btn md-close" onclick="closeMsgDetail()" title="关闭">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -430,35 +439,54 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
         <div id="mdBody">
           <div class="empty">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <p>从左侧选择一条消息查看详情</p>
+            <p>点行在此查看详情<br>列表不被遮挡，可连续对比多条</p>
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <div class="page" id="v-dead">
-    <div class="page-head">
-      <h1>死信处置</h1>
-      <p class="desc">超过重试上限的投递按客户端隔离存放，逐条或批量处置，操作均需填原因留痕</p>
-    </div>
-    <div class="filterbar">
-      <select id="deadClient" onchange="loadDead()"><option value="">选择客户端…</option></select>
-      <span class="weak" id="deadHint">选择客户端查看其死信</span>
-      <span style="flex:1"></span>
-      <button class="btn btn-outline btn-sm" onclick="forceTransitionModal()">通用状态变更</button>
-      <button class="btn btn-outline btn-sm" id="deadBatchSkip" onclick="batchSkip()" style="display:none">批量跳过</button>
-    </div>
-    <div id="deadTasks"></div>
-  </div>
-
-  <div class="page" id="v-clients">
+  <div class="page" id="p-clients">
     <div class="page-head">
       <h1>客户端</h1>
-      <p class="desc">启停、断开连接、未完成明细与远程指令通道</p>
+      <p class="desc">点卡片进入客户端详情（指标 / 远程指令 / 该客户端的消息）</p>
     </div>
     <div class="client-grid" id="clientGrid"></div>
     <footer class="ver">Linkora Admin Console · v0.4.0 · 数据每 10 秒自动刷新</footer>
+  </div>
+
+  <div class="page" id="p-clientDetail">
+    <div class="crumb" onclick="go('clients')">← 返回客户端列表</div>
+    <div class="cd-head">
+      <div class="avatar" id="cdAvatar">—</div>
+      <div><h1 id="cdId">—</h1><div class="weak num" id="cdReg"></div></div>
+      <div class="actions">
+        <div class="switch" id="cdSwitch"></div>
+        <button class="btn btn-outline btn-sm" onclick="sendCmd(cdCurrent,'PING')">PING</button>
+        <button class="btn btn-outline btn-sm" onclick="queryOutbox(cdCurrent)">QUERY_OUTBOX</button>
+        <button class="btn btn-outline btn-sm" onclick="kick(cdCurrent)">断开连接</button>
+      </div>
+    </div>
+    <div class="metrics" style="margin-top:16px">
+      <div class="metric"><div class="m-lbl"><i id="cdConnDot"></i>连接状态</div><div class="m-val num" id="cdConn" style="font-size:26px">—</div><div class="m-sub" id="cdConnSub">—</div></div>
+      <div class="metric"><div class="m-lbl"><i style="background:var(--warn);box-shadow:var(--glow-warn)"></i>未完成</div><div class="m-val num" id="cdPending">0</div><div class="m-sub">全部未完成投递</div></div>
+      <div class="metric"><div class="m-lbl"><i style="background:var(--bad);box-shadow:var(--glow-bad)"></i>死信</div><div class="m-val num" id="cdDead">0</div><div class="m-sub" id="cdDeadSub">—</div></div>
+    </div>
+    <div class="subtabs">
+      <button class="on" data-t="messages" onclick="setCdTab('messages')">该客户端的消息</button>
+      <button data-t="unfinished" onclick="setCdTab('unfinished')">未完成明细</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin:16px 0 4px" id="cdSegWrap">
+      <div class="seg" id="cdSeg">
+        <button class="on" onclick="setCdSeg('all')">全部</button>
+        <button onclick="setCdSeg('run')">待处理</button>
+        <button class="dead" onclick="setCdSeg('dead')">死信</button>
+      </div>
+      <span class="weak">点行跳转到消息页查看详情</span>
+    </div>
+    <div class="rows" id="cdList"></div>
+    <div id="cdUnfinished" style="display:none"></div>
+    <div id="cdCmdResult" class="codeblock" style="display:none;margin-top:14px"></div>
   </div>
 </div>
 
@@ -489,13 +517,18 @@ footer.ver{margin-top:30px;text-align:center;font-size:11.5px;color:var(--ink-3)
 /* ═════════ 数据层 ═════════ */
 var TOKEN = sessionStorage.getItem("linkora-admin-token") || "";
 var mapper = {PROCESSED:"ok", RETRYING:"warn", FAILED:"warn", DEAD_LETTER:"bad"};
+var ICONS = {
+  bad:'<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  warn:'<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+  ok:'<polyline points="20 6 9 17 4 12"/>',
+  mut:'<circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/>'
+};
+function esc(s){return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];})}
 function stPill(state, text){
   var cls = mapper[state] || "mut";
   return '<span class="pill ' + cls + '"><i></i>' + esc(text || state) + '</span>';
 }
-function esc(s){return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
-  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];})}
-
 function api(path, opts){
   opts = opts || {};
   opts.headers = Object.assign({"Authorization": "Bearer " + TOKEN}, opts.headers || {});
@@ -511,6 +544,13 @@ function api(path, opts){
     });
   });
 }
+function boxSkeleton(id){
+  var el = document.getElementById(id);
+  if (!el.innerHTML.trim() || el.innerHTML.indexOf("skeleton") >= 0){
+    el.innerHTML = '<div class="skeleton" style="width:60%"></div>';
+  }
+}
+function fmtNum(n){return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
 
 /* ═════════ 登录 / 退出 ═════════ */
 function togglePwd(){
@@ -549,33 +589,69 @@ document.getElementById("token").addEventListener("keydown", function(e){
   if (e.key === "Enter") doLogin();
 });
 document.getElementById("token").addEventListener("paste", function(e){
-  setTimeout(function(){
-    e.target.value = e.target.value.replace(/^Bearer\s+/i, "").trim();
-  }, 0);
+  setTimeout(function(){ e.target.value = e.target.value.replace(/^Bearer\s+/i, "").trim(); }, 0);
 });
 function boot(){
   document.getElementById("login").classList.remove("on");
   document.getElementById("app").style.display = "block";
+  loadClientMenu();
   refreshCurrent();
 }
 
 /* ═════════ 导航 ═════════ */
-var titles = {cockpit:"驾驶舱", messages:"消息", dead:"死信处置", clients:"客户端"};
 var current = "cockpit";
 function go(v){
   current = v;
-  var links = document.querySelectorAll(".tabs a");
+  var links = document.querySelectorAll(".pillnav a");
   for (var i = 0; i < links.length; i++) links[i].classList.toggle("on", links[i].dataset.v === v);
   var pages = document.querySelectorAll(".page");
   for (var j = 0; j < pages.length; j++) pages[j].classList.remove("on");
-  document.getElementById("v-" + v).classList.add("on");
+  document.getElementById("p-" + v).classList.add("on");
   refreshCurrent();
 }
+function goMessagesDead(){ go("messages"); setMsgSeg("dead"); }
 function refreshCurrent(){
   if (current === "cockpit") loadCockpit();
   else if (current === "messages") loadMessages();
-  else if (current === "dead") loadDead();
   else if (current === "clients") loadClients();
+  else if (current === "clientDetail") refreshClientDetail();
+}
+
+/* ═════════ 全局客户端选择器 ═════════ */
+var selectedClient = "", clientCache = [];
+function toggleCsMenu(e){
+  e.stopPropagation();
+  document.getElementById("csMenu").classList.toggle("on");
+}
+document.addEventListener("click", function(){
+  document.getElementById("csMenu").classList.remove("on");
+});
+function sumDead(){ var s = 0; for (var i = 0; i < clientCache.length; i++) s += clientCache[i].deadLetterCount || 0; return s; }
+function sumPending(){ var s = 0; for (var i = 0; i < clientCache.length; i++) s += clientCache[i].unfinishedCount || 0; return s; }
+function loadClientMenu(){
+  api("api/clients").then(function(clients){
+    clientCache = clients || [];
+    var menu = document.getElementById("csMenu");
+    var html = '<div class="cs-item' + (selectedClient === "" ? " on" : "") + '" onclick="pickClient(\'\')">全部客户端</div>';
+    for (var i = 0; i < clientCache.length; i++){
+      var c = clientCache[i];
+      html += '<div class="cs-item' + (selectedClient === c.clientId ? " on" : "") + '" onclick="pickClient(\'' + esc(c.clientId) + '\')">'
+        + '<span class="mono">' + esc(c.clientId) + '</span>'
+        + (c.deadLetterCount > 0 ? '<span class="dl">死信 ' + c.deadLetterCount + '</span>' : "") + '</div>';
+    }
+    menu.innerHTML = html;
+    document.getElementById("deadBadge").textContent = sumDead() > 0 ? sumDead() : "";
+  }).catch(function(){ /* 登录失败已有专门路径 */ });
+}
+function pickClient(id){
+  selectedClient = id;
+  document.getElementById("csLabel").textContent = id === "" ? "全部" : id;
+  document.getElementById("csScope").textContent = id === "" ? "全部客户端" : id;
+  document.getElementById("csMenu").classList.remove("on");
+  if (current === "messages") loadMessages();
+}
+function clientFilterParam(){
+  return selectedClient ? "&clientId=" + encodeURIComponent(selectedClient) : "";
 }
 
 /* ═════════ 驾驶舱 ═════════ */
@@ -617,27 +693,62 @@ function loadCockpit(){
     var today = days.length ? days[days.length - 1] : null;
     setKpi("kpiPub", today ? today.count : 0, "");
     document.getElementById("kpiPubSub").textContent = today ? today.date : "—";
-
     renderAreaChart(days);
     renderFeed();
-    loadTasks(clients, pending, dead);
+    loadTasks(clients);
   }).catch(showErr);
 }
-
-/* 待办工单流：死信（bad）+ 重试中（warn），来自各客户端 */
-function loadTasks(clients, pending, dead){
-  var box = document.getElementById("taskList");
+function renderAreaChart(days){
+  if (!days.length){ document.getElementById("chartArea").innerHTML = '<div class="empty"><p>暂无发布数据</p></div>'; return; }
+  var w = 760, h = 200, padX = 10, max = 1, i;
+  for (i = 0; i < days.length; i++) max = Math.max(max, days[i].count);
+  var pts = days.map(function(day, idx){
+    var x = padX + idx * (w - padX * 2) / (days.length - 1 || 1);
+    var y = h - 22 - (day.count / max) * (h - 50);
+    return [x, y];
+  });
+  var line = pts.map(function(p, idx){ return (idx ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+  var area = line + " L" + pts[pts.length-1][0].toFixed(1) + " " + (h-22) + " L" + pts[0][0].toFixed(1) + " " + (h-22) + " Z";
+  var dots = pts.map(function(p, idx){
+    return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.2" fill="#0B0C12" stroke="var(--accent)" stroke-width="2"><title>' + esc(days[idx].date) + ' · ' + days[idx].count + ' 条</title></circle>';
+  }).join("");
+  document.getElementById("chartArea").innerHTML =
+    '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">'
+    + '<defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">'
+    + '<stop offset="0%" stop-color="#8B7CF8" stop-opacity=".28"/>'
+    + '<stop offset="100%" stop-color="#8B7CF8" stop-opacity="0"/></linearGradient></defs>'
+    + '<path d="' + area + '" fill="url(#ag)"/>'
+    + '<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" style="filter:drop-shadow(0 0 7px rgba(139,124,248,.45))"/>'
+    + dots + '</svg>';
+  document.getElementById("chartX").innerHTML = days.map(function(d){ return "<span>" + esc(d.date.slice(5)) + "</span>"; }).join("");
+}
+function renderFeed(){
+  api("api/messages?page=1&size=8").then(function(list){
+    document.getElementById("feedList").innerHTML = (list || []).map(function(m){
+      var bad = (m.deliverySummary || "").indexOf("死信") >= 0;
+      var warn = (m.deliverySummary || "").indexOf("重试") >= 0 && !bad;
+      var cls = bad ? "bad" : (warn ? "warn" : "ok");
+      var verb = bad ? "出现死信" : (warn ? "仍在重试" : "投递推进中");
+      return '<div class="feed-item ' + cls + '" style="position:relative;padding:0 0 20px 20px">'
+        + '<div style="font-size:10.5px;color:var(--ink-3);font-family:var(--mono)">' + esc(m.createdAt || "") + '</div>'
+        + '<div style="font-size:12.5px;color:var(--ink-2);margin-top:1px"><span class="mono">' + esc(m.messageType) + '</span> · <span class="mono">'
+        + esc(m.messageId.slice(-6)) + '</span> → ' + esc(m.clientId) + ' ' + verb + '</div></div>';
+    }).join("");
+  }).catch(function(){ document.getElementById("feedList").innerHTML = ""; });
+}
+/* 待办工单流：死信（bad）+ 重试中（warn），附顺序键芯片与同键阻塞 */
+function loadTasks(clients){
   var withDead = clients.filter(function(c){ return c.deadLetterCount > 0; });
   var withRetry = clients.filter(function(c){ return c.unfinishedCount > 0; });
   if (!withDead.length && !withRetry.length){
-    box.innerHTML = '<div class="all-clear"><div class="ac-ico">'
+    document.getElementById("taskList").innerHTML = '<div class="all-clear"><div class="ac-ico">'
       + '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>'
       + "<b>一切正常，没有需要处理的事项</b><span>死信与重试异常会在这里排队等你</span></div>";
     document.getElementById("taskCount").textContent = "";
     return;
   }
-    boxSkeleton("taskList");
-    var jobs = [];
+  boxSkeleton("taskList");
+  var jobs = [];
   withDead.forEach(function(c){
     jobs.push(api("api/dead-letters?clientId=" + encodeURIComponent(c.clientId)).then(function(list){
       return list.map(function(d){ return {kind:"bad", clientId:c.clientId, d:d}; });
@@ -653,125 +764,167 @@ function loadTasks(clients, pending, dead){
     var tasks = [].concat.apply([], groups);
     tasks.sort(function(a, b){ return a.kind === "bad" && b.kind !== "bad" ? -1 : 1; });
     document.getElementById("taskCount").textContent = tasks.length + " 项";
-    box.innerHTML = tasks.map(function(t){
+    document.getElementById("taskList").innerHTML = tasks.map(function(t){
       var d = t.d, bad = t.kind === "bad";
-      return '<div class="task">'
-        + '<div class="t-ico ' + (bad ? "bad" : "warn") + '">'
-        + (bad
-          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
-          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>')
-        + '</div>'
-        + '<div class="t-main">'
-        + '<div class="t-title">' + (bad ? "死信待处置" : "自动重试中") + ' · <span class="mono">' + esc(d.messageId) + '</span></div>'
-        + '<div class="t-meta"><span class="mono">' + esc(t.clientId) + '</span>'
-        + '<span>' + esc(d.messageType || "—") + '</span>'
-        + '<span class="mono">' + esc(d.lastError || (bad ? "达到重试上限" : "等待下次补发")) + '</span>'
-        + '<span>重试 ' + d.retryCount + ' 次 · 更新于 ' + esc(d.updatedAt || "—") + '</span></div>'
-        + '</div>'
-        + '<div class="t-acts">'
+      var chips = d.sequenceKey ? '<span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg>' + esc(d.sequenceKey) + '</span>' : "";
+      var blk = d.sequenceKey ? '<span class="chip block" id="blk-' + esc(d.messageId) + '" style="display:none">同键阻塞</span>' : "";
+      return '<div class="row">'
+        + '<div class="r-ico ' + (bad ? "bad" : "warn") + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONS[t.kind] + '</svg></div>'
+        + '<div class="r-main"><div class="r-title"><span class="mid">' + esc(d.messageId) + '</span>'
+        + '<span class="type">' + esc(d.messageType || "—") + '</span>' + chips + blk + '</div>'
+        + '<div class="r-sub"><span class="mono">' + esc(t.clientId) + '</span>'
+        + '<span>' + esc(d.lastError || (bad ? "达到重试上限" : "等待下次补发")) + '</span>'
+        + '<span>重试 ' + d.retryCount + ' 次 · 更新于 ' + esc(d.updatedAt || "—") + '</span></div></div>'
+        + '<span class="r-time">' + esc((d.updatedAt || "").slice(11)) + '</span>'
+        + '<div class="r-acts">'
         + '<button class="btn btn-ghost btn-sm" onclick="viewMessage(\'' + esc(d.messageId) + '\')">详情</button>'
-        + (bad
-          ? '<button class="btn btn-tint btn-sm" onclick="cockpitRetry(\'' + esc(t.clientId) + '\',\'' + esc(d.messageId) + '\')">重放</button>'
-          : '<button class="btn btn-outline btn-sm" onclick="cockpitSkip(\'' + esc(t.clientId) + '\',\'' + esc(d.messageId) + '\')">跳过</button>')
+        + (bad ? '<button class="btn btn-tint btn-sm" onclick="retryTask(\'' + esc(t.clientId) + '\',\'' + esc(d.messageId) + '\')">重放</button>'
+               : '<button class="btn btn-outline btn-sm" onclick="skipTask(\'' + esc(t.clientId) + '\',\'' + esc(d.messageId) + '\')">跳过</button>')
         + '</div></div>';
     }).join("");
+    fetchBlocked(tasks);
   }).catch(showErr);
 }
-function cockpitRetry(clientId, messageId){
+function fetchBlocked(tasks){
+  tasks.forEach(function(t){
+    if (!t.d.sequenceKey) return;
+    api("api/seq-blocked?clientId=" + encodeURIComponent(t.clientId)
+      + "&messageId=" + encodeURIComponent(t.d.messageId)).then(function(r){
+      var el = document.getElementById("blk-" + t.d.messageId);
+      if (el && r.blocked > 0){
+        el.style.display = "";
+        el.textContent = "同键阻塞 " + r.blocked + " 条";
+      }
+    }).catch(function(){});
+  });
+}
+function retryTask(clientId, messageId){
   confirmOp("重放死信", messageId + " 将重新进入投递队列（DEAD_LETTER → RETRYING），按顺序键补发。", "重放",
     function(reason){ return api("api/actions/retry-dead-letter",
       {method:"POST", body:{clientId: clientId, messageId: messageId, reason: reason}}); });
 }
-function cockpitSkip(clientId, messageId){
+function skipTask(clientId, messageId){
   confirmOp("跳过消息", messageId + " 将标记为 EXPIRED 终态，不再投递，同键后续消息立即放行。", "跳过",
     function(reason){ return api("api/actions/skip",
       {method:"POST", body:{clientId: clientId, messageId: messageId, reason: reason}}); });
 }
 
-function renderAreaChart(days){
-  if (!days.length){ document.getElementById("chartArea").innerHTML = '<div class="empty"><p>暂无发布数据</p></div>'; return; }
-  var w = 760, h = 210, padX = 10, max = 1, i;
-  for (i = 0; i < days.length; i++) max = Math.max(max, days[i].count);
-  var pts = days.map(function(day, idx){
-    var x = padX + idx * (w - padX * 2) / (days.length - 1 || 1);
-    var y = h - 22 - (day.count / max) * (h - 52);
-    return [x, y];
-  });
-  var line = pts.map(function(p, idx){ return (idx ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
-  var area = line + " L" + pts[pts.length-1][0].toFixed(1) + " " + (h-22) + " L" + pts[0][0].toFixed(1) + " " + (h-22) + " Z";
-  var dots = pts.map(function(p, idx){
-    return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.2" fill="#0B0C12" stroke="var(--accent)" stroke-width="2">'
-      + '<title>' + esc(days[idx].date) + ' · ' + days[idx].count + ' 条</title></circle>';
-  }).join("");
-  document.getElementById("chartArea").innerHTML =
-    '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">'
-    + '<defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1">'
-    + '<stop offset="0%" stop-color="#8B7CF8" stop-opacity=".28"/>'
-    + '<stop offset="100%" stop-color="#8B7CF8" stop-opacity="0"/></linearGradient></defs>'
-    + '<path d="' + area + '" fill="url(#ag)"/>'
-    + '<path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" style="filter:drop-shadow(0 0 7px rgba(139,124,248,.45))"/>'
-    + dots + '</svg>';
-  document.getElementById("chartX").innerHTML = days.map(function(d){ return "<span>" + esc(d.date.slice(5)) + "</span>"; }).join("");
-}
-
-/* 最近动态：取最新 8 条消息生成流 */
-function renderFeed(){
-  api("api/messages?page=1&size=8").then(function(list){
-    document.getElementById("feedList").innerHTML = (list || []).map(function(m){
-      var bad = (m.deliverySummary || "").indexOf("死信") >= 0;
-      var warn = (m.deliverySummary || "").indexOf("重试") >= 0 && !bad;
-      var cls = bad ? "bad" : (warn ? "warn" : "ok");
-      var verb = bad ? "出现死信" : (warn ? "仍在重试" : "投递推进中");
-      return '<div class="feed-item ' + cls + '">'
-        + '<div class="f-t">' + esc(m.createdAt || "") + '</div>'
-        + '<div class="f-n"><span class="mono">' + esc(m.messageType) + '</span> · <span class="mono">'
-        + esc(m.messageId.slice(-6)) + '</span> → ' + esc(m.clientId) + ' ' + verb + '</div></div>';
-    }).join("");
-  }).catch(function(){ document.getElementById("feedList").innerHTML = ""; });
-}
-
-/* ═════════ 消息 ═════════ */
-var msgPage = 1;
-function pageMsgs(delta){
-  msgPage = Math.max(1, msgPage + delta);
+/* ═════════ 统一消息页 ═════════ */
+var msgSeg = "all", msgPage = 1, currentMsgId = "";
+function setMsgSeg(s){ msgSeg = s; msgPage = 1;
+  var btns = document.querySelectorAll("#msgSeg button");
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].dataset.s === s);
   loadMessages();
 }
+function pageMsgs(delta){ msgPage = Math.max(1, msgPage + delta); loadMessages(); }
+function rowHtml(d, opts){
+  opts = opts || {};
+  var cls = mapper[d.state] || "mut";
+  var chips = d.sequenceKey ? '<span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="9 18 3 12 9 6"/></svg>' + esc(d.sequenceKey) + '</span>' : "";
+  var blk = (d.sequenceKey && opts.blocked) ? '<span class="chip block" id="blk-' + esc(d.messageId) + '" style="display:none">同键阻塞</span>' : "";
+  var stateName = d.stateText || d.state;
+  var actions = "";
+  if (d.state === "DEAD_LETTER"){
+    actions = '<button class="btn btn-tint btn-sm" onclick="event.stopPropagation();retryTask(\'' + esc(d.clientId) + '\',\'' + esc(d.messageId) + '\')">重放</button>'
+      + '<button class="btn btn-danger-tint btn-sm" onclick="event.stopPropagation();skipTask(\'' + esc(d.clientId) + '\',\'' + esc(d.messageId) + '\')">跳过</button>';
+  } else if (d.state === "RETRYING" || d.state === "FAILED"){
+    actions = '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();skipTask(\'' + esc(d.clientId) + '\',\'' + esc(d.messageId) + '\')">跳过</button>';
+  }
+  return '<div class="row' + (currentMsgId === d.messageId ? " sel" : "") + '" onclick="openMessage(\'' + esc(d.messageId) + '\')">'
+    + '<div class="r-ico ' + cls + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' + ICONS[cls] + '</svg></div>'
+    + '<div class="r-main"><div class="r-title"><span class="mid">' + esc(d.messageId) + '</span>'
+    + '<span class="type">' + esc(d.messageType || "—") + '</span>' + chips + blk + '</div>'
+    + '<div class="r-sub"><span class="mono">' + esc(d.clientId) + '</span>'
+    + '<span>' + esc(stateName) + ' · ' + esc(d.lastError && d.lastError !== "—" ? d.lastError : "投递推进中") + '</span>'
+    + '<span>重试 ' + d.retryCount + ' 次</span></div></div>'
+    + '<span class="r-time">' + esc(d.updatedAt || d.createdAt || "") + '</span>'
+    + (actions ? '<div class="r-acts">' + actions + '</div>' : "")
+    + '</div>';
+}
+function blockedChips(rows){
+  rows.forEach(function(d){
+    if (!d.sequenceKey) return;
+    api("api/seq-blocked?clientId=" + encodeURIComponent(d.clientId)
+      + "&messageId=" + encodeURIComponent(d.messageId)).then(function(r){
+      var el = document.getElementById("blk-" + d.messageId);
+      if (el && r.blocked > 0){ el.style.display = ""; el.textContent = "同键阻塞 " + r.blocked + " 条"; }
+    }).catch(function(){});
+  });
+}
+function parseSummaryState(summary){
+  var s = summary || "";
+  if (s.indexOf("死信") >= 0) return "死信待处置";
+  if (s.indexOf("重试") >= 0) return "重试中";
+  if (s.indexOf("已完成") >= 0 || s.indexOf("确认") >= 0) return "已完成";
+  return "进行中";
+}
 function loadMessages(){
-  var clientId = document.getElementById("mSearch").value.trim();
-  var type = document.getElementById("mType").value;
-  var begin = document.getElementById("mBegin").value;
-  var q = "?page=" + msgPage + "&size=20"
-    + (clientId ? "&clientId=" + encodeURIComponent(clientId) : "")
-    + (type ? "&type=" + encodeURIComponent(type) : "")
-    + (begin ? "&begin=" + new Date(begin + "T00:00:00").getTime() : "");
-  boxSkeleton("msgRows");
-  api("api/messages" + q).then(function(list){
-    list = list || [];
-    document.getElementById("msgRows").innerHTML = list.length ? list.map(function(m){
-      var sel = m.messageId === currentMsgId ? " sel" : "";
-      return '<div class="mrow' + sel + '" onclick="openMessage(\'' + esc(m.messageId) + '\')">'
-        + '<div class="mrow-top"><span class="mid">' + esc(m.messageId) + '</span>'
-        + '<span class="weak num">' + esc(m.createdAt) + '</span></div>'
-        + '<div class="mrow-sub">' + esc(m.messageType) + ' · <span class="mono">' + esc(m.clientId)
-        + '</span> · 投递 ' + esc(m.deliverySummary || "—") + '</div></div>';
-    }).join("") : '<div class="empty"><p>没有符合条件的消息</p></div>';
-    document.getElementById("mPageInfo").textContent = "第 " + msgPage + " 页";
-    document.getElementById("mPrev").disabled = msgPage <= 1;
-    document.getElementById("mNext").disabled = list.length < 20;
+  document.getElementById("segRunN").textContent = sumPending() ? " " + sumPending() : "";
+  document.getElementById("segDeadN").textContent = sumDead() ? " " + sumDead() : "";
+  var batch = document.getElementById("batchbar");
+  if (msgSeg === "dead"){
+    batch.classList.add("on");
+    document.getElementById("batchHint").textContent = selectedClient
+      ? "死信处置模式 · 操作需填原因留痕"
+      : "死信处置模式 · 已按客户端分组，选择顶栏具体客户端后可批量跳过";
+    document.getElementById("batchSkipBtn").style.display = selectedClient ? "" : "none";
+  } else {
+    batch.classList.remove("on");
+  }
+  var listEl = document.getElementById("msgList");
+  if (msgSeg === "all"){
+    document.getElementById("msgPager").style.display = "";
+    boxSkeleton("msgList");
+    api("api/messages?page=" + msgPage + "&size=20" + clientFilterParam()).then(function(list){
+      list = list || [];
+      listEl.innerHTML = list.length ? list.map(function(m){
+        return rowHtml({messageId:m.messageId, clientId:m.clientId, messageType:m.messageType,
+          state:"ACCEPTED", stateText:parseSummaryState(m.deliverySummary), retryCount:0,
+          sequenceKey:m.sequenceKey, updatedAt:m.createdAt}, {blocked:false});
+      }).join("") : '<div class="empty"><p>没有符合条件的消息</p></div>';
+      document.getElementById("mPageInfo").textContent = "第 " + msgPage + " 页";
+      document.getElementById("mPrev").disabled = msgPage <= 1;
+      document.getElementById("mNext").disabled = list.length < 20;
+    }).catch(showErr);
+    return;
+  }
+  document.getElementById("msgPager").style.display = "none";
+  boxSkeleton("msgList");
+  var targets = clientCache.filter(function(c){
+    return selectedClient ? c.clientId === selectedClient : true;
+  }).filter(function(c){ return msgSeg === "dead" ? c.deadLetterCount > 0 : c.unfinishedCount > 0; });
+  if (!targets.length){
+    listEl.innerHTML = '<div class="empty"><p>' + (msgSeg === "dead" ? "当前没有死信" : "没有待处理投递") + '</p></div>';
+    return;
+  }
+  var jobs = targets.map(function(c){
+    var url = msgSeg === "dead"
+      ? "api/dead-letters?clientId=" + encodeURIComponent(c.clientId)
+      : "api/clients/" + encodeURIComponent(c.clientId) + "/unfinished?limit=50";
+    return api(url).then(function(l){ return l || []; });
+  });
+  Promise.all(jobs).then(function(groups){
+    var rows = [].concat.apply([], groups);
+    if (msgSeg === "run"){
+      rows = rows.filter(function(d){ return d.state !== "DEAD_LETTER"; });
+    }
+    rows.sort(function(a, b){ return (b.updatedAt || "").localeCompare(a.updatedAt || ""); });
+    listEl.innerHTML = rows.length ? rows.map(function(d){ return rowHtml(d, {blocked:true}); }).join("")
+      : '<div class="empty"><p>' + (msgSeg === "dead" ? "当前没有死信" : "没有待处理投递") + '</p></div>';
+    blockedChips(rows);
   }).catch(showErr);
 }
-var currentMsgId = "";
 function openMessage(id){
   currentMsgId = id;
-  var rows = document.querySelectorAll("#msgRows .mrow");
+  var rows = document.querySelectorAll("#msgList .row");
   for (var i = 0; i < rows.length; i++){
-    rows[i].classList.toggle("sel", rows[i].getAttribute("onclick").indexOf("'" + id + "'") >= 0);
+    var oc = rows[i].getAttribute("onclick") || "";
+    rows[i].classList.toggle("sel", oc.indexOf("'" + id + "'") >= 0);
   }
   document.getElementById("mdTitle").textContent = id;
   document.getElementById("mdSub").textContent = "";
   document.getElementById("mdBody").innerHTML = '<div class="skeleton" style="width:80%"></div>';
-  var detail = document.getElementById("msgDetail");
-  if (window.matchMedia("(max-width:1100px)").matches) detail.classList.add("on");
+  if (window.matchMedia("(max-width:1100px)").matches) document.getElementById("md").classList.add("on");
   api("api/messages/" + encodeURIComponent(id)).then(function(m){
     document.getElementById("mdSub").textContent = (m.messageType || "") + " · 发布于 " + (m.createdAt || "");
     var pretty = m.payload || "";
@@ -781,7 +934,7 @@ function openMessage(id){
     var html = '<div class="kv">'
       + "<dt>客户端</dt><dd class='mono'>" + esc(m.clientId) + "</dd>"
       + "<dt>类型</dt><dd>" + esc(m.messageType) + "</dd>"
-      + "<dt>顺序键</dt><dd class='mono'>" + esc(m.sequenceKey || "—") + "</dd>"
+      + "<dt>顺序键</dt><dd class='mono'>" + esc(m.sequenceKey || "（无顺序键）") + "</dd>"
       + "<dt>过期时间</dt><dd class='num'>" + esc(m.expiresAt || "不过期") + "</dd>"
       + "<dt>大小</dt><dd class='num'>" + m.payloadSize + " 字节</dd></div>"
       + '<div class="sect-lbl">PAYLOAD</div><div class="codeblock">' + esc(pretty) + "</div>"
@@ -791,10 +944,13 @@ function openMessage(id){
     document.getElementById("mdBody").innerHTML = '<div class="empty"><p>' + esc(e.error || "加载失败") + "</p></div>";
   });
 }
-function viewMessage(id){ go("messages"); openMessage(id); }
+function viewMessage(id){
+  go("messages");
+  openMessage(id);
+}
 function closeMsgDetail(){
   if (window.matchMedia("(max-width:1100px)").matches){
-    document.getElementById("msgDetail").classList.remove("on");
+    document.getElementById("md").classList.remove("on");
   }
 }
 function deliveryTimeline(deliveries){
@@ -810,58 +966,10 @@ function deliveryTimeline(deliveries){
       + "</div></div>";
   }).join("") + "</div>";
 }
-
-/* ═════════ 死信工单流 ═════════ */
-function loadDead(){
-  var sel = document.getElementById("deadClient");
-  api("api/clients").then(function(clients){
-    var cur = sel.value, opts = '<option value="">选择客户端…</option>';
-    for (var i = 0; i < clients.length; i++){
-      opts += '<option value="' + esc(clients[i].clientId) + '">' + esc(clients[i].clientId)
-        + "（死信 " + clients[i].deadLetterCount + "）</option>";
-    }
-    sel.innerHTML = opts; sel.value = cur;
-    var id = sel.value;
-    document.getElementById("deadBatchSkip").style.display = id ? "" : "none";
-    document.getElementById("deadHint").textContent = id ? "" : "选择客户端查看其死信";
-    if (!id){
-      document.getElementById("deadTasks").innerHTML = '<div class="empty">'
-        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
-        + '<p>死信按客户端隔离存放，先选择要处置的客户端</p></div>';
-      return;
-    }
-    boxSkeleton("deadTasks");
-    api("api/dead-letters?clientId=" + encodeURIComponent(id)).then(function(list){
-      document.getElementById("deadTasks").innerHTML = list.length ? list.map(function(d){
-        return '<div class="task">'
-          + '<div class="t-ico bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>'
-          + '<div class="t-main">'
-          + '<div class="t-title"><span class="mono" style="color:var(--bad)">' + esc(d.messageId) + '</span> · ' + esc(d.messageType) + '</div>'
-          + '<div class="t-meta"><span class="mono">' + esc(id) + '</span>'
-          + '<span class="mono">' + esc(d.lastError || "达到重试上限") + '</span>'
-          + '<span>重试 ' + d.retryCount + ' 次 · 更新于 ' + esc(d.updatedAt || "") + '</span></div>'
-          + '</div>'
-          + '<div class="t-acts">'
-          + '<button class="btn btn-ghost btn-sm" onclick="viewMessage(\'' + esc(d.messageId) + '\')">详情</button>'
-          + '<button class="btn btn-tint btn-sm" onclick="deadRetry(\'' + esc(d.messageId) + '\')">重放</button>'
-          + '<button class="btn btn-danger-tint btn-sm" onclick="deadSkip(\'' + esc(d.messageId) + '\')">跳过</button>'
-          + '</div></div>';
-      }).join("") : '<div class="empty"><p>当前没有死信</p></div>';
-    }).catch(showErr);
-  }).catch(showErr);
-}
-function deadRetry(messageId){
-  confirmOp("重放死信", messageId + " 将重新进入投递队列（DEAD_LETTER → RETRYING），按顺序键补发。", "重放",
-    function(reason){ return api("api/actions/retry-dead-letter", {method:"POST", body:{clientId: document.getElementById("deadClient").value, messageId: messageId, reason: reason}}); });
-}
-function deadSkip(messageId){
-  confirmOp("跳过死信", messageId + " 将标记为 EXPIRED 终态，不再投递，同键后续消息立即放行。", "跳过",
-    function(reason){ return api("api/actions/skip", {method:"POST", body:{clientId: document.getElementById("deadClient").value, messageId: messageId, reason: reason}}); });
-}
 function batchSkip(){
-  confirmOp("批量跳过死信", "所选客户端的全部死信将标记为 EXPIRED 终态（上限 100 条），不再投递。", "批量跳过",
-    function(reason){ return api("api/actions/batch-skip", {method:"POST", body:{clientId: document.getElementById("deadClient").value, reason: reason}}); },
-    function(){ loadDead(); });
+  confirmOp("批量跳过死信", "客户端 " + selectedClient + " 的全部死信将标记为 EXPIRED 终态（上限 100 条），不再投递。", "批量跳过",
+    function(reason){ return api("api/actions/batch-skip", {method:"POST", body:{clientId: selectedClient, reason: reason}}); },
+    function(){ loadMessages(); });
 }
 function forceTransitionModal(){
   var states = ["ACCEPTED","RECEIVED","PROCESSED","FAILED","RETRYING","EXPIRED","DEAD_LETTER"];
@@ -879,55 +987,122 @@ function forceTransitionModal(){
         messageId: document.getElementById("mMessageId").value.trim(),
         target: document.getElementById("mTarget").value, reason: reason}});
     },
-    function(){ loadDead(); });
+    function(){ refreshCurrent(); });
 }
 
 /* ═════════ 客户端 ═════════ */
-function loadClients(){
-  api("api/clients").then(function(clients){
-    document.getElementById("clientGrid").innerHTML = clients.length ? clients.map(function(c){
-      return '<div class="client-card">'
-        + '<div class="cc-top"><div class="avatar">' + esc(shortId(c.clientId)) + "</div>"
-        + "<div><h4>" + esc(c.clientId) + "</h4>"
-        + '<div class="weak num">注册于 ' + esc(c.createdAt) + "</div></div>"
-        + '<div class="switch' + (c.enabled ? " on" : "") + '" onclick="toggleClient(\'' + esc(c.clientId) + '\',' + c.enabled + ')"></div></div>'
-        + '<div class="cc-stats">'
-        + "<div><b>" + (c.online ? '<span style="color:var(--ok);text-shadow:0 0 12px rgba(52,211,153,.5)">在线</span>' : "离线") + "</b><span>连接 " + c.connectionCount + "</span></div>"
-        + '<div><b class="num" style="' + (c.unfinishedCount > 0 ? "color:var(--warn)" : "") + '">' + c.unfinishedCount + "</b><span>未完成</span></div>"
-        + '<div><b class="num" style="' + (c.deadLetterCount > 0 ? "color:var(--bad)" : "") + '">' + c.deadLetterCount + "</b><span>死信</span></div></div>"
-        + '<div class="cc-acts">'
-        + '<button class="btn btn-outline btn-sm" onclick="toggleDetail(this,\'' + esc(c.clientId) + '\')">未完成明细</button>'
-        + '<button class="btn btn-outline btn-sm" onclick="cmdPanel(this)">远程指令</button>'
-        + '<span class="spacer"></span>'
-        + '<button class="btn btn-outline btn-sm" onclick="kick(\'' + esc(c.clientId) + '\')">断开连接</button></div>'
-        + '<div class="detail-rows"></div>'
-        + '<div class="cmd-panel" style="display:none;margin-top:13px;background:rgba(255,255,255,.025);border:1px solid var(--hair);border-radius:11px;padding:13px 15px">'
-        + '<div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px">'
-        + '<button class="btn btn-outline btn-sm" style="font-family:var(--mono);font-size:11.5px" onclick="sendCmd(\'' + esc(c.clientId) + '\',\'PING\')">PING</button>'
-        + '<button class="btn btn-outline btn-sm" style="font-family:var(--mono);font-size:11.5px" onclick="queryOutbox(\'' + esc(c.clientId) + '\',this)">QUERY_OUTBOX</button>'
-        + "</div>"
-        + '<div class="codeblock" style="font-size:11px;color:var(--ink-3)">指令经 SSE ctrl 事件实时下发（特殊通道，不落库、不混业务消息），仅在线客户端生效。</div>'
-        + '<div class="codeblock cmd-result" style="margin-top:9px;display:none"></div></div></div>';
-    }).join("") : '<div class="empty"><p>暂无注册客户端</p></div>';
-  }).catch(showErr);
-}
 function shortId(id){
   var digits = id.replace(/[^0-9]/g, "");
   return digits.length >= 2 ? digits.slice(-2) : id.slice(0, 2).toUpperCase();
 }
-function toggleDetail(btn, clientId){
-  var box = btn.closest(".client-card").querySelector(".detail-rows");
-  if (box.classList.contains("on")){ box.classList.remove("on"); return; }
-  box.classList.add("on");
-  box.innerHTML = '<div class="skeleton" style="width:70%;margin-top:12px"></div>';
-  api("api/clients/" + encodeURIComponent(clientId) + "/unfinished").then(function(list){
-    box.innerHTML = list.length ? "<table><tbody>" + list.map(function(d){
-      return "<tr><td class='mono'>" + esc(d.messageId) + "</td><td>"
+function loadClients(){
+  api("api/clients").then(function(clients){
+    clientCache = clients || [];
+    document.getElementById("deadBadge").textContent = sumDead() > 0 ? sumDead() : "";
+    document.getElementById("clientGrid").innerHTML = clientCache.length ? clientCache.map(function(c){
+      return '<div class="client-card" onclick="openClient(\'' + esc(c.clientId) + '\')">'
+        + '<div class="cc-top"><div class="avatar">' + esc(shortId(c.clientId)) + "</div>"
+        + "<div><h4>" + esc(c.clientId) + "</h4>"
+        + '<div class="weak num">注册于 ' + esc(c.createdAt) + "</div></div>"
+        + '<div class="switch' + (c.enabled ? " on" : "") + '" onclick="event.stopPropagation();toggleClient(\'' + esc(c.clientId) + '\',' + c.enabled + ')"></div></div>'
+        + '<div class="cc-stats">'
+        + "<div><b>" + (c.online ? '<span style="color:var(--ok);text-shadow:0 0 12px rgba(52,211,153,.5)">在线</span>' : "离线") + "</b><span>连接 " + c.connectionCount + "</span></div>"
+        + '<div><b class="num" style="' + (c.unfinishedCount > 0 ? "color:var(--warn)" : "") + '">' + c.unfinishedCount + "</b><span>未完成</span></div>"
+        + '<div><b class="num" style="' + (c.deadLetterCount > 0 ? "color:var(--bad)" : "") + '">' + c.deadLetterCount + "</b><span>死信</span></div></div>"
+        + "</div>";
+    }).join("") : '<div class="empty"><p>暂无注册客户端</p></div>';
+  }).catch(showErr);
+}
+var cdCurrent = "", cdSeg = "all";
+function openClient(id){
+  cdCurrent = id; cdSeg = "all";
+  go("clientDetail");
+}
+function refreshClientDetail(){
+  api("api/clients").then(function(clients){
+    clientCache = clients || [];
+    var c = null;
+    for (var i = 0; i < clientCache.length; i++) if (clientCache[i].clientId === cdCurrent) c = clientCache[i];
+    if (!c){ go("clients"); return; }
+    document.getElementById("cdAvatar").textContent = shortId(c.clientId);
+    document.getElementById("cdId").textContent = c.clientId;
+    document.getElementById("cdReg").textContent = "注册于 " + c.createdAt + " · 本页数据按该客户端过滤";
+    var sw = document.getElementById("cdSwitch");
+    sw.classList.toggle("on", c.enabled);
+    sw.onclick = function(){ toggleClient(c.clientId, c.enabled); };
+    var conn = document.getElementById("cdConn");
+    conn.textContent = c.online ? "在线" : (c.enabled ? "离线" : "已禁用");
+    conn.style.color = c.online ? "var(--ok)" : "";
+    document.getElementById("cdConnDot").style.background = c.online ? "var(--ok)" : "var(--mut)";
+    document.getElementById("cdConnDot").style.boxShadow = c.online ? "var(--glow-ok)" : "none";
+    document.getElementById("cdConnSub").textContent = c.connectionCount + " 个活动连接";
+    var pd = document.getElementById("cdPending");
+    pd.textContent = c.unfinishedCount;
+    pd.style.color = c.unfinishedCount > 0 ? "var(--warn)" : "";
+    var dl = document.getElementById("cdDead");
+    dl.textContent = c.deadLetterCount;
+    dl.style.color = c.deadLetterCount > 0 ? "var(--bad)" : "";
+    document.getElementById("cdDeadSub").textContent = c.deadLetterCount > 0 ? "需人工处置" : "—";
+    renderCdBody(c);
+  }).catch(showErr);
+}
+function setCdSeg(s){ cdSeg = s;
+  var btns = document.querySelectorAll("#cdSeg button");
+  var names = {all:"全部", run:"待处理", dead:"死信"};
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].textContent.trim() === names[s]);
+  refreshClientDetail();
+}
+function setCdTab(t){
+  var btns = document.querySelectorAll(".subtabs button");
+  for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].dataset.t === t);
+  document.getElementById("cdSegWrap").style.display = t === "messages" ? "" : "none";
+  document.getElementById("cdList").style.display = t === "messages" ? "" : "none";
+  document.getElementById("cdUnfinished").style.display = t === "unfinished" ? "" : "none";
+  if (t === "unfinished") loadCdUnfinished();
+}
+function renderCdBody(c){
+  var listEl = document.getElementById("cdList");
+  if (cdSeg === "dead" && c.deadLetterCount === 0){
+    listEl.innerHTML = '<div class="empty"><p>该客户端当前没有死信</p></div>'; return;
+  }
+  if (cdSeg === "run" && c.unfinishedCount === 0){
+    listEl.innerHTML = '<div class="empty"><p>该客户端没有待处理投递</p></div>'; return;
+  }
+  boxSkeleton("cdList");
+  var jobs = [];
+  if (cdSeg === "dead"){
+    jobs.push(api("api/dead-letters?clientId=" + encodeURIComponent(c.clientId)));
+  } else if (cdSeg === "run"){
+    jobs.push(api("api/clients/" + encodeURIComponent(c.clientId) + "/unfinished?limit=50").then(function(l){
+      return (l || []).filter(function(d){ return d.state !== "DEAD_LETTER"; });
+    }));
+  } else {
+    jobs.push(api("api/messages?page=1&size=20&clientId=" + encodeURIComponent(c.clientId)).then(function(l){
+      return (l || []).map(function(m){
+        return {messageId:m.messageId, clientId:m.clientId, messageType:m.messageType, state:"ACCEPTED",
+          stateText:parseSummaryState(m.deliverySummary), retryCount:0, sequenceKey:m.sequenceKey, updatedAt:m.createdAt};
+      });
+    }));
+  }
+  Promise.all(jobs).then(function(groups){
+    var rows = [].concat.apply([], groups);
+    rows.sort(function(a, b){ return (b.updatedAt || "").localeCompare(a.updatedAt || ""); });
+    listEl.innerHTML = rows.length ? rows.map(function(d){ return rowHtml(d, {blocked:cdSeg !== "all"}); }).join("")
+      : '<div class="empty"><p>没有符合条件的记录</p></div>';
+    blockedChips(rows.filter(function(d){ return d.sequenceKey; }));
+  }).catch(showErr);
+}
+function loadCdUnfinished(){
+  var box = document.getElementById("cdUnfinished");
+  box.innerHTML = '<div class="skeleton" style="width:60%"></div>';
+  api("api/clients/" + encodeURIComponent(cdCurrent) + "/unfinished").then(function(list){
+    box.innerHTML = list.length ? "<table style='width:100%;border-collapse:collapse'><tbody>" + list.map(function(d){
+      return "<tr style='border-bottom:1px solid var(--hair)'><td style='padding:12px' class='mono'>" + esc(d.messageId) + "</td><td style='padding:12px'>"
         + stPill(d.state, d.stateText || d.state) + "</td>"
-        + '<td class="num">' + d.retryCount + " 次</td>"
-        + '<td class="weak num">' + esc(d.updatedAt || "") + "</td></tr>";
+        + "<td style='padding:12px' class='num'>" + d.retryCount + " 次</td>"
+        + "<td style='padding:12px' class='weak num'>" + esc(d.updatedAt || "") + "</td></tr>";
     }).join("") + "</tbody></table>"
-      : '<div class="empty" style="padding:20px 0"><p>没有未完成投递</p></div>';
+      : '<div class="empty"><p>没有未完成投递</p></div>';
   }).catch(function(e){ box.innerHTML = '<div class="weak">' + esc(e.error || "加载失败") + "</div>"; });
 }
 function toggleClient(clientId, enabled){
@@ -937,17 +1112,13 @@ function toggleClient(clientId, enabled){
       : "停用后 " + clientId + " 将拒收新消息并拒绝接入，存量消息保留。", next ? "启用" : "停用",
     function(reason){ return api("api/actions/" + (next ? "enable" : "disable"),
       {method:"POST", body:{clientId: clientId, reason: reason}}); },
-    function(){ loadClients(); });
+    function(){ refreshCurrent(); loadClientMenu(); });
 }
 function kick(clientId){
   confirmOp("断开连接", "将关闭 " + clientId + " 的全部 SSE 连接，客户端会按退避策略自动重连补发。", "断开",
     function(reason){ return api("api/actions/disconnect",
       {method:"POST", body:{clientId: clientId, reason: reason}}); },
-    function(){ loadClients(); });
-}
-function cmdPanel(btn){
-  var panel = btn.closest(".client-card").querySelector(".cmd-panel");
-  panel.style.display = panel.style.display === "none" ? "" : "none";
+    function(){ refreshCurrent(); });
 }
 function sendCmd(clientId, command){
   confirmOp("下发指令 " + command, "指令经 SSE ctrl 通道实时下发，仅在线客户端生效。", "下发",
@@ -957,9 +1128,7 @@ function sendCmd(clientId, command){
       toast(command + " 已送达 " + res.delivered + " 个连接", res.delivered ? "" : "warn");
     });
 }
-function queryOutbox(clientId, btn){
-  var panel = btn.closest(".client-card");
-  var out = panel.querySelector(".cmd-result");
+function queryOutbox(clientId){
   confirmOp("远程查询 outbox", "下发 QUERY_OUTBOX，客户端执行后经上行回传结果（与业务消息隔离）。", "查询",
     function(reason){
       return api("api/actions/client-command", {method:"POST", body:{
@@ -967,6 +1136,7 @@ function queryOutbox(clientId, btn){
     },
     function(res){
       if (!res.queryId){ toast("指令未送达（客户端离线）", "bad"); return; }
+      var out = document.getElementById("cdCmdResult");
       out.style.display = ""; out.textContent = "→ 指令已下发，轮询回执中…";
       var n = 0;
       var timer = setInterval(function(){
@@ -981,8 +1151,8 @@ function queryOutbox(clientId, btn){
 /* ═════════ 命令面板（⌘K） ═════════ */
 var CMDS = [
   {icon:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>', label:"前往：驾驶舱", hint:"G O", run:function(){go("cockpit")}},
+  {icon:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', label:"前往：消息（死信视图）", hint:"G D", run:function(){goMessagesDead()}},
   {icon:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', label:"前往：消息", hint:"G M", run:function(){go("messages")}},
-  {icon:'<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>', label:"前往：死信处置", hint:"G D", run:function(){go("dead")}},
   {icon:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>', label:"前往：客户端", hint:"G C", run:function(){go("clients")}},
   {icon:'<path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/>', label:"立即刷新数据", hint:"R", run:function(){refreshCurrent();toast("数据已刷新")}},
   {icon:'<rect x="6" y="4" width="12" height="16" rx="2"/>', label:"暂停 / 恢复自动刷新", hint:"S", run:function(){toggleRefresh()}},
@@ -1074,7 +1244,7 @@ function copyText(s){
 }
 document.getElementById("mdTitle").addEventListener("click", function(){
   var id = this.textContent;
-  if (id && id !== "—") copyText(id);
+  if (id && id !== "从左侧选择消息") copyText(id);
 });
 function toast(msg, kind){
   var t = document.createElement("div");
@@ -1088,20 +1258,8 @@ function toast(msg, kind){
 }
 function showErr(e){ toast(e && e.error ? e.error : "请求失败", "bad"); }
 
-/* ═════════ 自动刷新（弹窗打开时暂停；已有数据时静默替换不闪骨架） ═════════ */
+/* ═════════ 自动刷新 ═════════ */
 var tick = 10, paused = false;
-function rowSkeleton(id, cols){
-  var el = document.getElementById(id);
-  if (!el.innerHTML.trim() || el.innerHTML.indexOf("skeleton") >= 0){
-    el.innerHTML = '<tr><td colspan="' + cols + '"><div class="skeleton" style="width:60%"></div></td></tr>';
-  }
-}
-function boxSkeleton(id){
-  var el = document.getElementById(id);
-  if (!el.innerHTML.trim() || el.innerHTML.indexOf("skeleton") >= 0){
-    el.innerHTML = '<div class="skeleton" style="width:60%"></div>';
-  }
-}
 setInterval(function(){
   if (document.getElementById("modal").classList.contains("on")) return;
   document.getElementById("nextTick").textContent = paused ? "已暂停" : tick + "s";

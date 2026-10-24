@@ -135,6 +135,19 @@ public class AdminConsoleServlet extends HttpServlet {
             writeJson(resp, 200, body);
             return;
         }
+        if ("/api/seq-blocked".equals(path)) {
+            String clientId = req.getParameter("clientId");
+            String messageId = req.getParameter("messageId");
+            if (clientId == null || clientId.trim().isEmpty()
+                    || messageId == null || messageId.trim().isEmpty()) {
+                sendError(resp, 400, "clientId 与 messageId 不能为空");
+            } else {
+                ObjectNode body = mapper.createObjectNode();
+                body.put("blocked", server.countBlockedBySequenceKey(clientId, messageId));
+                writeJson(resp, 200, body);
+            }
+            return;
+        }
         sendError(resp, 404, "未知端点: " + path);
     }
 

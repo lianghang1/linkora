@@ -54,10 +54,9 @@ AdminConsoleInstaller.register(servletContext, linkoraServer, "你的访问令�
 
 | 页签 | 内容 |
 |---|---|
-| 总览 | KPI（在线客户端/未完成投递/死信/今日发布）+ 客户端表 + 近 7 日发布量 |
-| 消息 | 条件筛选 + 分页列表；点行查看完整 payload 与投递时间线 |
-| 死信处置 | 按客户端查看死信，逐条重放/跳过，批量跳过，通用状态变更 |
-| 客户端 | 启停、断开连接、未完成明细、远程指令面板（含结果轮询） |
+| 驾驶舱 | KPI + 待办工单流（死信/重试中，带顺序键与同键阻塞提示）+ 近 7 日发布量 + 最近动态 |
+| 消息 | 统一列表：状态分段器（全部/待处理/死信）+ 顶栏客户端筛选 + 点行右侧查看详情；死信视图含批量操作 |
+| 客户端 | 卡片列表，点进详情：该客户端指标、远程指令、复用统一消息列表、未完成明细 |
 
 REST 端点（全部位于 `<path>/api/**`，JSON）：
 
@@ -79,6 +78,7 @@ REST 端点（全部位于 `<path>/api/**`，JSON）：
 | `/api/actions/force-transition` | POST | 人工状态变更（仅合法转移，reason 必填） |
 | `/api/actions/client-command` | POST | 下发远程指令（白名单见 ClientCommands） |
 | `/api/command-result/{queryId}` | GET | 读取远程查询回执 |
+| `/api/seq-blocked` | GET | 同键阻塞统计（clientId + messageId，返回该顺序键下除自身外仍处非终态的条数） |
 
 错误统一返回 `{"error": "..."}` + 400/401/404/500。
 
