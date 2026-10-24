@@ -60,6 +60,11 @@ public class AdminConsoleServlet extends HttpServlet {
             serveIndex(resp);
             return;
         }
+        /* 静态资源：css/js/vendor（与页面同级别放行，无敏感信息） */
+        if (path.startsWith("/css/") || path.startsWith("/js/") || path.startsWith("/vendor/")) {
+            serveStatic(path, resp);
+            return;
+        }
         try {
             handleGet(path, req, resp);
         } catch (IllegalArgumentException e) {
@@ -68,6 +73,32 @@ public class AdminConsoleServlet extends HttpServlet {
             log.error("控制台查询端点异常: path={}", path, e);
             sendError(resp, 500, "内部错误: " + e.getMessage());
         }
+    }
+
+    /** 输出 jar 内静态资源（css/js/vendor），content-type 按扩展名判定。 */
+    private void serveStatic(String path, HttpServletResponse resp) throws IOException {
+        String resource = "/linkora-admin-console" + path;
+        String type;
+        if (path.endsWith(".css")) type = "text/css;charset=UTF-8";
+        else if (path.endsWith(".js")) type = "application/javascript;charset=UTF-8";
+        else if (path.endsWith(".html")) type = "text/html;charset=UTF-8";
+        else { sendError(resp, 404, "未知资源: " + path); return; }
+        InputStream in = AdminConsoleServlet.class.getResourceAsStream(resource);
+        if (in == null) {
+            sendError(resp, 404, "资源缺失: " + path);
+            return;
+        }
+        resp.setStatus(200);
+        resp.setContentType(type);
+        resp.setHeader("Cache-Control", "no-store");
+        OutputStream out = resp.getOutputStream();
+        byte[] buffer = new byte[8192];
+        int n;
+        while ((n = in.read(buffer)) > 0) {
+            out.write(buffer, 0, n);
+        }
+        in.close();
+        out.flush();
     }
 
     private void handleGet(String path, HttpServletRequest req, HttpServletResponse resp)

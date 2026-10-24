@@ -47,7 +47,9 @@ public class AdminConsoleFilter implements Filter {
         // 否则浏览器首跳无法携带 Authorization 头，页面永远无法打开。
         String pathInfo = req.getPathInfo();
         boolean isPageRequest = "GET".equals(req.getMethod())
-                && (pathInfo == null || "/".equals(pathInfo) || "/index.html".equals(pathInfo));
+                && (pathInfo == null || "/".equals(pathInfo) || "/index.html".equals(pathInfo)
+                    || pathInfo.startsWith("/css/") || pathInfo.startsWith("/js/")
+                    || pathInfo.startsWith("/vendor/"));
 
         if (!isPageRequest) {
             String header = req.getHeader("Authorization");
