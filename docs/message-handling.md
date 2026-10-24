@@ -76,6 +76,8 @@
 
 ## 业务接入清单
 
+> 完整上线检查清单见 [integration-guide.md](integration-guide.md)。
+
 ### 服务端（上行处理）
 
 | 宿主 | 接入方式 |

@@ -101,3 +101,35 @@ context.addServlet(new ServletHolder(
   `.db`（及 WAL）文件；恢复后各端按持久化状态自动续跑，无需人工对账；
 - **死信处置**：`getMessageStatus` 看到 DEAD_LETTER 后，修复业务原因，
   用同一 messageType 重新 `publish` 即可产生新投递（原记录保留作审计）。
+
+## 数据库表
+
+服务端在业务库里建 6 张 `lk_` 前缀表。首次启动自动建表（全部 `IF NOT EXISTS`
+幂等迁移），不触碰业务表；linkora 表与业务表同库共存，互不干扰。
+
+| 表 | 用途 |
+|---|---|
+| `lk_message` | 下行消息正文：messageId、类型、payload（base64）、顺序键、过期时间、traceId |
+| `lk_delivery` | 每条消息对每个客户端的投递状态：状态机、投递序号、顺序键、重试次数、下次重试时间、最后错误——可靠性核心表 |
+| `lk_client` | 客户端注册与在线状态：启用/禁用、SSE 连接状态、最后活跃时间 |
+| `lk_client_seq` | 每客户端投递序号分配（行锁串行化，保证并发下无重复、无跳号） |
+| `lk_client_cursor` | 客户端 ACK 游标（断线重连续传的依据） |
+| `lk_schema_version` | SDK 表结构版本号（自动迁移用） |
+
+客户端 SQLite 单文件（`db-path` 指定，缺省路径自动创建），4 张表：
+
+| 表 | 用途 |
+|---|---|
+| `lk_outbox` | 上行发件队列：先落库再发送，含状态/重试计数/下次重试时间，崩溃后自动补传 |
+| `lk_inbox` | 下行收件队列：先落库再回调业务，接收/处理两级状态，去重与 ACK 补发的依据 |
+| `lk_meta` | SDK 元数据（本地游标等） |
+| `lk_schema_version` | 客户端本地结构版本号 |
+
+payload 存储与大小上限：payload 列按 LONGTEXT/CLOB 建表（迁移自动完成），
+存储不是瓶颈；真正的上限是 `message-size-limit-bytes`（HTTP body，默认 1MB，
+对应原始 payload 约 786KB）。
+
+升级与维护：结构变更由 SDK 自动顺序迁移（按 `lk_schema_version` 逐版本执行，
+中途崩溃重启自动续跑），宿主无需手动执行任何 SQL。所有时间字段统一存 epoch
+毫秒（整数），跨时区、跨数据库一致。客户端替换为 MySQL 时建表语句见
+[custom-storage.md](custom-storage.md)。
