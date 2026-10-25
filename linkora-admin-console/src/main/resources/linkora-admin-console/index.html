@@ -10,76 +10,80 @@
 <div id="app" v-cloak>
 
   <!-- ═══ 登录 ═══ -->
-  <div id="login" class="on" v-if="!s.loggedIn">
+  <div id="login" v-if="!s.loggedIn">
     <div class="login-card">
-      <div class="lg"><span class="mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span><b>Linkora</b></div>
+      <div class="lg"><span class="mark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span><b>Linkora</b></div>
       <h2>输入访问令牌，进入运维控制台</h2>
       <label>访问令牌 <b>*</b></label>
       <div class="linput-wrap">
         <input id="loginToken" :type="s.showToken ? 'text' : 'password'" v-model="s.loginInput" placeholder="Bearer Token" autocomplete="off" @keydown.enter="doLogin()">
-        <button class="eye" @click="s.showToken = !s.showToken" title="显示/隐藏">
+        <button class="eye" @click="s.showToken = !s.showToken" aria-label="显示或隐藏令牌">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
       </div>
       <div id="loginErr" v-if="s.loginErr">{{ s.loginErr }}</div>
-      <div id="loginErr" v-else style="min-height:17px"></div>
+      <div id="loginErr" v-else style="min-height:16px"></div>
       <button class="btn btn-primary" :disabled="s.loginBusy" @click="doLogin()">{{ s.loginBusy ? "验证中…" : "进入控制台" }}</button>
       <p class="login-tip">令牌由服务端 linkora.admin-console.token 配置 · 粘贴时自动去除 Bearer 前缀</p>
     </div>
   </div>
 
   <!-- ═══ 主应用 ═══ -->
-  <div v-else>
+  <div v-if="s.loggedIn">
     <header class="topbar">
       <div class="logo"><span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>Linkora</div>
-      <nav class="mainnav">
-        <a :class="{on: s.view==='cockpit'}" @click="go('cockpit')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>概览</a>
-        <a :class="{on: s.view==='messages'}" @click="go('messages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>消息<span v-if="s.sumDead()" style="color:var(--bad);font-family:var(--mono);font-size:11px;margin-left:4px">{{ s.sumDead() }}</span></a>
-        <a :class="{on: s.view==='clients'}" @click="go('clients')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>客户端</a>
+      <nav class="mainnav" aria-label="主导航">
+        <a href="#" :class="{on: s.view==='cockpit'}" @click.prevent="go('cockpit')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>概览</a>
+        <a href="#" :class="{on: s.view==='messages'}" @click.prevent="go('messages')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>消息<span v-if="s.sumDead()" style="color:var(--danger);font-family:var(--font-mono);font-size:11px;margin-left:4px">{{ s.sumDead() }}</span></a>
+        <a href="#" :class="{on: s.view==='clients'}" @click.prevent="go('clients')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>客户端</a>
       </nav>
       <span class="sp"></span>
       <div class="gsearch">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
-        <input v-model="s.msgSearch" placeholder="按客户端 ID 过滤消息，回车跳转" @keydown.enter="go('messages'); s.msgClient=''; setMsgSeg('all')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        <input v-model="s.msgSearch" placeholder="按客户端 ID 过滤消息，回车跳转" @keydown.enter="go('messages'); s.msgClient=''; setMsgTab('all')">
       </div>
-      <div class="syschip"><i></i><span>{{ s.tick }}s</span></div>
+      <div class="syschip" :class="{err: !s.backendOk}" :title="s.backendOk ? '基于最近一次概览数据' : '最近一次数据获取失败'">
+        <i></i><span>{{ s.backendOk ? s.tick + "s" : "后端不可用" }}</span>
+      </div>
       <div class="avatar">A</div>
-      <button class="icon-btn" @click="logout()" title="退出登录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+      <button class="icon-btn" @click="logout()" title="退出登录" aria-label="退出登录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
     </header>
 
     <!-- ═══ 概览 ═══ -->
     <div class="page on" id="p-cockpit" v-if="s.view==='cockpit'">
       <div class="page-head">
-        <div><h1>概览</h1><div class="sub">实时掌握系统运行状态，快速定位待处理异常</div></div>
+        <div><h1>概览</h1><div class="sub">全局运行情况与待处理异常 · 在线/离线/禁用互斥计数，未完成与死信为服务端口径</div></div>
         <span class="sp"></span>
         <div class="upd">最近更新<br><span class="mono">{{ s.updTime }}</span></div>
         <button class="btn btn-outline btn-sm" style="align-self:center" @click="refreshCurrent()">刷新</button>
       </div>
+      <div class="errbox" v-if="s.overviewErr">无法获取服务端数据：{{ s.overviewErr }} · 数据显示为最近一次结果，可点击刷新重试</div>
       <div class="kcards">
-        <div class="kcard"><div class="top"><span class="ico" style="background:var(--accent-tint);color:var(--accent-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span><span class="lbl">客户端总数</span></div><div class="val num">{{ s.clients.length }}</div><div class="sub">已注册接入白名单</div></div>
-        <div class="kcard"><div class="top"><span class="ico" style="background:var(--ok-tint);color:var(--ok)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span><span class="lbl">在线客户端</span></div><div class="val num">{{ onlineCount() }}<small> / {{ s.clients.length }}</small></div><div class="sub">{{ s.clients.length ? "在线率 " + pct(onlineCount()) + "%" : "—" }}</div></div>
-        <div class="kcard"><div class="top"><span class="ico" style="background:var(--accent-tint);color:var(--accent-2)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="lbl">今日发布</span></div><div class="val num">{{ todayCount() }}</div><div class="sub">{{ s.publishedPerDay.length ? s.publishedPerDay[s.publishedPerDay.length-1].date + " 发布" : "—" }}</div></div>
-        <div class="kcard"><div class="top"><span class="ico" style="background:var(--bad-tint);color:var(--bad)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span class="lbl">待处理异常</span></div><div class="val num" style="color:var(--bad)">{{ s.sumDead() }}</div><div class="sub">{{ s.sumDead() ? "死信需人工处置" : "无死信" }}</div></div>
+        <div class="kcard"><div class="top"><span class="ico" style="background:var(--accent-tint);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span><span class="lbl">客户端总数</span></div><div class="val num">{{ s.clients.length }}</div><div class="sub">已注册接入白名单</div></div>
+        <div class="kcard"><div class="top"><span class="ico" style="background:var(--success-tint);color:var(--success)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></span><span class="lbl">在线客户端</span></div><div class="val num">{{ onlineCount() }}<small> / {{ s.clients.length }}</small></div><div class="sub">{{ s.clients.length ? "在线率 " + pct(onlineCount()) + "%" : "—" }}</div></div>
+        <div class="kcard"><div class="top"><span class="ico" style="background:var(--accent-tint);color:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span><span class="lbl">未完成投递</span></div><div class="val num">{{ s.sumPending() }}</div><div class="sub">服务端待推送/重试中合计</div></div>
+        <div class="kcard link alert" style="cursor:pointer" @click="go('messages'); setMsgTab('dead')" :title="s.sumDead() ? '查看死信明细' : ''"><div class="top"><span class="ico" style="background:var(--danger-tint);color:var(--danger)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span class="lbl">死信</span></div><div class="val num" :style="s.sumDead() ? 'color:var(--danger)' : ''">{{ s.sumDead() }}</div><div class="sub">{{ s.sumDead() ? "点击查看死信明细 →" : "无死信" }}</div></div>
       </div>
       <div class="grid-2">
-        <div class="card">
-          <h3>消息投递趋势<span class="sp"></span><span class="legend"><span><i style="background:var(--accent)"></i>每日发布量</span><span class="weak">近 7 日</span></span></h3>
-          <div class="chartbox" style="height:190px"><canvas id="trendChart"></canvas></div>
+        <div class="panel">
+          <h3>消息发布趋势<span class="sp"></span><span class="legend"><span><i style="background:var(--accent)"></i>每日发布量</span><span class="weak">近 7 日（日级数据）</span></span></h3>
+          <div class="chartbox" style="height:185px"><canvas id="trendChart" aria-label="近 7 日消息发布量趋势图" role="img"></canvas></div>
+          <div class="hintline" style="margin-top:8px" v-if="!s.publishedPerDay.length">暂无发布数据</div>
         </div>
-        <div class="card">
+        <div class="panel">
           <h3>客户端状态</h3>
           <div class="donut-wrap">
-            <div class="donut-c" style="width:130px;height:130px"><canvas id="donutChart"></canvas><div class="c"><b class="num">{{ s.clients.length }}</b><span>总数</span></div></div>
+            <div class="donut-c" style="width:128px;height:128px"><canvas id="donutChart" aria-label="客户端状态分布图" role="img"></canvas><div class="c"><b class="num">{{ s.clients.length }}</b><span>总数</span></div></div>
             <div class="dlegend">
-              <div class="row2"><i style="background:var(--ok)"></i>在线<b>{{ onlineCount() }} · {{ pct(onlineCount()) }}%</b></div>
-              <div class="row2"><i style="background:var(--mut)"></i>离线<b>{{ offlineCount() }} · {{ pct(offlineCount()) }}%</b></div>
-              <div class="row2"><i style="background:var(--warn)"></i>已禁用<b>{{ disabledCount() }} · {{ pct(disabledCount()) }}%</b></div>
+              <div class="row2"><i style="background:var(--success)"></i>在线<b>{{ onlineCount() }} · {{ pct(onlineCount()) }}%</b></div>
+              <div class="row2"><i style="background:var(--text-secondary)"></i>离线<b>{{ offlineCount() }} · {{ pct(offlineCount()) }}%</b></div>
+              <div class="row2"><i style="background:var(--warning)"></i>已禁用<b>{{ disabledCount() }} · {{ pct(disabledCount()) }}%</b></div>
             </div>
           </div>
         </div>
       </div>
       <div class="grid-2b">
-        <div class="card">
+        <div class="panel">
           <h3>最近消息<span class="sp"></span><a class="btn-ghost btn-sm" @click="go('messages')">全部 ›</a></h3>
           <div class="tbl-wrap"><table class="tbl" style="min-width:520px">
             <thead><tr><th>类型</th><th>客户端</th><th>状态</th><th>重试</th><th>创建时间</th><th></th></tr></thead>
@@ -95,7 +99,7 @@
               <tr v-if="!s.recent.length"><td colspan="6"><div class="empty"><p>还没有消息</p></div></td></tr>
             </tbody></table></div>
         </div>
-        <div class="card">
+        <div class="panel">
           <h3>客户端<span class="sp"></span><a class="btn-ghost btn-sm" @click="go('clients')">全部 ›</a></h3>
           <div class="tbl-wrap"><table class="tbl" style="min-width:480px">
             <thead><tr><th>客户端 ID</th><th>状态</th><th>未完成</th><th>死信</th><th>注册时间</th></tr></thead>
@@ -104,7 +108,7 @@
                 <td class="mono" style="font-size:12.5px">{{ c.clientId }}</td>
                 <td><span v-html="clientPill(c)"></span></td>
                 <td class="num">{{ c.unfinishedCount || 0 }}</td>
-                <td class="num" :style="c.deadLetterCount > 0 ? 'color:var(--bad)' : ''">{{ c.deadLetterCount || 0 }}</td>
+                <td class="num" :style="c.deadLetterCount > 0 ? 'color:var(--danger)' : ''">{{ c.deadLetterCount || 0 }}</td>
                 <td class="weak mono" style="font-size:11.5px">{{ c.createdAt }}</td>
               </tr>
               <tr v-if="!s.clients.length"><td colspan="5"><div class="empty"><p>暂无注册客户端 · 在客户端页「添加客户端」</p></div></td></tr>
@@ -117,51 +121,52 @@
     <!-- ═══ 消息 ═══ -->
     <div class="page on" id="p-messages" v-if="s.view==='messages'">
       <div class="page-head">
-        <div><h1>消息</h1><div class="sub">追查每一条消息的投递过程与结果，处理失败与死信</div></div>
+        <div><h1>消息</h1><div class="sub">按运维任务分类追查消息投递：全部 · 未完成投递 · 死信</div></div>
       </div>
       <div class="toolbar">
-        <div class="seg" id="msgSeg">
-          <button :class="{on: s.msgSeg==='all'}" @click="setMsgSeg('all')">全部</button>
-          <button :class="{on: s.msgSeg==='run'}" @click="setMsgSeg('run')">待处理<span class="n">{{ s.sumPending() ? " " + s.sumPending() : "" }}</span></button>
-          <button :class="{on: s.msgSeg==='dead', dead: true}" @click="setMsgSeg('dead')">死信<span class="n">{{ s.sumDead() ? " " + s.sumDead() : "" }}</span></button>
+        <div class="seg" role="tablist" aria-label="消息分类">
+          <button :class="{on: s.msgTab==='all'}" @click="setMsgTab('all')">全部消息</button>
+          <button :class="{on: s.msgTab==='pending'}" @click="setMsgTab('pending')">未完成投递<span class="n" v-if="s.sumPending()">{{ s.sumPending() }}</span></button>
+          <button :class="{on: s.msgTab==='dead'}" @click="setMsgTab('dead')">死信消息<span class="n" v-if="s.sumDead()">{{ s.sumDead() }}</span></button>
         </div>
-        <select class="fsel" v-model="s.msgClient" @change="s.msgPage=1; loadMessages()">
+        <select class="fsel" v-model="s.msgClient" @change="s.msgPage=1; loadMessages()" aria-label="按客户端筛选">
           <option value="">全部客户端</option>
           <option v-for="c in s.clients" :key="c.clientId" :value="c.clientId">{{ c.clientId }}{{ c.deadLetterCount ? "（死信 " + c.deadLetterCount + "）" : "" }}</option>
         </select>
-        <input class="fin mono" v-model="s.msgSearch" placeholder="精确客户端 ID…" @keydown.enter="s.msgPage=1; loadMessages()">
+        <input class="fin mono" v-model="s.msgSearch" placeholder="精确客户端 ID…" @keydown.enter="s.msgPage=1; loadMessages()" aria-label="按客户端 ID 精确筛选">
+        <input type="date" class="fdate" v-model="s.msgBegin" @change="s.msgPage=1; loadMessages()" aria-label="开始日期">
+        <span class="weak">至</span>
+        <input type="date" class="fdate" v-model="s.msgEnd" @change="s.msgPage=1; loadMessages()" aria-label="结束日期">
         <span style="flex:1"></span>
-        <span class="pill mut"><i></i>范围：{{ pickedClient() || "全部客户端" }}</span>
+        <span class="pill mut" style="padding:3px 9px;border-radius:var(--radius-sm);font-size:11.5px;background:var(--mut-tint);color:var(--text-secondary);display:inline-flex;align-items:center;gap:6px"><i style="width:6px;height:6px;border-radius:50%;background:var(--text-muted)"></i>范围：{{ pickedClient() || "全部客户端" }}</span>
       </div>
-      <p class="hintline">状态含义：已接受=服务端已收待推送 · 重试中/失败=推送遇错自动重试 · 死信=重试耗尽需人工处置 · 处理成功=客户端已确认（终态）。死信/待处理视图行内操作：重试=重新投递，跳过=转终态放行后续。</p>
-      <div id="batchbar" v-if="s.msgSeg!=='all'" style="display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:9px 14px;border-radius:10px;background:var(--bad-tint);border:1px solid rgba(240,101,90,.25);font-size:12px;color:var(--ink-2)">
-        <span>死信处置模式 · 选择具体客户端后可批量操作 · 操作需填原因留痕</span><span style="flex:1"></span>
-        <button class="btn btn-outline btn-sm" @click="forceTransitionModal()">通用状态变更</button>
-        <button class="btn btn-danger-tint btn-sm" v-if="pickedClient()" @click="batchSkip()">批量跳过死信</button>
-      </div>
+      <p class="hintline" v-if="s.msgTab!=='all'">
+        {{ s.msgTab==='dead' ? "死信处置模式：重试=转回重试队列重新推送；跳过=转终态并放行同顺序键后续消息（不会撤回已在途的推送）。" : "未完成投递：正在推送或自动重试中的消息。行内可跳过以放行同键后续消息。" }}
+      </p>
       <div class="split">
         <div>
-          <div class="card" style="padding:6px 10px">
+          <div class="panel" style="padding:4px 10px">
             <div class="tbl-wrap"><table class="tbl">
               <thead><tr><th>消息 ID / 类型</th><th>客户端</th><th>状态</th><th>重试</th><th>最近推进</th><th></th></tr></thead>
               <tbody>
                 <tr v-for="m in s.messages" :key="m.messageId" :class="{sel: s.currentMsgId===m.messageId}" @click="openMessage(m.messageId)">
-                  <td><span class="mono" style="font-size:12px;color:var(--accent-2)">{{ m.messageId }}</span><span class="weak" style="margin-left:8px;font-size:11.5px">{{ m.messageType }}</span><span class="weak mono" style="margin-left:8px;font-size:11px" v-if="m.sequenceKey && m.sequenceKey!=='—'">⇠ {{ m.sequenceKey }}</span></td>
+                  <td><span class="mono" style="font-size:12px;color:var(--accent)">{{ m.messageId }}</span><span class="weak" style="margin-left:8px;font-size:11.5px">{{ m.messageType }}</span><span class="weak mono" style="margin-left:8px;font-size:11px" v-if="m.sequenceKey && m.sequenceKey!=='—'">⇠ {{ m.sequenceKey }}</span></td>
                   <td class="mono" style="font-size:12px">{{ m.clientId }}</td>
                   <td><span v-html="A.stPill(m.state, m.stateText)"></span></td>
                   <td class="num">{{ m.retryCount || 0 }}</td>
                   <td class="weak mono" style="font-size:11.5px">{{ m.updatedAt || m.createdAt }}</td>
-                  <td @click.stop v-if="s.msgSeg!=='all'" style="white-space:nowrap">
+                  <td @click.stop v-if="s.msgTab!=='all'" style="white-space:nowrap">
                     <button class="btn btn-tint btn-sm" v-if="m.state==='DEAD_LETTER'" @click="retryTask(m.clientId, m.messageId)">重试</button>
-                    <button class="btn btn-danger-tint btn-sm" v-if="m.state==='DEAD_LETTER'" @click="skipTask(m.clientId, m.messageId)">跳过</button>
+                    <button class="btn btn-danger btn-sm" v-if="m.state==='DEAD_LETTER'" @click="skipTask(m.clientId, m.messageId)">跳过</button>
                     <button class="btn btn-outline btn-sm" v-if="m.state==='RETRYING'||m.state==='FAILED'" @click="skipTask(m.clientId, m.messageId)">跳过</button>
                   </td>
-                  <td v-if="s.msgSeg==='all'"><button class="btn btn-ghost btn-sm">详情</button></td>
+                  <td v-if="s.msgTab==='all'"><button class="btn btn-ghost btn-sm">详情</button></td>
                 </tr>
-                <tr v-if="!s.messages.length && !s.msgsLoading"><td colspan="6"><div class="empty"><p>{{ s.msgSeg==='dead' ? "当前没有死信，一切正常" : (s.msgSeg==='run' ? "没有待处理投递" : "没有符合条件的消息") }}</p></div></td></tr>
+                <tr v-if="!s.messages.length && !s.msgsLoading && !s.msgsError"><td colspan="6"><div class="empty"><p>{{ s.msgTab==='dead' ? "当前没有死信" : (s.msgTab==='pending' ? "没有未完成投递" : "没有符合条件的消息") }}</p></div></td></tr>
                 <tr v-if="s.msgsLoading"><td colspan="6"><div class="skeleton" style="width:60%"></div></td></tr>
+                <tr v-if="s.msgsError"><td colspan="6"><div class="errbox">{{ s.msgsError }} · 可点击刷新重试</div></td></tr>
               </tbody></table></div>
-            <div class="pager" v-if="s.msgSeg==='all'">
+            <div class="pager" v-if="s.msgTab==='all'">
               <span>第 {{ s.msgPage }} 页 · 每页 20 条</span><span class="sp"></span>
               <button :disabled="s.msgPage<=1" @click="pageMsgs(-1)">‹ 上一页</button>
               <button :disabled="!s.msgHasNext" @click="pageMsgs(1)">下一页 ›</button>
@@ -173,18 +178,19 @@
             <div class="row1">
               <h3 class="mono" @click="A.copyText(s.currentMsgId)" title="点击复制">{{ s.currentMsgId || "消息详情" }}</h3>
               <span class="sp"></span>
-              <button class="icon-btn md-close" @click="closeDetail()" title="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+              <button class="icon-btn md-close" @click="s.mdOpen=false" title="返回列表" aria-label="返回列表"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
             </div>
             <div class="weak" v-if="s.detail">{{ s.detail.messageType }} · 发布于 {{ s.detail.createdAt }}</div>
           </div>
-          <div class="dtabs">
+          <div class="dtabs" role="tablist" aria-label="消息详情">
             <button :class="{on: s.mdTab==='info'}" @click="s.mdTab='info'">基本信息</button>
             <button :class="{on: s.mdTab==='payload'}" @click="s.mdTab='payload'">Payload</button>
-            <button :class="{on: s.mdTab==='timeline'}" @click="s.mdTab='timeline'">时间线</button>
+            <button :class="{on: s.mdTab==='timeline'}" @click="s.mdTab='timeline'">投递记录</button>
           </div>
           <div class="side-b">
-            <div class="empty" v-if="!s.detail && !s.detailLoading"><p>点左侧任意一行查看详情</p></div>
+            <div class="empty" v-if="!s.detail && !s.detailLoading && !s.detailError"><p>点左侧任意一行在此查看详情<br>列表不会被遮挡，可连续对比</p></div>
             <div class="skeleton" v-if="s.detailLoading" style="width:70%"></div>
+            <div class="errbox" v-if="s.detailError">{{ s.detailError }} · <a @click="openMessage(s.currentMsgId)" style="color:inherit;text-decoration:underline">重试</a></div>
             <template v-if="s.detail && s.mdTab==='info'">
               <dl class="kv">
                 <dt>消息 ID</dt><dd class="mono" style="font-size:12px">{{ s.detail.messageId }}</dd>
@@ -199,23 +205,23 @@
               <template v-if="s.detail.sequenceKey && s.detail.sequenceKey!=='—'">
                 <div class="sect">顺序键阻塞</div>
                 <div class="weak" v-if="s.seqBlocked===null">查询中…</div>
-                <div class="weak" v-else-if="s.seqBlocked>0"><span class="pill warn"><i></i>同键阻塞 {{ s.seqBlocked }} 条</span> <span class="weak">该顺序键后续消息正在排队等它</span></div>
+                <div class="weak" v-else-if="s.seqBlocked>0"><span class="tag warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>同键阻塞 {{ s.seqBlocked }} 条</span> <span class="weak">该顺序键后续消息正在排队等它</span></div>
                 <div class="weak" v-else>不影响同键后续消息</div>
               </template>
             </template>
             <template v-if="s.detail && s.mdTab==='payload'">
-              <div class="sect" style="margin-top:0">PAYLOAD（{{ s.detail.payloadSize }} 字节）</div>
+              <div class="sect" style="margin-top:0;display:flex;align-items:center">PAYLOAD（{{ s.detail.payloadSize }} 字节）<span class="sp" style="flex:1"></span><button class="btn btn-ghost btn-sm" @click="A.copyText(s.detail.payload)">复制</button></div>
               <div class="codeblock" style="max-height:none">{{ prettyPayload() }}</div>
             </template>
             <template v-if="s.detail && s.mdTab==='timeline'">
-              <div class="sect" style="margin-top:0">投递时间线</div>
-              <div class="tl">
+              <div class="sect" style="margin-top:0">投递记录</div>
+              <div class="tl" v-if="s.detail.deliveries && s.detail.deliveries.length">
                 <div class="tl-item" v-for="d in s.detail.deliveries" :key="d.seq" :class="{err: d.state==='DEAD_LETTER'||d.state==='FAILED', mut: d.state!=='PROCESSED'&&d.state!=='DEAD_LETTER'&&d.state!=='FAILED'}">
                   <div class="t">{{ d.updatedAt }} · 重试 {{ d.retryCount }}</div>
                   <div class="n"><span v-html="A.stPill(d.state, d.stateText)"></span> <span class="weak" v-if="d.lastError && d.lastError!=='—'">{{ d.lastError }}</span></div>
                 </div>
-                <div class="empty" v-if="!s.detail.deliveries.length"><p>暂无投递记录</p></div>
               </div>
+              <div class="empty" v-else><p>后端未返回投递记录，数据不可用</p></div>
             </template>
           </div>
         </div>
@@ -225,22 +231,22 @@
     <!-- ═══ 客户端 ═══ -->
     <div class="page on" id="p-clients" v-if="s.view==='clients'">
       <div class="page-head">
-        <div><h1>客户端</h1><div class="sub">管理接入白名单、查看连接与积压、远程处置设备本地队列</div></div>
+        <div><h1>客户端</h1><div class="sub">接入白名单 · 连接与积压 · 设备本地队列远程处置</div></div>
         <span class="sp"></span>
         <button class="btn btn-primary btn-sm" style="align-self:center" @click="openRegisterModal()">＋ 添加客户端</button>
       </div>
       <div class="toolbar">
-        <div class="seg" id="clSeg">
-          <button :class="{on: s.clSeg==='all'}" @click="setClSeg('all')">全部<span class="n" id="clAllN"></span></button>
-          <button :class="{on: s.clSeg==='online'}" @click="setClSeg('online')">在线<span class="n" id="clOnN"></span></button>
-          <button :class="{on: s.clSeg==='offline'}" @click="setClSeg('offline')">离线<span class="n" id="clOffN"></span></button>
-          <button :class="{on: s.clSeg==='dead', dead: true}" @click="setClSeg('dead')">有异常<span class="n" id="clDeadN"></span></button>
+        <div class="seg" role="tablist" aria-label="客户端筛选">
+          <button :class="{on: s.clTab==='all'}" @click="setClTab('all')">全部<span class="n" v-if="clientCounts().all">{{ clientCounts().all }}</span></button>
+          <button :class="{on: s.clTab==='online'}" @click="setClTab('online')">在线<span class="n" v-if="clientCounts().online">{{ clientCounts().online }}</span></button>
+          <button :class="{on: s.clTab==='offline'}" @click="setClTab('offline')">离线<span class="n" v-if="clientCounts().offline">{{ clientCounts().offline }}</span></button>
+          <button :class="{on: s.clTab==='disabled'}" @click="setClTab('disabled')">已禁用<span class="n" v-if="clientCounts().disabled">{{ clientCounts().disabled }}</span></button>
         </div>
       </div>
       <div class="cl-split">
-        <div class="clnav">
-          <div class="citem" v-for="c in navClients()" :key="c.clientId" :class="{sel: s.cdCurrent===c.clientId}" @click="selectClient(c.clientId)">
-            <i :style="{background: !c.enabled ? 'var(--warn)' : (c.online ? 'var(--ok)' : 'var(--mut)')}"></i>
+        <div class="clnav" role="list" aria-label="客户端列表">
+          <div class="citem" v-for="c in navClients()" :key="c.clientId" role="listitem" :class="{sel: s.cdId===c.clientId}" @click="selectClient(c.clientId)">
+            <i :style="{background: !c.enabled ? 'var(--warning)' : (c.online ? 'var(--success)' : 'var(--text-secondary)')}"></i>
             <span class="id">{{ c.clientId }}</span>
             <span class="dn" v-if="c.deadLetterCount > 0">{{ c.deadLetterCount }}</span>
           </div>
@@ -252,7 +258,7 @@
               <div class="avatar" style="width:36px;height:36px">{{ shortId(cdC().clientId) }}</div>
               <div style="min-width:0"><h3 class="mono" style="cursor:default">{{ cdC().clientId }}</h3><div class="weak">注册于 {{ cdC().createdAt }}</div></div>
               <span class="sp"></span>
-              <div class="switch" :class="{on: cdC().enabled}" @click="toggleClient(cdC().clientId, cdC().enabled)" title="启用/停用"></div>
+              <div class="switch" :class="{on: cdC().enabled}" @click="toggleClient(cdC().clientId, cdC().enabled)" title="启用/停用" role="switch" :aria-checked="cdC().enabled ? 'true' : 'false'"></div>
             </div>
           </div>
           <div class="side-b">
@@ -260,17 +266,22 @@
               <dt>当前状态</dt><dd><span v-html="clientPill(cdC())"></span></dd>
               <dt>活动连接</dt><dd class="num">{{ cdC().connectionCount || 0 }}</dd>
               <dt>未完成投递</dt><dd class="num">{{ cdC().unfinishedCount || 0 }}</dd>
-              <dt>死信</dt><dd class="num" :style="cdC().deadLetterCount > 0 ? 'color:var(--bad)' : ''">{{ cdC().deadLetterCount || 0 }}</dd>
+              <dt>死信</dt><dd class="num" :style="cdC().deadLetterCount > 0 ? 'color:var(--danger)' : ''">{{ cdC().deadLetterCount || 0 }}</dd>
             </dl>
             <div class="opbox" style="margin-top:10px">
-              <button class="btn btn-outline btn-sm" @click="sendCmd(s.cdCurrent,'PING')">PING</button>
-              <button class="btn btn-outline btn-sm" @click="kick(s.cdCurrent)">断开连接</button>
-              <button class="btn btn-danger-tint btn-sm" @click="removeClientOp(s.cdCurrent)">注销客户端</button>
+              <button class="btn btn-outline btn-sm" @click="sendCmd(s.cdId,'PING')">PING</button>
+              <div class="opsmenu">
+                <button class="btn btn-outline btn-sm" @click.stop="opsMenuToggle()" aria-label="更多操作">操作 ▾</button>
+                <div class="menu" v-if="s.opsMenuOpen">
+                  <button @click="s.opsMenuOpen=false; kick(s.cdId)">断开连接…</button>
+                  <button @click="s.opsMenuOpen=false; removeClientOp(s.cdId)" class="danger">注销客户端…</button>
+                </div>
+              </div>
               <a @click="goClientMessages()" style="font-size:12px;align-self:center;margin-left:auto">查投递记录 →</a>
             </div>
-            <div class="sect" style="margin-top:14px">本地队列（客户端设备快照 · 需主动拉取，不会自动更新）</div>
+            <div class="sect" style="margin-top:14px">发件箱（客户端设备本地队列）</div>
             <div class="toolbar" style="margin-bottom:8px">
-              <select class="fsel" v-model="s.obStatus" style="flex:1;min-width:0">
+              <select class="fsel" v-model="s.obStatus" style="flex:1;min-width:0" aria-label="本地队列状态过滤">
                 <option value="">全部状态</option>
                 <option value="PENDING">待发送</option>
                 <option value="SENDING">发送中</option>
@@ -278,39 +289,46 @@
                 <option value="FAILED">发送失败</option>
                 <option value="DEAD_LETTER">死信</option>
               </select>
-              <button class="btn btn-primary btn-sm" :disabled="s.obPulling" @click="pullOutbox()">{{ s.obPulling ? "拉取中…" : "拉取快照" }}</button>
+              <button class="btn btn-primary btn-sm" :disabled="s.obPulling" @click="pullOutbox()">{{ s.obPulling ? "执行中…" : "拉取快照" }}</button>
+              <button class="icon-btn" @click="pullOutbox()" title="再次查询" aria-label="再次查询" v-if="s.obPhase==='unknown' || s.obPhase==='timeout'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
             </div>
+            <div class="cmdstate" v-if="s.obPhase!=='idle' && s.obPhase!=='done'" :class="obPhaseCls()" role="status">
+              <span class="spin" v-if="s.obPhase==='submitted' || s.obPhase==='waiting'"></span>
+              {{ obPhaseText() }}
+            </div>
+            <div class="cmdstate ok" v-if="s.obPhase==='done'" role="status">{{ obPhaseText() }}</div>
             <div class="oblist">
-              <table class="tbl" style="min-width:420px" v-if="s.obData.length">
+              <table class="tbl" style="min-width:420px" v-if="s.obData && s.obData.length">
                 <thead><tr><th>消息 ID</th><th>状态</th><th>重试</th><th>大小</th><th></th></tr></thead>
                 <tbody>
                   <tr v-for="(r, idx) in s.obData" :key="r.messageId">
                     <td class="mono" style="font-size:11.5px">{{ r.messageId }}</td>
-                    <td><span class="pill" :class="obStateCls(r.statusText)"><i></i>{{ r.statusText }}</span></td>
+                    <td><span class="tag" :class="obStateTag(r.statusText)"><i style="width:6px;height:6px;border-radius:50%;background:currentColor"></i>{{ r.statusText }}</span></td>
                     <td class="num">{{ r.retryCount || 0 }}</td>
                     <td class="num weak">{{ r.payloadSize || 0 }}B</td>
                     <td style="white-space:nowrap" v-if="r.statusText && r.statusText.indexOf('死信')>=0">
                       <button class="btn btn-tint btn-sm" @click="retryOutbox(idx)">重发</button>
-                      <button class="btn btn-danger-tint btn-sm" @click="discardOutbox(idx)">放弃</button>
+                      <button class="btn btn-danger btn-sm" @click="discardOutbox(idx)">放弃</button>
                     </td>
                   </tr>
                 </tbody></table>
-              <div style="padding:14px 4px" v-if="!s.obData.length">尚未拉取 · 点上方按钮获取设备本地队列</div>
+              <div style="padding:14px 4px" v-if="!s.obData">尚未拉取 · 点上方「拉取快照」获取设备本地队列</div>
+              <div class="empty" style="padding:18px 0" v-if="s.obData && !s.obData.length"><p>本地队列为空（当前过滤条件下）</p></div>
             </div>
-            <details style="margin-top:8px;flex:none"><summary class="weak" style="cursor:pointer">原始回执 JSON<span v-if="s.obPulledAt"> · 拉取于 {{ s.obPulledAt }}</span></summary>
-              <div class="codeblock" style="margin-top:8px;max-height:160px">{{ obRaw() }}</div>
-            </details>
           </div>
+        </div>
+        <div class="cpanel" v-else style="align-items:center;justify-content:center;color:var(--text-muted)">
+          <div class="empty"><p>从左侧选择一个客户端查看详情</p></div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ═══ 确认弹窗（reason 留痕） ═══ -->
-  <div class="modal" :class="{on: s.confirm.on}">
+  <!-- ═══ 确认弹窗（仅破坏性操作，规范 §6.2） ═══ -->
+  <div class="modal" :class="{on: s.confirm.on}" role="dialog" aria-modal="true" :aria-label="s.confirm.title">
     <div class="m-mask" @click="s.confirm.on=false"></div>
     <div class="m-box">
-      <h3><span class="mic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>{{ s.confirm.title }}</h3>
+      <h3><span class="mic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>{{ s.confirm.title }}</h3>
       <p>{{ s.confirm.desc }}</p>
       <template v-if="s.confirm.extra==='register'">
         <label>客户端 ID <b>*</b>（接入时使用的唯一标识，支持自动生成）</label>
@@ -336,7 +354,7 @@
   </div>
 
   <!-- Toast -->
-  <div id="toasts">
+  <div id="toasts" aria-live="polite">
     <div class="toast" v-for="t in s.toasts" :key="t.id" :class="t.kind">{{ t.msg }}</div>
   </div>
 </div>
