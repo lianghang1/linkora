@@ -109,7 +109,7 @@ window.bootApp = function(){
   /* ── 消息页 ── */
   function setMsgTab(t){ s.msgTab = t; s.msgPage = 1; loadMessages(); }
   function pageMsgs(delta){ s.msgPage = Math.max(1, s.msgPage + delta); loadMessages(); }
-  function pickedClient(){ return (s.msgKeyword || "").trim() || s.msgClient || ""; }
+  function pickedClient(){ return s.msgClient || ""; }
   function timeRangeParam(){
     var p = "";
     if (s.msgBegin) p += "&begin=" + new Date(s.msgBegin + "T00:00:00").getTime();

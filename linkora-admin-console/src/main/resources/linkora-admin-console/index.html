@@ -55,7 +55,7 @@
         <div><h1>查询</h1><div class="sub">按门店 / 主题关键词 / 时间段查消息与投递轨迹</div></div>
       </div>
       <div class="toolbar">
-        <input class="fin" v-model="s.msgKeyword" placeholder="主题 / 类型 / 消息 ID…" style="width:200px" @keydown.enter="s.msgPage=1; loadMessages()" aria-label="关键词搜索">
+        <input class="fin" v-model="s.msgKeyword" placeholder="主题 / 类型 / 消息 ID…" @keydown.enter="s.msgPage=1; loadMessages()" aria-label="关键词搜索">
         <select class="fsel" v-model="s.msgClient" @change="s.msgPage=1; loadMessages()" aria-label="按客户端筛选" style="width:170px">
           <option value="">全部客户端</option>
           <option v-for="c in s.clients" :key="c.clientId" :value="c.clientId">{{ c.clientId }}{{ c.deadLetterCount ? "（死信 " + c.deadLetterCount + "）" : "" }}</option>
@@ -64,7 +64,7 @@
         <span class="weak">至</span>
         <input type="date" class="fdate" v-model="s.msgEnd" @change="s.msgPage=1; loadMessages()" aria-label="结束日期">
         <span class="clearbtn" @click="clearFilters()">清除筛选</span>
-        <span style="flex:1"></span>
+        <span class="sp"></span>
         <button class="btn btn-outline btn-sm" @click="refreshCurrent()">刷新</button>
       </div>
       <div class="toolbar">
@@ -85,7 +85,7 @@
               <thead><tr><th>消息 ID / 类型</th><th>客户端</th><th>状态</th><th>重试</th><th>最近推进</th><th></th></tr></thead>
               <tbody>
                 <tr v-for="m in s.messages" :key="m.messageId" :class="{sel: s.currentMsgId===m.messageId}" @click="openMessage(m.messageId)">
-                  <td><span style="font-size:12.5px;font-weight:600">{{ m.subject || m.messageType }}</span><span class="weak mono" style="margin-left:8px;font-size:11px">{{ m.messageId.slice(0,8) }}</span><span class="weak mono" style="margin-left:8px;font-size:11px" v-if="m.sequenceKey && m.sequenceKey!=='—'">⇠ {{ m.sequenceKey }}</span></td>
+                  <td><span style="font-size:12.5px;font-weight:600">{{ m.subject || m.messageType }}</span><span class="weak mono" style="margin-left:8px;font-size:11px">{{ m.messageId }}</span><span class="weak mono" style="margin-left:8px;font-size:11px" v-if="m.sequenceKey && m.sequenceKey!=='—'">⇠ {{ m.sequenceKey }}</span></td>
                   <td class="mono" style="font-size:12px">{{ m.clientId }}</td>
                   <td><span v-html="A.stPill(m.state, m.stateText)"></span></td>
                   <td class="num">{{ m.retryCount || 0 }}</td>
@@ -301,7 +301,7 @@
           </div>
         </div>
       </div>
-      <footer class="ver">Linkora Admin Console · v0.4.1 · 收件箱每 10 秒自动检查</footer>
+      <footer class="ver">Linkora Admin Console · v0.4.2 · 收件箱每 10 秒自动检查</footer>
     </div>
 
 
