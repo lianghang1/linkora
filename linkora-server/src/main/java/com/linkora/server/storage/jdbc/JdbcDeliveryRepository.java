@@ -6,6 +6,7 @@ import com.linkora.core.message.MessageState;
 import com.linkora.core.storage.server.DeliveryRecord;
 import com.linkora.core.storage.server.DeliveryRepository;
 
+import com.linkora.core.storage.jdbc.JdbcErrors;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -77,11 +78,12 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
             ps.setLong(9, record.getUpdatedAt());
             setNullableString(ps, 10, record.getSequenceKey());
             ps.executeUpdate();
-        } catch (SQLIntegrityConstraintViolationException duplicate) {
-            // 幂等语义：重复初始化忽略
         } catch (SQLException e) {
-            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
-                    "初始化投递记录失败: " + record, e, record.getMessageId());
+            // 幂等语义：重复初始化忽略；其余错误照常上抛
+            if (!JdbcErrors.isIntegrityViolation(e)) {
+                throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                        "初始化投递记录失败: " + record, e, record.getMessageId());
+            }
         }
     }
 
@@ -270,7 +272,10 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
                 init.setString(1, clientId);
                 try {
                     init.executeUpdate();
-                } catch (SQLIntegrityConstraintViolationException alreadyExists) {
+                } catch (SQLException alreadyExists) {
+                if (!JdbcErrors.isIntegrityViolation(alreadyExists)) {
+                    throw alreadyExists;
+                }
                     // 行已存在，继续
                 }
             }

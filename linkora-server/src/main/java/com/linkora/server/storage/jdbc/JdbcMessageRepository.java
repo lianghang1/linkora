@@ -5,6 +5,7 @@ import com.linkora.core.error.LinkoraException;
 import com.linkora.core.message.LinkoraMessage;
 import com.linkora.core.storage.server.MessageRepository;
 
+import com.linkora.core.storage.jdbc.JdbcErrors;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -55,12 +56,14 @@ public final class JdbcMessageRepository implements MessageRepository {
             setNullableString(ps, 10, message.getSubject());
             ps.executeUpdate();
             return true;
-        } catch (SQLIntegrityConstraintViolationException duplicate) {
-            // 幂等语义：messageId 已存在，保留原记录、不覆盖、不报错
-            return false;
         } catch (SQLException e) {
-            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
-                    "保存消息失败: " + message.getMessageId(), e, message.getMessageId());
+            // 幂等语义：messageId 已存在（唯一键冲突），保留原记录、不覆盖、不报错；
+            // 其余错误照常上抛
+            if (!JdbcErrors.isIntegrityViolation(e)) {
+                throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                        "保存消息失败: " + message.getMessageId(), e, message.getMessageId());
+            }
+            return false;
         }
     }
 

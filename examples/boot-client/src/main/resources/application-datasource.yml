@@ -1,0 +1,17 @@
+# datasource 模式：客户端本地队列落在宿主 DataSource，与业务表同库同事务
+# 启动方式：--spring.profiles.active=datasource
+#
+# 演示用 H2 内存库；OrderStatusService.updateStatusAtomically 的 @Transactional
+# 同时包住 business_shipment 业务行与 lk_client_outbox 队列写入。
+spring:
+  datasource:
+    url: jdbc:h2:mem:linkora-boot-client;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+    hikari:
+      leak-detection-threshold: 5000
+
+linkora:
+  client:
+    store: datasource

@@ -41,6 +41,7 @@
         <module>linkora-spring</module>
         <module>linkora-admin-console</module>
         <module>linkora-spring-boot-starter</module>
+        <module>linkora-testkit</module>
         <module>examples</module>
     </modules>
 
@@ -94,6 +95,11 @@
             <dependency>
                 <groupId>org.springframework</groupId>
                 <artifactId>spring-context</artifactId>
+                <version>${spring-framework.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework</groupId>
+                <artifactId>spring-jdbc</artifactId>
                 <version>${spring-framework.version}</version>
             </dependency>
             <dependency>

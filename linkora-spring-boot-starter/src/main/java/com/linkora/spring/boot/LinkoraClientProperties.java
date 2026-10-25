@@ -18,7 +18,18 @@ public class LinkoraClientProperties {
     /** 本端客户端标识（必填）。 */
     private String clientId;
     /** SQLite 本地队列文件路径；未设置时要求宿主自行提供 ClientStore bean。 */
-    private String dbPath;
+    /** sqlite 模式的本地队列文件路径（与服务端 db-path 对等，默认即可零配置运行）。 */
+    private String dbPath = "./data/linkora-client.db";
+
+    /**
+     * 存储模式（0.5.0 起，与服务端对等）：
+     * <ul>
+     *   <li>{@code sqlite}（默认）：本地 SQLite 文件，离线缓冲优先；</li>
+     *   <li>{@code datasource}：复用宿主 DataSource（业务消息同库同事务，
+     *       transactional outbox），要求宿主存在 DataSource Bean。</li>
+     * </ul>
+     */
+    private String store = "sqlite";
 
     private Long senderIntervalMs;
     private Long recoveryIntervalMs;
@@ -54,6 +65,14 @@ public class LinkoraClientProperties {
 
     public void setDbPath(String dbPath) {
         this.dbPath = dbPath;
+    }
+
+    public String getStore() {
+        return store;
+    }
+
+    public void setStore(String store) {
+        this.store = store;
     }
 
     public Long getSenderIntervalMs() {

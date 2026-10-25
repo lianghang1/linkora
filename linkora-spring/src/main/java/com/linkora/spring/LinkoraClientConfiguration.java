@@ -3,10 +3,14 @@ package com.linkora.spring;
 import com.linkora.client.LinkoraClient;
 import com.linkora.client.UplinkPublisher;
 import com.linkora.core.storage.client.ClientStore;
+import com.linkora.core.storage.client.jdbc.JdbcClientStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+
+import javax.sql.DataSource;
 
 /**
  * LinkoraClient 客户端装配（纯 Spring 宿主，与 Boot starter 的客户端自动配置
@@ -14,12 +18,14 @@ import org.springframework.core.env.Environment;
  *
  * <p>默认关闭：宿主显式 {@code @Import(LinkoraClientConfiguration.class)} 才生效，
  * 避免纯服务端宿主意外初始化客户端。配置键与 Boot 版完全对齐（{@code linkora.client.*}）：
- * server-url 与 client-id 必填，缺失时启动即失败；db-path 未配置且宿主未提供
- * 自定义 {@link ClientStore} bean 时缺省使用 SQLite。数值型调优项
+ * server-url 与 client-id 必填，缺失时启动即失败。存储模式与 Boot 版对齐（0.5.0）：
+ * {@code linkora.client.store=sqlite}（默认，本地文件，离线缓冲优先）或
+ * {@code datasource}（复用宿主 DataSource，事务感知包装后交给
+ * {@link JdbcClientStore}，业务消息同库同事务）。数值型调优项
  * （sender-interval-ms / recovery-interval-ms / idle-timeout-ms）未设置时沿用 SDK 默认值。</p>
  *
- * <p>宿主自定义 {@link ClientStore}（如接业务库接管事务，见 docs/storage-spi.md）时，
- * 为自定义 bean 添加 {@code @Primary} 以避免与本装配的缺省 SQLite bean 冲突
+ * <p>宿主自定义 {@link ClientStore} 时，
+ * 为自定义 bean 添加 {@code @Primary} 以避免与本装配的缺省存储 bean 冲突
  * （Boot 宿主由 @ConditionalOnMissingBean 自动让位，纯 Spring 无此条件机制）。</p>
  *
  * @author lianghang
@@ -28,12 +34,25 @@ import org.springframework.core.env.Environment;
 public class LinkoraClientConfiguration {
 
     /**
-     * 缺省提供基于 SQLite 的本地队列存储；宿主自定义 {@link ClientStore} bean
-     * 时请为本装配 bean 声明 {@code @Primary} 让位，否则按类型注入将出现多候选。
+     * 按 {@code linkora.client.store} 提供本地队列存储；宿主自定义 {@link ClientStore}
+     * bean 时请为本装配 bean 声明 {@code @Primary} 让位，否则按类型注入将出现多候选。
      */
     @Bean(destroyMethod = "close")
-    public ClientStore linkoraClientStore(Environment environment) {
-        return LinkoraClientAssembler.sqliteStore(environment.getProperty("linkora.client.db-path"));
+    public ClientStore linkoraClientStore(Environment environment,
+                                          ObjectProvider<DataSource> hostDataSource) {
+        String store = environment.getProperty("linkora.client.store", "sqlite");
+        if ("datasource".equalsIgnoreCase(store.trim())) {
+            DataSource dataSource = hostDataSource.getIfAvailable();
+            if (dataSource == null) {
+                throw new IllegalStateException(
+                        "linkora.client.store=datasource 需要宿主提供 DataSource Bean"
+                                + "（或改用 linkora.client.store=sqlite）");
+            }
+            return new JdbcClientStore(TxAwareDataSources.wrap(dataSource));
+        }
+        return LinkoraClientAssembler.sqliteStore(
+                environment.getProperty("linkora.client.db-path",
+                        "./data/linkora-client.db"));
     }
 
     /**

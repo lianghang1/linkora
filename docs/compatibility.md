@@ -11,8 +11,9 @@
 
 | 环境 | 要求 | 状态 |
 |---|---|---|
-| 客户端运行时 | JDK 8+，纯 Java，无 Spring 依赖 | 已验证 |
-| 服务端容器 | Servlet 3.1+（需要 async 能力）：Tomcat 8+/9+、Jetty 9.3+、WildFly 等 | Tomcat 9（Boot/MVC 示例）与 Jetty 9.4（testkit）双容器验收通过 |
+| **宿主形态（0.5.0 定位）** | **仅支持 Spring MVC（Tomcat）与 Spring Boot（内嵌 Tomcat）宿主**；纯 Java Builder / 非 Spring Servlet 容器不再作为产品保障范围 | 已验证（4 个示例应用） |
+| 客户端运行时 | JDK 8+，Spring 宿主 | 已验证 |
+| 服务端容器 | Tomcat 8+/9+（Boot 内嵌或 MVC war） | Tomcat 9（Boot/MVC 示例）验收通过 |
 | `javax.servlet-api` | 3.1.0，宿主容器 provided | 3.1 API 面（无 Servlet 4.0 常量依赖） |
 | 生产数据库 | 任一 ANSI SQL 兼容 JDBC 库 | 见下文数据库矩阵 |
 | 消息中间件 | **不要求**，服务端零新增中间件 | 设计保证 |
@@ -37,7 +38,8 @@
 
 | 数据库 | 状态 | 说明 |
 |---|---|---|
-| H2 2.2.x | **已验证**（全部自动化测试 + testkit） | SQL 为方言中立 ANSI |
+| H2 2.2.x | **已验证**（全部自动化测试 + testkit + datasource 模式示例） | SQL 为方言中立 ANSI |
+| SQLite 3.46（内嵌，0.5.0 起两端默认） | **已验证**（schema 迁移幂等 + 四仓储读写 + 服务端全量测试 + 示例运行验证） | 内嵌模式统一 PRAGMA：WAL + busy_timeout=5000 + synchronous=NORMAL；注意宿主 Boot BOM 可能压制驱动版本至 3.36（事务内并发写有 BUSY 差异），请显式声明 3.46+ |
 | MySQL 8.0 | **已验证**（MySQL 8.0.46 真库 IT：schema 迁移幂等、二进制 payload 往返、CAS 竞争、并发投递序号分配、事务接管发件箱） | 迁移语句经真库回归；并发序号分配含 InnoDB 死锁重试处理 |
 | PostgreSQL | 代码就绪，**待真实库回归** | 接入前在测试库执行 `JdbcServerSchema.migrate` 验证方言差异 |
 
@@ -46,10 +48,10 @@
 
 ## 客户端本地存储
 
-- SQLite（xerial sqlite-jdbc）：Windows/Linux/macOS x86_64 / aarch64
-  官方支持平台；
-- 配置 `WAL` + `synchronous=FULL`：进程崩溃/断电场景下已提交事务不丢失；
-- 客户端每个实例独占一个库文件。
+- **sqlite 模式（默认）**：SQLite（xerial sqlite-jdbc）本地文件，每个实例独占一个库文件；
+  配置 `WAL` + `synchronous=FULL`：进程崩溃/断电场景下已提交事务不丢失；
+- **datasource 模式（0.5.0 起）**：客户端队列表（lk_client_outbox/inbox/meta）
+  落在宿主 DataSource，与业务同库同事务（见 docs/storage-models.md）。
 
 ## Spring 集成
 

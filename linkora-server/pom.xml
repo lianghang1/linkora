@@ -25,6 +25,12 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>
+        <!-- 内嵌 SQLite（store=sqlite 模式）：optional，仅内嵌模式加载；测试亦用 -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <optional>true</optional>
+        </dependency>
         <!-- Servlet 端点适配随服务端编排一并发布；容器由宿主提供 -->
         <dependency>
             <groupId>javax.servlet</groupId>

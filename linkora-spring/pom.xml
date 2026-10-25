@@ -32,6 +32,11 @@
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
         </dependency>
+        <!-- 事务感知数据源包装（TxAwareDataSources）：两端 publish 同事务共用 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+        </dependency>
         <!-- 装配辅助只触碰 ServletContext 注册 API，容器由宿主提供 -->
         <dependency>
             <groupId>javax.servlet</groupId>

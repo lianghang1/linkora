@@ -2,6 +2,7 @@ package com.linkora.server.storage.jdbc;
 
 import com.linkora.core.error.LinkoraErrorCode;
 import com.linkora.core.error.LinkoraException;
+import com.linkora.core.storage.jdbc.JdbcErrors;
 import com.linkora.core.storage.server.ClientCursorRepository;
 
 import javax.sql.DataSource;
@@ -44,12 +45,18 @@ public final class JdbcClientCursorRepository implements ClientCursorRepository 
             }
             // 影响行数 0：行不存在（首次写入）或新值不大于已有值。
             // 尝试插入；主键冲突说明行已存在且新值不更大，属于合法的滞后写入，忽略。
+            // 注意按 SQLState "23"（完整性约束违反）判断而非仅捕获 JDBC 标准异常：
+            // 各驱动映射不一致（如 SQLite xerial 抛 SQLiteException，不继承
+            // SQLIntegrityConstraintViolationException）。
             try (PreparedStatement insert = connection.prepareStatement(
                     "INSERT INTO lk_client_cursor (client_id, last_seq) VALUES (?, ?)")) {
                 insert.setString(1, clientId);
                 insert.setLong(2, seq);
                 insert.executeUpdate();
-            } catch (SQLIntegrityConstraintViolationException alreadyExistsOrStale) {
+            } catch (SQLException alreadyExistsOrStale) {
+                if (!JdbcErrors.isIntegrityViolation(alreadyExistsOrStale)) {
+                    throw alreadyExistsOrStale;
+                }
                 // 游标已存在且当前 seq 不更大：单调性保持，忽略
             }
         } catch (SQLException e) {
@@ -72,4 +79,5 @@ public final class JdbcClientCursorRepository implements ClientCursorRepository 
                     "查询客户端游标失败: " + clientId, e);
         }
     }
+
 }

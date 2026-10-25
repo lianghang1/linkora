@@ -6,6 +6,7 @@ import com.linkora.core.storage.server.ClientRegistration;
 import com.linkora.core.storage.server.ClientRegistry;
 import com.linkora.core.storage.server.ConnectionState;
 
+import com.linkora.core.storage.jdbc.JdbcErrors;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -45,11 +46,12 @@ public final class JdbcClientRegistry implements ClientRegistry {
             // 幂等重复注册时忽略 display_name（保留首次记录）
             ps.setString(5, registration.getDisplayName());
             ps.executeUpdate();
-        } catch (SQLIntegrityConstraintViolationException duplicate) {
-            // 幂等语义：重复注册忽略
         } catch (SQLException e) {
-            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
-                    "注册客户端失败: " + registration.getClientId(), e);
+            // 幂等语义：重复注册忽略；其余错误照常上抛
+            if (!JdbcErrors.isIntegrityViolation(e)) {
+                throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                        "注册客户端失败: " + registration.getClientId(), e);
+            }
         }
     }
 

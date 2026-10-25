@@ -20,6 +20,20 @@ public class LinkoraServerProperties {
     private boolean autoMigrate = true;
 
     /**
+     * 存储模式（0.5.0 起，与客户端对等）：
+     * <ul>
+     *   <li>{@code sqlite}（默认）：内嵌 SQLite 文件，零配置起步，
+     *       适用于开发/演示/小规模部署；</li>
+     *   <li>{@code datasource}：复用宿主 DataSource（业务消息同库同事务），
+     *       生产推荐。</li>
+     * </ul>
+     */
+    private String store = "sqlite";
+
+    /** sqlite 模式的数据库文件路径。 */
+    private String dbPath = "./data/linkora-server.db";
+
+    /**
      * 未提供 ClientAuthenticator 时是否允许回退为"放行全部请求"。
      *
      * <p>默认 false：缺认证器直接启动失败。仅本地开发/演示应设为 true。</p>
@@ -79,6 +93,22 @@ public class LinkoraServerProperties {
 
     public void setAutoMigrate(boolean autoMigrate) {
         this.autoMigrate = autoMigrate;
+    }
+
+    public String getStore() {
+        return store;
+    }
+
+    public void setStore(String store) {
+        this.store = store;
+    }
+
+    public String getDbPath() {
+        return dbPath;
+    }
+
+    public void setDbPath(String dbPath) {
+        this.dbPath = dbPath;
     }
 
     public String getEventsPath() {

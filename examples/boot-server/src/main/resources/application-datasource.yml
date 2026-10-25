@@ -1,0 +1,17 @@
+# datasource 模式：复用宿主 DataSource，业务消息同库同事务（transactional outbox）
+# 启动方式：--spring.profiles.active=datasource
+#
+# 演示用 H2 内存库；生产替换为业务库（MySQL 等 JDBC 兼容数据源）。
+# linkora 的 lk_* 表与业务表（本示例的 business_order）共库，
+# OrderService.placeOrderAtomically 的 @Transactional 同时包住两者。
+spring:
+  datasource:
+    url: jdbc:h2:mem:linkora-boot;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+linkora:
+  server:
+    store: datasource
+    auto-migrate: true

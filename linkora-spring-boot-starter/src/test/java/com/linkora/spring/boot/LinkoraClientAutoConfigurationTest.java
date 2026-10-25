@@ -96,9 +96,12 @@ class LinkoraClientAutoConfigurationTest {
     }
 
     private static ConfigurableApplicationContext runApp(String... extraProperties) {
-        String[] props = new String[extraProperties.length + 1];
+        String[] props = new String[extraProperties.length + 2];
         props[0] = "--server.port=0";
-        System.arraycopy(extraProperties, 0, props, 1, extraProperties.length);
+        // 本测试只关心客户端装配：显式关闭服务端（store 默认 sqlite 后服务端
+        // 不再依赖宿主 DataSource 存在与否，client-only 宿主应显式关闭）
+        props[1] = "--linkora.server.enabled=false";
+        System.arraycopy(extraProperties, 0, props, 2, extraProperties.length);
         return new SpringApplicationBuilder(App.class).run(props);
     }
 
@@ -108,6 +111,45 @@ class LinkoraClientAutoConfigurationTest {
                 "--linkora.client.server-url=" + embedded.baseUrl(),
                 "--linkora.client.client-id=boot-client",
                 "--linkora.client.db-path=target/boot-client-queue"};
+    }
+
+    /** 宿主 H2 数据源（datasource 模式验证用）。 */
+    @Configuration
+    static class HostDataSourceConfig {
+        @Bean
+        javax.sql.DataSource dataSource() {
+            org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+            ds.setURL("jdbc:h2:mem:client-ds-mode;DB_CLOSE_DELAY=-1");
+            return ds;
+        }
+    }
+
+    @Test
+    void clientAssembledWithDatasourceStore() {
+        String[] props = new String[] {
+                "--server.port=0",
+                "--linkora.server.enabled=false",
+                "--linkora.client.enabled=true",
+                "--linkora.client.server-url=" + embedded.baseUrl(),
+                "--linkora.client.client-id=boot-client",
+                "--linkora.client.store=datasource"};
+        ConfigurableApplicationContext context =
+                new SpringApplicationBuilder(App.class, HostDataSourceConfig.class).run(props);
+        try {
+            context.getBean(LinkoraClient.class);
+            ClientStore store = context.getBean(ClientStore.class);
+            assertTrue(store instanceof com.linkora.core.storage.client.jdbc.JdbcClientStore,
+                    "store=datasource 应装配 JdbcClientStore");
+            // 宿主库中应已建出客户端三表（datasource 模式随装配迁移）
+            try (java.sql.Connection c = context.getBean(javax.sql.DataSource.class).getConnection();
+                 java.sql.ResultSet rs = c.getMetaData().getTables(null, null, "LK_CLIENT_OUTBOX", null)) {
+                assertTrue(rs.next(), "宿主库应存在 lk_client_outbox 表");
+            } catch (java.sql.SQLException e) {
+                throw new IllegalStateException(e);
+            }
+        } finally {
+            context.close();
+        }
     }
 
     @Test
@@ -136,6 +178,7 @@ class LinkoraClientAutoConfigurationTest {
     void hostClientStoreOverridesSqlite() {
         String[] props = new String[] {
                 "--server.port=0",
+                "--linkora.server.enabled=false",
                 "--linkora.client.enabled=true",
                 "--linkora.client.server-url=" + embedded.baseUrl(),
                 "--linkora.client.client-id=boot-client"};

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 独立 pom（无父级）：模拟真实宿主项目，直接引用 Maven Central 已发布的 linkora 正式包，
+         可脱离本仓库单独构建（mvn -f 本文件），用于验证发布产物的可用性 -->
+    <groupId>io.github.lianghang1</groupId>
+    <artifactId>linkora-example-spring-boot-client-app</artifactId>
+    <version>0.4.2</version>
+    <packaging>jar</packaging>
+
+    <name>Linkora Example: Spring Boot Client App</name>
+    <description>Spring Boot 客户端示例：starter 自动装配 LinkoraClient，演示下行监听/处理/ACK、上行发送并等待服务端接受、触发服务端下发消息的完整闭环。</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.release>8</maven.compiler.release>
+        <!-- 固定引用已发布的正式版；升级示例依赖时仅需改此属性（联调 SNAPSHOT 先 mvn install） -->
+        <linkora.version>0.4.2</linkora.version>
+        <!-- 独立 pom 不继承 examples 聚合的该属性：maven-deploy-plugin 识别它，
+             防止 deploy 时把示例推往 settings.xml altDeploymentRepository 指向的公司 nexus -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+        <spring-boot.version>2.7.18</spring-boot.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <!-- 非 web 应用：仅引入基础 starter（web-application-type=none） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!-- datasource 模式需要：宿主 DataSource（HikariCP）与 JdbcTemplate -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
+        </dependency>
+        <!-- datasource 模式演示用 H2 内存库 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.github.lianghang1</groupId>
+            <artifactId>linkora-spring-boot-starter</artifactId>
+            <version>${linkora.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

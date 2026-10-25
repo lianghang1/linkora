@@ -2,44 +2,32 @@ package com.linkora.server.storage.jdbc;
 
 import com.linkora.core.error.LinkoraErrorCode;
 import com.linkora.core.error.LinkoraException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkora.core.storage.jdbc.SchemaMigrator;
 
 import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 
 /**
- * 服务端 schema 迁移（自研轻量实现：版本表 + 顺序脚本，不引入 Flyway）。
+ * 服务端 schema 迁移：DDL 定义 + 委托共用迁移框架 {@link SchemaMigrator} 执行。
  *
- * <p>SQL 保持方言中立（ANSI），已验证 H2 与 MySQL（5.7 / 8，见
- * {@code JdbcServerStorageMySqlIT}）；PostgreSQL 在后续三库矩阵阶段验证。
- * 每个迁移版本为语句数组（一条语句一个元素），在独立事务中执行并记录版本号，
- * 任意时刻崩溃重启后从上次版本继续。</p>
+ * <p>SQL 保持方言中立（ANSI），已验证 H2、SQLite 与 MySQL（5.7 / 8，见
+ * {@code JdbcServerStorageMySqlIT}）。方言差异（索引 DDL 裁剪、幂等容错）
+ * 由 {@code SchemaMigrator} 统一处理，本类只按方言提供语句数组。</p>
  *
- * <p>MySQL 方言注意两点：① {@code CREATE INDEX} 不支持 {@code IF NOT EXISTS}，
- * 索引脚本按方言裁剪；② DDL 隐式提交，崩溃续跑可能留下"已建表未记版本"的
- * 中间态——对 MySQL 放行"对象已存在"类错误（1050 表已存在 / 1061 索引已存在）
- * 保证重跑幂等。</p>
+ * <p>版本要点：v1 建表建索引；v2 payload 扩容（MySQL 64KB → LONGTEXT，
+ * H2 → CLOB，SQLite TEXT 无长度限制为 no-op）；v3 顺序键；v4 人类可读元数据
+ * （消息主题 subject、客户端显示名 display_name）。各版本重复执行均幂等。</p>
  *
  * @author lianghang
  */
 public final class JdbcServerSchema {
 
-    private static final Logger log = LoggerFactory.getLogger(JdbcServerSchema.class);
-
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    public static final int LATEST_VERSION = 3;
+    public static final int LATEST_VERSION = 4;
 
-    private static final String CREATE_VERSION_TABLE =
-            "CREATE TABLE IF NOT EXISTS lk_schema_version ("
-                    + " version     BIGINT NOT NULL PRIMARY KEY,"
-                    + " applied_at  BIGINT NOT NULL)";
+    private static final String VERSION_TABLE = "lk_schema_version";
 
-    /** v1 表结构（方言通用：CREATE TABLE IF NOT EXISTS 两种数据库均支持）。 */
+    /** v1 表结构（方言通用：CREATE TABLE IF NOT EXISTS 各库均支持）。 */
     private static final String[] V1_TABLES = {
             "CREATE TABLE IF NOT EXISTS lk_client ("
                     + " client_id        VARCHAR(128) PRIMARY KEY,"
@@ -75,8 +63,8 @@ public final class JdbcServerSchema {
                     + " PRIMARY KEY (message_id, client_id))",
     };
 
-    /** H2：CREATE INDEX 支持 IF NOT EXISTS。 */
-    private static final String[] V1_INDEXES_H2 = {
+    /** H2 / SQLite：CREATE INDEX 支持 IF NOT EXISTS。 */
+    private static final String[] V1_INDEXES_ANSI = {
             "CREATE INDEX IF NOT EXISTS idx_delivery_client_state ON lk_delivery (client_id, state, seq)",
             "CREATE UNIQUE INDEX IF NOT EXISTS uk_delivery_client_seq ON lk_delivery (client_id, seq)",
             "CREATE INDEX IF NOT EXISTS idx_message_client_created ON lk_message (client_id, created_at)",
@@ -90,14 +78,10 @@ public final class JdbcServerSchema {
     };
 
     /**
-     * 每个迁移版本 = 语句数组（一条语句一个元素，语句边界显式声明，不依赖
-     * 字符串切割，规避 SQL 内分号字面量/注释被误切的问题）；方言差异仅替换索引语句。
-     */
-    /**
      * v2：payload 列扩容。v1 的 TEXT 在 MySQL 上限 64KB，而 payload 走 Base64
      * （膨胀 4/3）且 body 上限 1MB——原始 payload 超约 48KB 就写库失败。
-     * MySQL 用 LONGTEXT（4GB）；H2 用 CLOB。MODIFY / SET DATA TYPE 重复执行
-     * 均幂等，崩溃重放安全。
+     * MySQL 用 LONGTEXT（4GB）；H2 用 CLOB；SQLite TEXT 无长度限制，no-op。
+     * MODIFY / SET DATA TYPE 重复执行均幂等，崩溃重放安全。
      */
     private static final String[] V2_H2 = {
             "ALTER TABLE lk_message ALTER COLUMN payload_base64 CLOB NOT NULL",
@@ -105,6 +89,7 @@ public final class JdbcServerSchema {
     private static final String[] V2_MYSQL = {
             "ALTER TABLE lk_message MODIFY COLUMN payload_base64 LONGTEXT NOT NULL",
     };
+    private static final String[] V2_SQLITE = {};
 
     /**
      * v3：顺序键。lk_message 存键（推送时线路 JSON 需要还原它），
@@ -124,6 +109,12 @@ public final class JdbcServerSchema {
             "CREATE INDEX idx_delivery_client_key_seq "
                     + "ON lk_delivery (client_id, sequence_key, seq)",
     };
+    private static final String[] V3_SQLITE = {
+            "ALTER TABLE lk_message ADD COLUMN sequence_key VARCHAR(128)",
+            "ALTER TABLE lk_delivery ADD COLUMN sequence_key VARCHAR(128)",
+            "CREATE INDEX IF NOT EXISTS idx_delivery_client_key_seq "
+                    + "ON lk_delivery (client_id, sequence_key, seq)",
+    };
 
     /** v4：人类可读元数据——消息主题（运维界面直接展示）、客户端显示名。幂等。 */
     private static final String[] V4_H2 = {
@@ -134,11 +125,17 @@ public final class JdbcServerSchema {
             "ALTER TABLE lk_message ADD COLUMN subject VARCHAR(255)",
             "ALTER TABLE lk_client ADD COLUMN display_name VARCHAR(255)",
     };
+    private static final String[] V4_SQLITE = {
+            "ALTER TABLE lk_message ADD COLUMN subject VARCHAR(255)",
+            "ALTER TABLE lk_client ADD COLUMN display_name VARCHAR(255)",
+    };
 
     private static final String[][] MIGRATIONS =
-            {concat(V1_TABLES, V1_INDEXES_H2), V2_H2, V3_H2, V4_H2};
+            {concat(V1_TABLES, V1_INDEXES_ANSI), V2_H2, V3_H2, V4_H2};
     private static final String[][] MIGRATIONS_MYSQL =
             {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL, V3_MYSQL, V4_MYSQL};
+    private static final String[][] MIGRATIONS_SQLITE =
+            {concat(V1_TABLES, V1_INDEXES_ANSI), V2_SQLITE, V3_SQLITE, V4_SQLITE};
 
     private static String[] concat(String[] tables, String[] indexes) {
         String[] all = new String[tables.length + indexes.length];
@@ -152,81 +149,25 @@ public final class JdbcServerSchema {
 
     /** 依次应用未执行的迁移；重复调用幂等。 */
     public static void migrate(DataSource dataSource) {
-        try (Connection connection = dataSource.getConnection()) {
-            boolean mysql = isMySql(connection);
-            String[][] migrations = mysql ? MIGRATIONS_MYSQL : MIGRATIONS;
-            createVersionTable(connection);
-            int current = currentVersion(connection);
-            for (int version = current + 1; version <= migrations.length; version++) {
-                applyMigration(connection, version, migrations[version - 1], mysql);
-            }
+        try {
+            SchemaMigrator.migrate(dataSource, VERSION_TABLE, selectMigrations(dataSource));
         } catch (SQLException e) {
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
                     "服务端 schema 迁移失败", e);
         }
     }
 
-    private static boolean isMySql(Connection connection) throws SQLException {
-        String product = connection.getMetaData().getDatabaseProductName();
-        return product != null && product.contains("MySQL");
-    }
-
-    private static void createVersionTable(Connection connection) throws SQLException {
-        try (Statement st = connection.createStatement()) {
-            st.execute(CREATE_VERSION_TABLE);
-        }
-    }
-
-    private static int currentVersion(Connection connection) throws SQLException {
-        try (Statement st = connection.createStatement();
-             ResultSet rs = st.executeQuery("SELECT COALESCE(MAX(version), 0) FROM lk_schema_version")) {
-            rs.next();
-            return rs.getInt(1);
-        }
-    }
-
-    private static void applyMigration(Connection connection, int version, String[] statements,
-                                       boolean mysql) throws SQLException {
-        // 宿主事务接管模式（连接已在手动提交）：迁移加入当前事务，提交/回滚由
-        // 宿主裁决，严禁中途 commit/rollback（否则提前提交宿主业务写入）；
-        // 自管模式（自动提交连接）保持原行为：本地事务自行提交。
-        boolean localTx = connection.getAutoCommit();
-        if (localTx) {
-            connection.setAutoCommit(false);
-        }
-        try {
-            for (String sql : statements) {
-                try (Statement st = connection.createStatement()) {
-                    st.execute(sql);
-                } catch (SQLException e) {
-                    // MySQL DDL 隐式提交：崩溃续跑时对象可能已存在，视为幂等命中
-                    // （1050 表已存在 / 1060 列已存在 / 1061 索引已存在）
-                    if (mysql && (e.getErrorCode() == 1050 || e.getErrorCode() == 1060
-                            || e.getErrorCode() == 1061)) {
-                        log.info("迁移对象已存在（MySQL 崩溃续跑幂等命中）: {}", sql);
-                        continue;
-                    }
-                    throw e;
-                }
-            }
-            try (PreparedStatement ps = connection.prepareStatement(
-                    "INSERT INTO lk_schema_version (version, applied_at) VALUES (?, ?)")) {
-                ps.setInt(1, version);
-                ps.setLong(2, System.currentTimeMillis());
-                ps.executeUpdate();
-            }
-            if (localTx) {
-                connection.commit();
-            }
-            log.info("已应用服务端 schema 迁移 v{}", version);
-        } catch (SQLException e) {
-            if (localTx) {
-                connection.rollback();
-            }
-            throw e;
-        } finally {
-            if (localTx) {
-                connection.setAutoCommit(true);
+    private static String[][] selectMigrations(DataSource dataSource) throws SQLException {
+        try (java.sql.Connection connection = dataSource.getConnection()) {
+            SchemaMigrator.Dialect dialect = SchemaMigrator.dialectOf(connection);
+            switch (dialect) {
+                case MYSQL:
+                    return MIGRATIONS_MYSQL;
+                case SQLITE:
+                    return MIGRATIONS_SQLITE;
+                case H2:
+                default:
+                    return MIGRATIONS;
             }
         }
     }
