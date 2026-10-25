@@ -71,12 +71,15 @@
         <div class="seg" role="tablist" aria-label="消息分类">
           <button :class="{on: s.msgTab==='all'}" @click="setMsgTab('all')">全部消息</button>
           <button :class="{on: s.msgTab==='pending'}" @click="setMsgTab('pending')">未完成投递<span class="n" v-if="s.sumPending()">{{ s.sumPending() }}</span></button>
-          <button @click="go('inbox')">死信收件箱<span class="n" v-if="s.sumDead()">{{ s.sumDead() }}</span></button>
+          <button :class="{on: s.msgTab==='dead'}" @click="setMsgTab('dead')">死信<span class="n" v-if="s.sumDead()">{{ s.sumDead() }}</span></button>
         </div>
         <span class="weak" style="margin-left:auto;align-self:center">范围：{{ pickedClient() || "全部客户端" }}</span>
       </div>
       <p class="hintline" v-if="s.msgTab==='pending'">
         未完成投递：正在推送或自动重试中的消息。行内可跳过以放行同键后续消息（不会撤回已在途的推送）。
+      </p>
+      <p class="hintline" v-if="s.msgTab==='dead'">
+        死信：重试耗尽仍投递失败的消息。行内可重试或跳过；异常发现也可在收件箱完成。
       </p>
       <div class="split">
         <div class="list-col">
@@ -205,13 +208,8 @@
             </dl>
             <div class="opbox" style="margin-top:10px">
               <button class="btn btn-outline btn-sm" @click="sendCmd(s.cdId,'PING')">PING</button>
-              <div class="opsmenu">
-                <button class="btn btn-outline btn-sm" @click.stop="opsMenuToggle()" aria-label="更多操作">操作 ▾</button>
-                <div class="menu" v-if="s.opsMenuOpen">
-                  <button @click="s.opsMenuOpen=false; kick(s.cdId)">断开连接…</button>
-                  <button @click="s.opsMenuOpen=false; removeClientOp(s.cdId)" class="danger">注销客户端…</button>
-                </div>
-              </div>
+              <button class="btn btn-outline btn-sm" @click="kick(s.cdId)">断开连接…</button>
+              <button class="btn btn-danger btn-sm" @click="removeClientOp(s.cdId)">注销客户端…</button>
               <a @click="goClientMessages()" style="font-size:12px;align-self:center;margin-left:auto">查投递记录 →</a>
             </div>
             <div class="sect" style="margin-top:14px">发件箱（客户端设备本地队列）</div>
@@ -236,17 +234,18 @@
               <table class="tbl" style="min-width:420px" v-if="s.obData && s.obData.length">
                 <thead><tr><th>消息 ID</th><th>状态</th><th>重试</th><th>大小</th><th></th></tr></thead>
                 <tbody>
-                  <tr v-for="(r, idx) in s.obData" :key="r.messageId">
+                  <tr v-for="(r, idx) in s.obData" :key="r.messageId" style="cursor:pointer" :title="'查看 ' + r.messageId + ' 的服务端详情'" @click="openOutboxMsg(idx)">
                     <td class="mono" style="font-size:11.5px">{{ r.messageId }}</td>
                     <td><span class="tag" :class="obStateTag(r.statusText)"><i style="width:6px;height:6px;border-radius:50%;background:currentColor"></i>{{ r.statusText }}</span></td>
                     <td class="num">{{ r.retryCount || 0 }}</td>
                     <td class="num weak">{{ r.payloadSize || 0 }}B</td>
-                    <td style="white-space:nowrap" v-if="r.statusText && r.statusText.indexOf('死信')>=0">
+                    <td style="white-space:nowrap" v-if="r.statusText && r.statusText.indexOf('死信')>=0" @click.stop>
                       <button class="btn btn-tint btn-sm" @click="retryOutbox(idx)">重发</button>
                       <button class="btn btn-danger btn-sm" @click="discardOutbox(idx)">放弃</button>
                     </td>
                   </tr>
                 </tbody></table>
+              <p class="weak" style="padding:8px 4px 0;font-size:11.5px" v-if="s.obData && s.obData.length">快照共 {{ s.obData.length }} 条 · 设备本地队列（单次最多返回 50 条）· 点击行查看服务端消息详情</p>
               <div style="padding:14px 4px" v-if="!s.obData">尚未拉取 · 点上方「拉取快照」获取设备本地队列</div>
               <div class="empty" style="padding:18px 0" v-if="s.obData && !s.obData.length"><p>本地队列为空（当前过滤条件下）</p></div>
             </div>
@@ -332,6 +331,31 @@
       <div class="m-acts">
         <button class="btn btn-ghost btn-sm" @click="s.confirm.on=false">取消</button>
         <button class="btn btn-primary btn-sm" :disabled="s.confirm.busy" @click="confirmSubmit()">{{ s.confirm.busy ? "执行中…" : s.confirm.okLabel }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 发件箱本地详情（仅存在于设备本地、服务端无记录的消息） -->
+  <div class="modal" :class="{on: !!s.obDetail}" role="dialog" aria-modal="true" aria-label="设备本地消息详情">
+    <div class="m-mask" @click="closeObDetail()"></div>
+    <div class="m-box" v-if="s.obDetail">
+      <h3 class="mono" style="cursor:pointer" @click="A.copyText(s.obDetail.messageId)" title="点击复制">{{ s.obDetail.messageId }}</h3>
+      <p class="weak" style="margin-top:2px">设备本地队列消息 · 服务端暂无记录</p>
+      <dl class="kv" style="margin-top:10px">
+        <dt>本地状态</dt><dd>{{ s.obDetail.statusText }}</dd>
+        <dt>消息类型</dt><dd class="mono">{{ s.obDetail.messageType || "—" }}</dd>
+        <dt>重试次数</dt><dd class="num">{{ s.obDetail.retryCount || 0 }}</dd>
+        <dt>大小</dt><dd class="num">{{ s.obDetail.payloadSize || 0 }}B</dd>
+        <dt>入队时间</dt><dd>{{ s.obDetail.createdAt || "—" }}</dd>
+        <dt>最近更新</dt><dd>{{ s.obDetail.updatedAt || "—" }}</dd>
+        <dt>最近错误</dt><dd class="mono" style="font-size:11.5px">{{ s.obDetail.lastError || "—" }}</dd>
+      </dl>
+      <div class="sect" style="margin-top:12px">PAYLOAD 预览（{{ s.obDetail.payloadSize || 0 }} 字节）</div>
+      <div class="codeblock">{{ s.obDetail.payloadPreview || "（空）" }}</div>
+      <p class="weak" style="font-size:11.5px;margin-top:8px">该消息仅在设备本地队列中（待发送 / 上行失败 / 上行死信），送达服务端后可在查询页查看完整投递时间线。</p>
+      <div class="m-acts">
+        <button class="btn btn-ghost btn-sm" @click="closeObDetail()">关闭</button>
+        <button class="btn btn-primary btn-sm" v-if="s.obDetail.statusText && s.obDetail.statusText.indexOf('死信')>=0" @click="closeObDetail(); retryOutbox(s.obData.indexOf(s.obDetail))">重发该消息</button>
       </div>
     </div>
   </div>

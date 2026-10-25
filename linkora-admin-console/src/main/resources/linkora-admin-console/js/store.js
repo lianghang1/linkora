@@ -46,7 +46,7 @@ window.createStore = function(Vue){
     /* 客户端页 */
     clTab: "all",               /* all | online | offline | disabled */
     cdId: "",                   /* 当前选中客户端 */
-    opsMenuOpen: false,
+    obDetail: null,             /* 发件箱本地详情（仅设备本地的消息） */
     obStatus: "",
     obData: null,               /* null=未拉取 */
     obPulling: false,

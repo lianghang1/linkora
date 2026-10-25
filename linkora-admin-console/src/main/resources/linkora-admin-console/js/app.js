@@ -32,7 +32,7 @@ window.bootApp = function(){
   }
   function logout(){
     sessionStorage.removeItem("linkora-admin-token");
-    s.token = ""; s.loggedIn = false; s.cdId = ""; s.obData = null; s.obPhase = "idle";
+    s.token = ""; s.loggedIn = false; s.cdId = ""; s.obData = null; s.obPhase = "idle"; s.obDetail = null;
     if (location.hash) history.replaceState(null, "", location.pathname + location.search);
     charts.destroyAll();
   }
@@ -72,7 +72,7 @@ window.bootApp = function(){
     }).catch(function(e){ errToast(e); if (after) after(); });
   }
   function resetClientSelection(){
-    s.cdId = ""; s.obData = null; s.obPhase = "idle"; s.obPulledAt = "";
+    s.cdId = ""; s.obData = null; s.obPhase = "idle"; s.obPulledAt = ""; s.obDetail = null;
   }
 
   /* ── 收件箱（死信 + 长时间无推进） ── */
@@ -116,6 +116,18 @@ window.bootApp = function(){
     s.msgTab = "all"; s.msgPage = 1; s.msgClient = ""; s.msgKeyword = ""; s.msgBegin = ""; s.msgEnd = "";
     loadMessages(function(){ openMessage(id); });
   }
+  /* 发件箱快照行点击：服务端有该消息 → 跳查询页完整详情；仅在设备本地 → 本地详情弹层 */
+  function openOutboxMsg(idx){
+    var r = s.obData && s.obData[idx];
+    if (!r || !r.messageId) return;
+    api("api/messages/" + encodeURIComponent(r.messageId), {tag: "obdetail"}).then(function(){
+      viewMessageFrom(r.messageId);
+    }).catch(function(e){
+      if (A.isSilent(e)) return;
+      s.obDetail = r;
+    });
+  }
+  function closeObDetail(){ s.obDetail = null; }
 
   /* ── 消息页 ── */
   function setMsgTab(t){ s.msgTab = t; s.msgPage = 1; loadMessages(); }
@@ -314,7 +326,6 @@ window.bootApp = function(){
         {method:"POST", body:{clientId: clientId, command: command, reason: reason}}); },
       function(res){ A.toast(s, command + " 已送达 " + (res.delivered || 0) + " 个连接", res.delivered ? "" : "warn"); });
   }
-  function opsMenuToggle(){ s.opsMenuOpen = !s.opsMenuOpen; }
   function cdC(){ return s.clientById(s.cdId); }
   function navClients(){
     return s.clients.filter(function(c){
@@ -441,11 +452,7 @@ window.bootApp = function(){
 
   /* ── 全局事件 ── */
   document.addEventListener("keydown", function(e){
-    if (e.key === "Escape"){ s.confirm.on = false; s.mdOpen = false; s.opsMenuOpen = false; }
-  });
-  document.addEventListener("click", function(e){
-    /* 点击菜单外关闭操作菜单 */
-    if (s.opsMenuOpen && !e.target.closest(".opsmenu")) s.opsMenuOpen = false;
+    if (e.key === "Escape"){ s.confirm.on = false; s.mdOpen = false; s.obDetail = null; }
   });
 
   /* ── 自动刷新（仅当前视图；弹窗打开时暂停） ── */
@@ -471,6 +478,8 @@ window.bootApp = function(){
         pct: function(n){ return s.clients.length ? Math.round(n / s.clients.length * 100) : 0; },
         clientPill: clientPill, shortId: shortId,
         viewMessageFrom: viewMessageFrom,
+        openOutboxMsg: openOutboxMsg,
+        closeObDetail: closeObDetail,
         setMsgTab: setMsgTab, pageMsgs: pageMsgs, pickedClient: function(){ return s.pickedClient(); },
         loadMessages: loadMessages,
         openMessage: openMessage, closeDetail: closeDetail,
@@ -481,7 +490,7 @@ window.bootApp = function(){
         setClTab: setClTab, selectClient: selectClient, navClients: navClients, clientCounts: clientCounts, cdC: cdC,
         clearFilters: clearFilters, loadInbox: loadInbox,
         toggleClient: toggleClient, kick: kick, removeClientOp: removeClientOp,
-        sendCmd: sendCmd, opsMenuToggle: opsMenuToggle,
+        sendCmd: sendCmd,
         openRegisterModal: openRegisterModal, genId: genId,
         pullOutbox: pullOutbox, retryOutbox: retryOutbox, discardOutbox: discardOutbox,
         obPhaseText: obPhaseText, obPhaseCls: obPhaseCls, obStateTag: obStateTag
