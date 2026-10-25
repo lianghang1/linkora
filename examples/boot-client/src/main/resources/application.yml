@@ -20,4 +20,4 @@ linkora:
     #   sqlite（默认）——本地 SQLite 文件，离线缓冲优先；
     #   datasource   ——复用宿主 DataSource（业务消息同库同事务，transactional
     #                    outbox），启动方式：--spring.profiles.active=datasource
-    # db-path: linkora/linkora-boot-client.db
+    # db-path: linkora/linkora-client.db（默认值，可省略）
