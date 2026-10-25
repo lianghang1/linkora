@@ -86,6 +86,19 @@ public class ClientDemoApplication {
     }
 
     /**
+     * datasource 模式的宿主数据源（-Dlinkora.client.store=datasource 时生效）：
+     * 演示用 H2 内存库，生产替换为业务库。sqlite 模式下此 Bean 不被使用
+     * （仍会创建，属无害的演示配置）。
+     */
+    @Bean
+    public javax.sql.DataSource linkoraDataSource() {
+        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
+        ds.setURL(System.getProperty("linkora.datasource.url",
+                "jdbc:h2:mem:mvc-client;DB_CLOSE_DELAY=-1"));
+        return ds;
+    }
+
+    /**
      * 业务演示：注入的 {@link LinkoraClient} 已由客户端装配启动（SSE 在线）。
      *
      * @param client 客户端装配托管的客户端

@@ -122,7 +122,7 @@ web.xml 无需任何配置。
 **注意一个已知的坑**：Spring 容器刷新完成后，嵌入式 Tomcat 会拒绝通过标准
 Servlet API 动态注册 Servlet/Filter（`IllegalStateException`）。此时必须用
 **Tomcat 原生 API** 注册（本项目 MVC 示例即此做法，可直接参考
-`examples/spring-mvc-server/server-app` 的 `SpringMvcServerMain`）：
+`examples/mvc-server` 的 `SpringMvcServerMain`）：
 
 ```java
 Tomcat tomcat = new Tomcat();
@@ -142,7 +142,7 @@ tomcatCtx.addServletMappingDecoded("/linkora-admin/*", "linkoraAdminConsoleServl
 
 ### 4.3 MVC 完整示例
 
-参考仓库 `examples/spring-mvc-server/server-app`：
+参考仓库 `examples/mvc-server`：
 
 - 启动命令：`java -Dlinkora.admin.console.token=你的令牌 -cp ... SpringMvcServerMain 1001`
 - 数据源默认连配置的 MySQL（示例连 `115.159.41.195:3306/linkora`，可用

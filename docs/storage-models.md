@@ -43,6 +43,37 @@ linkora:
   存在 `SQLITE_BUSY` 行为差异，宿主请显式声明版本
   （示例 pom 已示范）
 
+### SQLite 驱动版本要求（3.46+，重要）
+
+**来龙去脉**：linkora 父 pom 锁定 `sqlite-jdbc 3.46.1.3`，但宿主项目
+（如 mvc 示例这类独立 pom）引入 `spring-boot-dependencies` BOM 后，
+BOM 对 sqlite-jdbc 的版本管理（3.36.0.3）**优先级高于传递依赖**，
+实际解析到 3.36。
+
+**实测差异**（3.36 vs 3.46，同一场景：事务内业务写 + publish 写 +
+后台 sweep 线程周期写，全部经 TADSP 事务感知包装）：
+
+| 版本 | 行为 |
+|---|---|
+| 3.36.0.3 | 事务线程与后台线程的写锁竞争触发 `SQLITE_BUSY: database is locked`，busy_timeout=5000 未能如预期排队等待 |
+| 3.46.1.3 | 同场景正常，busy_timeout 排队生效，无 BUSY |
+
+（差异机理在驱动的锁等待实现层，未深挖驱动源码；结论以实测为准。）
+
+**处理**：宿主 pom 显式声明覆盖——
+
+```xml
+<dependency>
+    <groupId>org.xerial</groupId>
+    <artifactId>sqlite-jdbc</artifactId>
+    <version>3.46.1.3</version>
+</dependency>
+```
+
+已修复：`examples/boot-server`、`examples/mvc-server`、`examples/mvc-client`
+的 pom 均已显式锁定 3.46.1.3；仓库内模块（core/server/client/starter）
+由父 pom 统一管理不受影响。
+
 ## 内嵌模式参数
 
 `EmbeddedSqliteDatabase` 统一初始化（两端共用）：

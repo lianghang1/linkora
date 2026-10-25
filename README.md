@@ -114,12 +114,12 @@ uplinkPublisher.publish("order-status-updated", payload);
 mvn install -DskipTests
 
 # Spring Boot：终端 1 起服务端（8082），终端 2 起客户端（自动跑四向闭环输出 [PASS]）
-mvn -pl examples/spring-boot-server/server-app spring-boot:run
-mvn -pl examples/spring-boot-server/client-app spring-boot:run
+mvn -pl examples/boot-server spring-boot:run
+mvn -pl examples/boot-client spring-boot:run
 
 # Spring MVC：终端 1 起服务端（8081），终端 2 起客户端
-mvn -pl examples/spring-mvc-server/server-app compile exec:java "-Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain" "-Dexec.args=8081"
-mvn -pl examples/spring-mvc-server/client-app compile exec:java "-Dexec.mainClass=com.linkora.example.mvcclient.ClientDemoApplication"
+mvn -pl examples/mvc-server compile exec:java "-Dexec.mainClass=com.linkora.example.springmvc.SpringMvcServerMain" "-Dexec.args=8081"
+mvn -pl examples/mvc-client compile exec:java "-Dexec.mainClass=com.linkora.example.mvcclient.ClientDemoApplication"
 ```
 
 服务端启动后，管理接口演示端点可直接体验（生产必须自行加鉴权）：

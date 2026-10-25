@@ -68,5 +68,5 @@ git add -A; git commit -m '进入 0.3.0-SNAPSHOT 开发'
   给全部模块注入 `altDeploymentRepository`（公司 nexus）。示例被 central-publishing 的
   `excludeArtifacts` 排除后会回落到默认 deploy 行为，把正式版推向公司 nexus snapshots
   而被 400 拒绝；examples 聚合 pom 上的 skip 属性只罩得住有父级链的模块
-  （plain-java/tx），boot/mvc 四个独立 pom 必须在各自 properties 里声明
+  （testkit），examples 四个应用随仓库聚合构建，独立 pom 的 boot/mvc 示例在各自 properties 里声明
   （maven-deploy-plugin 识别 `maven.deploy.skip`，与 central-publishing 不识别是两回事）。
