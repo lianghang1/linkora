@@ -6,7 +6,7 @@
 ## 启动
 
 ```bash
-# sqlite 模式（默认）：内嵌 ./data/linkora-server.db，零配置
+# sqlite 模式（默认）：内嵌 ./linkora/linkora-server.db，零配置
 mvn spring-boot:run
 # datasource 模式：宿主 H2 内存库演示，生产替换 spring.datasource 为业务库
 mvn spring-boot:run -Dspring-boot.run.profiles=datasource

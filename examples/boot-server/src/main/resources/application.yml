@@ -9,12 +9,12 @@ linkora:
   server:
     enabled: true
     # 存储模式（0.5.0，与服务端/客户端对等）：
-    #   sqlite（默认）——内嵌 ./data/linkora-server.db，零配置起步，
+    #   sqlite（默认）——内嵌 ./linkora/linkora-server.db，零配置起步，
     #                    适用于开发/演示/小规模部署；
     #   datasource   ——复用宿主 DataSource（业务消息同库同事务），生产推荐，
     #                    启动方式：--spring.profiles.active=datasource
     # 本文件即 sqlite 模式的全部配置；无需数据库连接。
-    # db-path: ./data/linkora-server.db
+    # db-path: ./linkora/linkora-server.db
     # 演示用：未配置认证器时显式允许匿名（生产必须配置 HmacClientAuthenticator，见 docs/security.md）
     allow-anonymous: true
     # 启动时自动注册的演示客户端（幂等）

@@ -19,7 +19,7 @@ public class LinkoraClientProperties {
     private String clientId;
     /** SQLite 本地队列文件路径；未设置时要求宿主自行提供 ClientStore bean。 */
     /** sqlite 模式的本地队列文件路径（与服务端 db-path 对等，默认即可零配置运行）。 */
-    private String dbPath = "./data/linkora-client.db";
+    private String dbPath = "./linkora/linkora-client.db";
 
     /**
      * 存储模式（0.5.0 起，与服务端对等）：

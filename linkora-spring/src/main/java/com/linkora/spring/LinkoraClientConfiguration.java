@@ -52,7 +52,7 @@ public class LinkoraClientConfiguration {
         }
         return LinkoraClientAssembler.sqliteStore(
                 environment.getProperty("linkora.client.db-path",
-                        "./data/linkora-client.db"));
+                        "./linkora/linkora-client.db"));
     }
 
     /**

@@ -31,7 +31,7 @@ public class LinkoraServerProperties {
     private String store = "sqlite";
 
     /** sqlite 模式的数据库文件路径。 */
-    private String dbPath = "./data/linkora-server.db";
+    private String dbPath = "./linkora/linkora-server.db";
 
     /**
      * 未提供 ClientAuthenticator 时是否允许回退为"放行全部请求"。

@@ -28,7 +28,7 @@ import javax.sql.DataSource;
  *
  * <p>存储模式（0.5.0，与 Boot 示例对等），由系统属性 {@code linkora.store} 切换：</p>
  * <ul>
- *   <li>{@code sqlite}（默认）：内嵌 SQLite 文件（{@code ./data/linkora-mvc-server.db}），
+ *   <li>{@code sqlite}（默认）：内嵌 SQLite 文件（{@code ./linkora/linkora-mvc-server.db}），
  *       零配置起步；</li>
  *   <li>{@code mysql}：远程 MySQL（datasource 模式，业务消息同库同事务），
  *       测试可用 {@code linkora.datasource.url} 指向 H2 内存库覆盖。</li>
@@ -52,7 +52,7 @@ public class AppConfig implements WebMvcConfigurer {
     @Bean(destroyMethod = "close")
     public EmbeddedSqliteDatabase embeddedDb() {
         return EmbeddedSqliteDatabase.atFile(
-                System.getProperty("linkora.db-path", "./data/linkora-mvc-server.db"));
+                System.getProperty("linkora.db-path", "./linkora/linkora-mvc-server.db"));
     }
 
     @Bean

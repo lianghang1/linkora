@@ -82,7 +82,7 @@ public class LinkoraServerAutoConfiguration {
             havingValue = "sqlite", matchIfMissing = true)
     public EmbeddedSqliteDatabase linkoraEmbeddedServerDb(LinkoraServerProperties properties) {
         EmbeddedSqliteDatabase db = EmbeddedSqliteDatabase.atFile(
-                properties.getDbPath() == null ? "./data/linkora-server.db"
+                properties.getDbPath() == null ? "./linkora/linkora-server.db"
                         : properties.getDbPath());
         JdbcServerSchema.migrate(db.dataSource());
         log.info("Linkora 服务端存储模式: sqlite（内嵌 {}）。"

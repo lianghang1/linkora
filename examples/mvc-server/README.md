@@ -7,7 +7,7 @@
 
 ```bash
 mvn package dependency:build-classpath -Dmdep.outputFile=target/cp.txt
-# sqlite 模式（默认）：内嵌 ./data/linkora-mvc-server.db
+# sqlite 模式（默认）：内嵌 ./linkora/linkora-mvc-server.db
 java -Dlinkora.store=sqlite -Dlinkora.admin.console.token=令牌 \
      -cp "target/classes:$(cat target/cp.txt)" \
      com.linkora.example.springmvc.SpringMvcServerMain 8081

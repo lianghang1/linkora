@@ -16,10 +16,10 @@ Linkora 0.5.0 起，**服务端与客户端存储模型完全对等**：引擎�
 linkora:
   server:
     store: sqlite            # sqlite | datasource
-    db-path: ./data/linkora-server.db   # 仅 sqlite 模式
+    db-path: ./linkora/linkora-server.db   # 仅 sqlite 模式
   client:
     store: sqlite            # sqlite | datasource
-    db-path: ./data/linkora-client.db   # 仅 sqlite 模式
+    db-path: ./linkora/linkora-client.db   # 仅 sqlite 模式
 ```
 
 - `store=datasource` 要求宿主存在 DataSource Bean；缺省时启动快速失败并给出指引
