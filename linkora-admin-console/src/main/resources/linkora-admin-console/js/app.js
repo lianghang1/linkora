@@ -28,6 +28,7 @@ window.bootApp = function(){
   function logout(){
     sessionStorage.removeItem("linkora-admin-token");
     s.token = ""; s.loggedIn = false; s.cdId = ""; s.obData = null; s.obPhase = "idle";
+    s.cmdHistory.forEach(stopCmdPoll); s.cmdHistory = [];
     charts.destroyAll();
   }
   function boot(){
@@ -48,7 +49,9 @@ window.bootApp = function(){
   function refreshCurrent(){
     if (s.view === "cockpit") refreshCockpit();
     else if (s.view === "messages") loadMessages();
+    else if (s.view === "dead") loadDead();
     else if (s.view === "clients") loadClients();
+    else if (s.view === "remote") loadClients();
   }
 
   /* ── 客户端列表（概览与客户端页共用数据源） ── */
@@ -235,6 +238,105 @@ window.bootApp = function(){
       });
     s.confirm.extra = "ft";
     s.confirmExtra = {ftMsgId: "", ftTarget: "RETRYING"};
+  }
+
+  /* ── 死信页（真实死信数据，按客户端聚合） ── */
+  function loadDead(){
+    s.deadLoading = true; s.deadError = "";
+    var targets = s.clients.filter(function(c){
+      return s.deadClient ? c.clientId === s.deadClient : c.deadLetterCount > 0;
+    });
+    if (!targets.length){ s.deadRows = []; s.deadLoading = false; return; }
+    var jobs = targets.map(function(c){
+      return api("api/dead-letters?clientId=" + encodeURIComponent(c.clientId), {tag: "dl:" + c.clientId})
+        .then(function(l){ return l || []; });
+    });
+    Promise.all(jobs).then(function(groups){
+      s.deadLoading = false;
+      s.deadRows = [].concat.apply([], groups);
+    }).catch(function(e){
+      s.deadLoading = false;
+      if (!A.isSilent(e)) s.deadError = e.error || "加载失败";
+    });
+  }
+  function clearFilters(){
+    s.msgClient = ""; s.msgSearch = ""; s.msgBegin = ""; s.msgEnd = ""; s.msgPage = 1;
+    loadMessages();
+  }
+
+  /* ── 远程操作页（六态状态机，提交 ≠ 执行完成） ── */
+  function nowTime(){ return new Date().toLocaleTimeString("zh-CN", {hour12:false}); }
+  function submitRemote(){
+    var cid = s.remoteClientId, cmd = s.remoteCmd, reason = (s.remoteReason || "").trim();
+    if (!cid){ A.toast(s, "请选择目标客户端", "warn"); return; }
+    if (!reason){ A.toast(s, "请填写操作原因（必填留痕）", "warn"); return; }
+    if (s.remoteBusy) return;
+    s.remoteBusy = true;
+    var entry = {id: Date.now(), time: nowTime(), clientId: cid, command: cmd,
+                 phase: "submitted", queryId: "", raw: "", error: "", timer: null};
+    s.cmdHistory.unshift(entry);
+    api("api/actions/client-command", {method: "POST",
+      body: {clientId: cid, command: cmd, reason: reason}}).then(function(res){
+      s.remoteBusy = false;
+      if (cmd === "PING"){
+        /* PING 无异步结果回调、无 queryId：送达即探测完成（避免误判为失败） */
+        entry.phase = "done";
+        entry.raw = "指令已送达 " + (res.delivered || 0) + " 个活动连接（PING 为同步探测，送达即完成，无异步回执）";
+        return;
+      }
+      if (!res.queryId){
+        entry.phase = "failed";
+        entry.error = "指令未送达（客户端可能离线）";
+        return;
+      }
+      entry.queryId = res.queryId; entry.phase = "waiting";
+      pollCmd(entry);
+    }).catch(function(e){
+      s.remoteBusy = false;
+      entry.phase = "failed";
+      entry.error = e.error || "下发失败";
+    });
+  }
+  function pollCmd(entry){
+    var n = 0, MAX = 15, INTERVAL = 2000;
+    entry.timer = setInterval(function(){
+      api("api/command-result/" + encodeURIComponent(entry.queryId), {tag: "cmd:" + entry.id}).then(function(r){
+        if (!r.result){
+          if (++n >= MAX){ stopCmdPoll(entry); entry.phase = "unknown"; }
+          return;
+        }
+        stopCmdPoll(entry); entry.phase = "done";
+        if (entry.command === "QUERY_OUTBOX"){
+          try {
+            var parsed = JSON.parse(r.result);
+            entry.raw = JSON.stringify(parsed, null, 2);
+          } catch(e){ entry.raw = r.result; }
+        } else {
+          entry.raw = r.result;
+        }
+      }).catch(function(e){
+        stopCmdPoll(entry); entry.phase = "failed";
+        entry.error = e.error || "查询回执失败";
+      });
+    }, INTERVAL);
+  }
+  function stopCmdPoll(entry){ if (entry.timer){ clearInterval(entry.timer); entry.timer = null; } }
+  function requeryRemote(entry){
+    if (entry.phase !== "unknown" && entry.phase !== "timeout") return;
+    entry.phase = "waiting"; entry.error = "";
+    pollCmd(entry);
+  }
+  function clearRemoteHistory(){ s.cmdHistory.forEach(stopCmdPoll); s.cmdHistory = []; }
+  function cmdPhaseText(e){
+    switch (e.phase){
+      case "submitted": return "已提交";
+      case "waiting":   return "等待回执";
+      case "done":      return "已完成";
+      case "failed":    return "失败";
+      case "timeout":   return "超时";
+      case "unknown":   return "暂未取得结果";
+      default:          return "";
+    }
   }
 
   /* ── 客户端页 ── */
@@ -438,12 +540,16 @@ window.bootApp = function(){
         clientPill: clientPill, shortId: shortId,
         viewMessageFrom: viewMessageFrom,
         setMsgTab: setMsgTab, pageMsgs: pageMsgs, pickedClient: function(){ return s.pickedClient(); },
+        loadMessages: loadMessages,
         openMessage: openMessage, closeDetail: closeDetail,
         goClientMessages: goClientMessages,
         detailState: detailState, detailStateText: detailStateText, prettyPayload: prettyPayload,
         retryTask: retryTask, skipTask: skipTask, batchSkip: batchSkip,
         forceTransitionModal: forceTransitionModal, confirmSubmit: confirmSubmit,
         setClTab: setClTab, selectClient: selectClient, navClients: navClients, clientCounts: clientCounts, cdC: cdC,
+        clearFilters: clearFilters, loadDead: loadDead,
+        submitRemote: submitRemote, requeryRemote: requeryRemote,
+        clearRemoteHistory: clearRemoteHistory, cmdPhaseText: cmdPhaseText,
         toggleClient: toggleClient, kick: kick, removeClientOp: removeClientOp,
         sendCmd: sendCmd, opsMenuToggle: opsMenuToggle,
         openRegisterModal: openRegisterModal, genId: genId,

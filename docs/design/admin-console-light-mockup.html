@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linkora 运维控制台 · 浅色设计稿（静态）</title>
+<style>
+:root{
+  --bg:#F5F6F8; --panel:#FFFFFF; --panel-2:#F3F5F7; --hover:#ECEFF3;
+  --border:#DFE3E9; --border-weak:#E8EBEF;
+  --text:#222834; --text-2:#5C6572; --text-3:#8B95A5;
+  --accent:#3B6FE0; --accent-bg:#E9F0FD;
+  --ok:#189A6C; --warn:#B57C1E; --bad:#D2504A; --mut:#8B95A5;
+  --ok-bg:rgba(24,154,108,.09); --warn-bg:rgba(181,124,30,.10); --bad-bg:rgba(210,80,74,.09); --mut-bg:rgba(139,149,165,.08);
+  --r-lg:10px; --r-md:8px; --r-sm:6px;
+  --mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:13.5px;line-height:1.5}
+button{border:none;background:none;color:inherit;font-family:inherit;cursor:pointer;font-size:inherit}
+input,select{font-family:inherit;color:var(--text)}
+a{color:var(--accent);text-decoration:none;cursor:pointer}
+a:hover{color:#5B84E8}
+.mono{font-family:var(--mono)}
+.weak{color:var(--text-3);font-size:12px}
+.note{position:fixed;right:14px;bottom:12px;z-index:99;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-3)}
+
+/* 顶部导航 */
+.topbar{display:flex;align-items:center;gap:18px;height:56px;padding:0 26px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;background:var(--bg)}
+.logo{display:flex;align-items:center;gap:8px;font-weight:650;font-size:14.5px}
+.logo .mark{width:22px;height:22px;border-radius:6px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff}
+.mainnav{display:flex;gap:1px}
+.mainnav a{padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text-2);transition:all .13s}
+.mainnav a:hover{color:var(--text);background:var(--hover)}
+.mainnav a.on{color:var(--accent);background:var(--accent-bg);font-weight:550}
+.mainnav .dn{font-family:var(--mono);font-size:10.5px;color:var(--bad);margin-left:5px}
+.topbar .sp{flex:1}
+.syschip{display:flex;align-items:center;gap:7px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);font-size:11.5px;color:var(--text-2)}
+.syschip i{width:6px;height:6px;border-radius:50%;background:var(--ok)}
+.icon-btn{width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:var(--text-2)}
+.icon-btn:hover{background:var(--hover);color:var(--text)}
+.icon-btn svg{width:14px;height:14px}
+
+/* 页面 */
+.page{display:none;max-width:1400px;margin:0 auto;padding:22px 28px 50px}
+.page.on{display:block}
+.page-head{margin-bottom:16px}
+.page-head h1{font-size:18px;font-weight:650}
+.page-head .sub{margin-top:2px;font-size:12.5px;color:var(--text-2)}
+.headrow{display:flex;align-items:flex-start;gap:12px}
+.headrow .sp{flex:1}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 13px;border-radius:6px;font-size:12.5px;font-weight:500;transition:all .12s;border:1px solid transparent;white-space:nowrap}
+.btn-sm{height:27px;padding:0 10px;font-size:12px;border-radius:5px}
+.btn-primary{background:var(--accent);color:#FFFFFF}
+.btn-primary:hover{background:#4D80E8}
+.btn-outline{border-color:var(--border);color:var(--text-2)}
+.btn-outline:hover{color:var(--text);border-color:var(--text-3)}
+.btn-ghost{color:var(--text-2)}
+.btn-ghost:hover{background:var(--hover);color:var(--text)}
+.btn-danger{background:var(--bad-bg);color:var(--bad);border-color:rgba(210,80,74,.28)}
+.btn-tint{background:var(--accent-bg);color:var(--accent);border-color:rgba(59,111,224,.28)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.icon-btn svg{width:14px;height:14px}
+
+/* 指标（紧凑、同色系） */
+.krow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+.kcard{background:var(--panel);border:1px solid var(--border-weak);border-radius:8px;padding:13px 15px}
+.kcard .lbl{font-size:12px;color:var(--text-2)}
+.kcard .val{font-family:var(--mono);font-size:24px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+.kcard .sub{font-size:11px;color:var(--text-3);margin-top:1px}
+.kcard.link{cursor:pointer;transition:border-color .12s}
+.kcard.link:hover{border-color:var(--text-3)}
+.kcard .val.bad{color:var(--bad)}
+
+/* 面板 */
+.panel{background:var(--panel);border:1px solid var(--border-weak);border-radius:8px;padding:14px 16px}
+.panel h3{font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px}
+.panel h3 .sp{flex:1}
+.grid-2{display:grid;grid-template-columns:1fr 320px;gap:10px;margin-bottom:10px}
+.grid-2b{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--text-2)}
+.legend i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:5px}
+.chartbox svg{width:100%;height:170px;display:block}
+.donut-wrap{display:flex;align-items:center;gap:18px;margin-top:10px}
+.donut-c{position:relative;flex:none}
+.donut-c .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.donut-c .c b{font-family:var(--mono);font-size:20px}
+.donut-c .c span{font-size:10.5px;color:var(--text-3)}
+.dlegend{display:flex;flex-direction:column;gap:8px;font-size:12px;flex:1}
+.dlegend .row2{display:flex;align-items:center;gap:8px;color:var(--text-2)}
+.dlegend .row2 b{margin-left:auto;font-family:var(--mono);color:var(--text)}
+
+/* 需要关注 */
+.attention{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.att-item{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border-weak);border-radius:8px;padding:12px 15px;cursor:pointer;transition:border-color .12s}
+.att-item:hover{border-color:var(--text-3)}
+.att-item .ico{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex:none}
+.att-item .ico svg{width:15px;height:15px}
+.att-item .t{font-size:12.5px;font-weight:550}
+.att-item .d{font-size:11.5px;color:var(--text-3);margin-top:1px}
+.att-item .go{margin-left:auto;color:var(--text-3);font-size:12px}
+.att-item:hover .go{color:var(--accent)}
+
+/* 表格 */
+.tbl-wrap{overflow-x:auto;margin-top:10px}
+table.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th{text-align:left;padding:8px 11px;font-size:11px;font-weight:550;color:var(--text-3);border-bottom:1px solid var(--border);white-space:nowrap}
+.tbl td{padding:10.5px 11px;border-bottom:1px solid var(--border-weak);vertical-align:middle;white-space:nowrap}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr{cursor:pointer;transition:background .12s}
+.tbl tbody tr:hover{background:var(--hover)}
+.tbl tbody tr.sel{background:var(--accent-bg)}
+
+/* 状态标签（图标+文字） */
+.tag{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:500}
+.tag svg{width:10px;height:10px}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.tag.bad{background:var(--bad-bg);color:var(--bad)}
+.tag.mut{background:var(--mut-bg);color:var(--mut)}
+.tag.acc{background:var(--accent-bg);color:var(--accent)}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+
+/* 工具栏 */
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.fsel,.fin{height:31px;padding:0 10px;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);font-size:12.5px;outline:none;transition:border-color .12s}
+.fsel:focus,.fin:focus{border-color:var(--accent)}
+.fin{width:210px}
+.fdate{height:31px;padding:0 8px;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);font-size:12.5px;color-scheme:dark}
+.clearbtn{font-size:12px;color:var(--text-3)}
+.clearbtn:hover{color:var(--text)}
+.seg{display:flex;gap:1px;padding:2px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border-weak)}
+.seg button{padding:6px 13px;border-radius:5px;font-size:12.5px;color:var(--text-2)}
+.seg button .n{font-family:var(--mono);font-size:10.5px;color:var(--text-3);margin-left:4px}
+.seg button.on{background:var(--hover);color:var(--text)}
+
+/* 主从布局 */
+.split{display:grid;grid-template-columns:58fr 42fr;gap:0;align-items:start;background:var(--panel);border:1px solid var(--border-weak);border-radius:8px;overflow:hidden}
+.split > .list-col{padding:10px 12px 12px;border-right:1px solid var(--border-weak)}
+.split > .detail-col{padding:14px 17px 18px;min-height:420px}
+.pager{display:flex;align-items:center;gap:9px;padding:12px 2px 0;font-size:11.5px;color:var(--text-3)}
+.pager .sp{flex:1}
+.pager button{height:27px;padding:0 11px;border-radius:5px;border:1px solid var(--border);color:var(--text-2);font-size:11.5px}
+.pager button:disabled{opacity:.4;cursor:not-allowed}
+.detail-title{display:flex;align-items:center;gap:9px;padding-bottom:10px;border-bottom:1px solid var(--border-weak);margin-bottom:12px}
+.detail-title h3{font-family:var(--mono);font-size:13.5px;font-weight:600;cursor:pointer}
+.detail-title h3:hover{color:var(--accent)}
+.detail-title .sp{flex:1}
+.dtabs{display:flex;gap:13px;margin-bottom:13px}
+.dtabs button{font-size:12px;color:var(--text-3);padding:3px 0;border-bottom:1.5px solid transparent}
+.dtabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+.kv{display:grid;grid-template-columns:88px 1fr;gap:7px 11px;font-size:12.5px}
+.kv dt{color:var(--text-3)}
+.kv dd{word-break:break-all}
+.sect{font-size:10.5px;font-weight:600;color:var(--text-3);letter-spacing:.07em;margin:15px 0 7px;display:flex;align-items:center}
+.codeblock{background:#1D2430;border:1px solid #2A3342;border-radius:6px;padding:11px 13px;font-family:var(--mono);font-size:11.5px;color:#C6D1E2;white-space:pre-wrap;word-break:break-all;max-height:230px;overflow-y:auto;position:relative}
+.copybtn{position:absolute;top:7px;right:7px;font-size:10.5px;color:var(--text-3);background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:2px 7px}
+.copybtn:hover{color:var(--text)}
+.tl{position:relative;padding-left:18px}
+.tl-item{position:relative;padding-bottom:12px}
+.tl-item::before{content:"";position:absolute;left:-14px;top:5px;width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.tl-item.err::before{background:var(--bad)}
+.tl-item.mut::before{background:var(--text-3)}
+.tl-item:not(:last-child)::after{content:"";position:absolute;left:-11px;top:14px;bottom:-2px;width:1px;background:var(--border)}
+.tl-item .t{font-size:10.5px;color:var(--text-3);font-family:var(--mono)}
+.tl-item .n{font-size:12px;margin-top:2px;color:var(--text-2)}
+.empty{padding:36px 0;text-align:center;color:var(--text-3);font-size:12.5px}
+.skeleton{height:11px;border-radius:4px;background:linear-gradient(90deg,rgba(148,155,169,.06),rgba(148,155,169,.14),rgba(148,155,169,.06));background-size:200% 100%;animation:sk 1.2s infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* 客户端详情操作 */
+.oprow{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+.opsmenu{position:relative;display:inline-block}
+.opsmenu .menu{position:absolute;right:0;top:33px;min-width:140px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:4px;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.opsmenu .menu button{display:block;width:100%;text-align:left;padding:7px 10px;border-radius:5px;font-size:12px;color:var(--text-2)}
+.opsmenu .menu button:hover{background:var(--hover);color:var(--text)}
+.opsmenu .menu button.danger{color:var(--bad)}
+.switch{width:32px;height:18px;border-radius:99px;background:var(--border);position:relative;cursor:pointer;flex:none}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--text-2);transition:left .15s}
+.switch.on{background:var(--accent)}
+.switch.on::after{left:16px;background:#fff}
+
+/* 死信页 */
+.reason{font-size:12px;color:var(--text-2);max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.batchbar{display:flex;align-items:center;gap:9px;margin:10px 0;padding:9px 13px;border-radius:6px;background:var(--bad-bg);border:1px solid rgba(210,80,74,.24);font-size:12px;color:var(--text-2)}
+
+/* 远程操作 */
+.cmdform{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+.cmdform .full{grid-column:1/-1}
+.cmdform label{display:block;font-size:11.5px;color:var(--text-2);margin-bottom:5px}
+.cmdstate{display:flex;align-items:center;gap:9px;margin-top:12px;padding:10px 13px;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);font-size:12.5px}
+.cmdstate .spin{width:13px;height:13px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cmdstate .st{font-weight:600}
+.cmdstate.ok .st{color:var(--ok)} .cmdstate.warn .st{color:var(--warn)} .cmdstate.bad .st{color:var(--bad)}
+
+/* Toast 占位说明 */
+.mock-note{position:fixed;left:14px;bottom:12px;z-index:99;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:11px;color:var(--text-3);max-width:320px}
+
+@media (max-width:1024px){
+  .split{grid-template-columns:1fr}
+  .split > .list-col{border-right:none;border-bottom:1px solid var(--border-weak)}
+  .krow,.attention,.grid-2b{grid-template-columns:1fr 1fr}
+  .grid-2{grid-template-columns:1fr}
+  .page{padding:16px 14px 40px}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo"><span class="mark"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>Linkora</div>
+  <nav class="mainnav">
+    <a href="#" class="on" data-p="cockpit" onclick="go('cockpit');return false">概览</a>
+    <a href="#" data-p="messages" onclick="go('messages');return false">消息</a>
+    <a href="#" data-p="clients" onclick="go('clients');return false">客户端</a>
+    <a href="#" data-p="dead" onclick="go('dead');return false">死信<span class="dn">2</span></a>
+    <a href="#" data-p="remote" onclick="go('remote');return false">远程操作</a>
+  </nav>
+  <span class="sp"></span>
+  <div class="syschip"><i></i>系统正常 · 10s</div>
+  <button class="icon-btn" title="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+</header>
+
+<!-- ═══ 概览 ═══ -->
+<div class="page on" id="p-cockpit">
+  <div class="page-head headrow">
+    <div><h1>概览</h1><div class="sub">系统运行正常 · 最近更新 10:38:22</div></div>
+    <span class="sp"></span>
+    <button class="btn btn-outline btn-sm">刷新</button>
+  </div>
+  <div class="krow">
+    <div class="kcard"><div class="lbl">客户端总数</div><div class="val">5</div><div class="sub">在线 3 · 离线 1 · 禁用 1</div></div>
+    <div class="kcard"><div class="lbl">在线客户端</div><div class="val">3</div><div class="sub">在线率 60%</div></div>
+    <div class="kcard"><div class="lbl">未完成投递</div><div class="val">6</div><div class="sub">推送中 / 重试中</div></div>
+    <div class="kcard link" onclick="go('dead')"><div class="lbl">死信</div><div class="val bad">2</div><div class="sub">点击进入死信处理 →</div></div>
+  </div>
+  <div class="attention">
+    <div class="att-item" onclick="go('dead')">
+      <span class="ico" style="background:var(--bad-bg);color:var(--bad)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+      <div><div class="t">2 条死信待处理</div><div class="d">store-001、kiosk-001 · 重试耗尽</div></div>
+      <span class="go">去处理 ›</span>
+    </div>
+    <div class="att-item" onclick="go('clients')">
+      <span class="ico" style="background:var(--warn-bg);color:var(--warn)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
+      <div><div class="t">1 个客户端离线</div><div class="d">kiosk-001 · 上次活跃 09:12</div></div>
+      <span class="go">查看 ›</span>
+    </div>
+    <div class="att-item" onclick="go('messages');setSeg('pending')">
+      <span class="ico" style="background:var(--accent-bg);color:var(--accent)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+      <div><div class="t">6 条未完成投递</div><div class="d">其中 2 条重试中</div></div>
+      <span class="go">查看 ›</span>
+    </div>
+  </div>
+  <div class="grid-2">
+    <div class="panel">
+      <h3>消息发布趋势<span class="sp"></span><span class="legend"><span><i style="background:var(--accent)"></i>每日发布量</span><span class="weak">近 7 日</span></span></h3>
+      <div class="chartbox">
+        <svg viewBox="0 0 760 170" preserveAspectRatio="none">
+          <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3B6FE0" stop-opacity=".18"/><stop offset="100%" stop-color="#3B6FE0" stop-opacity="0"/></linearGradient></defs>
+          <line x1="0" y1="42" x2="760" y2="42" stroke="#E3E7ED" stroke-width="1"/>
+          <line x1="0" y1="85" x2="760" y2="85" stroke="#E3E7ED" stroke-width="1"/>
+          <line x1="0" y1="128" x2="760" y2="128" stroke="#E3E7ED" stroke-width="1"/>
+          <path d="M12 118 L134 96 L256 128 L378 74 L500 105 L622 62 L744 85 L744 148 L12 148 Z" fill="url(#ag)"/>
+          <path d="M12 118 L134 96 L256 128 L378 74 L500 105 L622 62 L744 85" fill="none" stroke="#3B6FE0" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="12" cy="118" r="3" fill="#FFFFFF" stroke="#3B6FE0" stroke-width="2"/>
+          <circle cx="134" cy="96" r="3" fill="#FFFFFF" stroke="#3B6FE0" stroke-width="2"/>
+          <circle cx="256" cy="128" r="3" fill="#FFFFFF" stroke="#3B6FE0" stroke-width="2"/>
+          <circle cx="378" cy="74" r="3" fill="#FFFFFF" stroke="#3B6FE0" stroke-width="2"/>
+          <circle cx="500" cy="105" r="3" fill="#FFFFFF" stroke="#3B6FE0" stroke-width="2"/>
+          <circle cx="622" cy="62" r="3" fill="#FFFFFF" stroke="#3B6FE0" stroke-width="2"/>
+          <circle cx="744" cy="85" r="3" fill="#FFFFFF" stroke="#3B6FE0" stroke-width="2"/>
+        </svg>
+        <div class="chart-x" style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-3);font-family:var(--mono)"><span>10-19</span><span>10-20</span><span>10-21</span><span>10-22</span><span>10-23</span><span>10-24</span><span>10-25</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>客户端状态</h3>
+      <div class="donut-wrap">
+        <div class="donut-c" style="width:120px;height:120px"><svg viewBox="0 0 120 120" width="120" height="120">
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#E3E7ED" stroke-width="12"/>
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#1E9E72" stroke-width="12" stroke-dasharray="181 302" transform="rotate(-90 60 60)"/>
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#D7DCE3" stroke-width="12" stroke-dasharray="60 302" stroke-dashoffset="-181" transform="rotate(-90 60 60)"/>
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#C9922F" stroke-width="12" stroke-dasharray="60 302" stroke-dashoffset="-242" transform="rotate(-90 60 60)"/>
+        </svg><div class="c"><b>5</b><span>总数</span></div></div>
+        <div class="dlegend">
+          <div class="row2"><i style="background:var(--ok)"></i>在线<b>3 · 60%</b></div>
+          <div class="row2"><i style="background:var(--mut)"></i>离线<b>1 · 20%</b></div>
+          <div class="row2"><i style="background:var(--warn)"></i>已禁用<b>1 · 20%</b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>最近消息<span class="sp"></span><a class="btn-ghost btn-sm" onclick="go('messages')">全部 ›</a></h3>
+    <div class="tbl-wrap"><table class="tbl">
+      <thead><tr><th>类型</th><th>客户端</th><th>状态</th><th>重试</th><th>创建时间</th><th></th></tr></thead>
+      <tbody>
+        <tr><td class="mono">NOTICE</td><td class="mono">store-001</td><td><span class="tag ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px"><polyline points="20 6 9 17 4 12"/></svg>处理成功</span></td><td>0</td><td class="weak mono">10-25 09:41</td><td><button class="btn btn-ghost btn-sm">详情</button></td></tr>
+        <tr><td class="mono">BIZ</td><td class="mono">store-002</td><td><span class="tag warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>重试中</span></td><td>2</td><td class="weak mono">10-25 09:22</td><td><button class="btn btn-ghost btn-sm">详情</button></td></tr>
+        <tr><td class="mono">SYNC</td><td class="mono">kiosk-001</td><td><span class="tag bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="width:10px;height:10px"><circle cx="12" cy="12" r="9"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>死信</span></td><td>5</td><td class="weak mono">10-25 08:07</td><td><button class="btn btn-ghost btn-sm">详情</button></td></tr>
+      </tbody></table></div>
+  </div>
+</div>
+
+<!-- ═══ 消息 ═══ -->
+<div class="page" id="p-messages">
+  <div class="page-head"><h1>消息</h1><div class="sub">查看消息、追踪投递状态与处理异常</div></div>
+  <div class="toolbar">
+    <input class="fin mono" placeholder="搜索消息 ID…" style="width:200px">
+    <span class="weak" style="margin-left:6px">客户端</span>
+    <select class="fsel" style="width:150px"><option>全部客户端</option><option>store-001</option><option>store-002</option><option>store-003</option><option>kiosk-001</option><option>kiosk-002</option></select>
+    <span class="weak" style="margin:0 2px">状态</span>
+    <select class="fsel" style="width:120px"><option>全部状态</option><option>已接受</option><option>重试中</option><option>死信</option><option>处理成功</option><option>已过期</option></select>
+    <span class="weak" style="margin:0 2px">时间</span>
+    <select class="fsel" style="width:112px"><option>最近 24 小时</option><option>最近 7 天</option><option>全部</option></select>
+    <span class="clearbtn" onclick="alert('演示：清除全部筛选')">清除筛选</span>
+    <span style="flex:1"></span>
+    <button class="btn btn-outline btn-sm">刷新</button>
+  </div>
+  <div class="toolbar" style="margin-bottom:10px">
+    <div class="seg">
+      <button class="on">全部消息<span class="n">64</span></button>
+      <button onclick="alert('演示：切到未完成投递')">未完成投递<span class="n">6</span></button>
+      <button onclick="go('dead')">死信消息<span class="n">2</span></button>
+    </div>
+  </div>
+  <div class="split">
+    <div class="list-col">
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>消息 ID</th><th>类型</th><th>客户端</th><th>状态</th><th>重试</th><th>更新时间</th></tr></thead>
+        <tbody>
+          <tr class="sel" onclick="sel(this)"><td class="mono" style="font-size:12px">msg-2026-1031</td><td>NOTICE</td><td class="mono">store-001</td><td><span class="tag acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:10px;height:10px"><circle cx="12" cy="12" r="5.5" fill="currentColor" stroke="none"/></svg>已接受</span></td><td>0</td><td class="weak mono">09:41:22</td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12px">msg-2026-1028</td><td>BIZ</td><td class="mono">store-002</td><td><span class="tag warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>重试中</span></td><td>2</td><td class="weak mono">09:22:08</td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12px">msg-2026-1024</td><td>SYNC</td><td class="mono">kiosk-001</td><td><span class="tag bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="width:10px;height:10px"><circle cx="12" cy="12" r="9"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>死信</span></td><td>5</td><td class="weak mono">08:07:41</td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12px">msg-2026-1020</td><td>NOTICE</td><td class="mono">store-001</td><td><span class="tag ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px"><polyline points="20 6 9 17 4 12"/></svg>处理成功</span></td><td>0</td><td class="weak mono">07:58:13</td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12px">msg-2026-1017</td><td>BIZ</td><td class="mono">store-003</td><td><span class="tag acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:10px;height:10px"><circle cx="12" cy="12" r="5.5" fill="currentColor" stroke="none"/></svg>已接受</span></td><td>0</td><td class="weak mono">07:41:56</td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12px">msg-2026-1012</td><td>NOTICE</td><td class="mono">store-002</td><td><span class="tag ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:10px;height:10px"><polyline points="20 6 9 17 4 12"/></svg>处理成功</span></td><td>0</td><td class="weak mono">07:12:30</td></tr>
+        </tbody></table></div>
+      <div class="pager"><span>第 1 页 · 每页 20 条</span><span class="sp"></span><button disabled>‹ 上一页</button><button>下一页 ›</button></div>
+    </div>
+    <div class="detail-col">
+      <div class="detail-title"><h3 id="dTitle">msg-2026-1031</h3><span class="sp"></span><button class="icon-btn" title="复制 ID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <div class="dtabs"><button class="on">Basic Info</button><button>Payload</button><button>Delivery Records</button></div>
+      <dl class="kv">
+        <dt>状态</dt><dd><span class="tag acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:10px;height:10px"><circle cx="12" cy="12" r="5.5" fill="currentColor" stroke="none"/></svg>已接受，等待推送</span></dd>
+        <dt>类型</dt><dd>NOTICE</dd>
+        <dt>客户端</dt><dd class="mono">store-001</dd>
+        <dt>顺序键</dt><dd class="mono">store-001-seq</dd>
+        <dt>创建时间</dt><dd class="mono num">2026-10-25 09:41:20</dd>
+        <dt>过期时间</dt><dd class="mono num">不过期</dd>
+        <dt>大小 / 追踪</dt><dd class="num">53 字节 · <span class="mono">trace-0-0</span></dd>
+      </dl>
+      <div class="sect">PAYLOAD<button class="copybtn" style="position:static;margin-left:auto">复制</button></div>
+      <div class="codeblock">{
+  "title": "今日营业数据日报",
+  "level": "NORMAL"
+}</div>
+      <div class="sect">DELIVERY RECORDS</div>
+      <div class="tl">
+        <div class="tl-item"><div class="t">10-25 09:41:21 · 重试 0</div><div class="n"><span class="tag acc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:10px;height:10px"><circle cx="12" cy="12" r="5.5" fill="currentColor" stroke="none"/></svg>已接受，等待推送</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 客户端 ═══ -->
+<div class="page" id="p-clients">
+  <div class="page-head"><h1>客户端</h1><div class="sub">接入白名单 · 连接状态与积压 · 远程操作入口</div></div>
+  <div class="split">
+    <div class="list-col">
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>客户端 ID</th><th>状态</th><th>连接</th><th>未完成</th><th>死信</th><th>最近活跃</th><th></th></tr></thead>
+        <tbody>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12.5px">store-001</td><td><span class="tag ok"><i class="dot" style="background:var(--ok)"></i>在线</span></td><td>1</td><td>2</td><td style="color:var(--bad)">1</td><td class="weak mono">10:38:04</td><td><button class="btn btn-ghost btn-sm">详情</button></td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12.5px">store-002</td><td><span class="tag ok"><i class="dot" style="background:var(--ok)"></i>在线</span></td><td>1</td><td>1</td><td>0</td><td class="weak mono">10:36:51</td><td><button class="btn btn-ghost btn-sm">详情</button></td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12.5px">store-003</td><td><span class="tag ok"><i class="dot" style="background:var(--ok)"></i>在线</span></td><td>1</td><td>0</td><td>0</td><td class="weak mono">10:30:18</td><td><button class="btn btn-ghost btn-sm">详情</button></td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12.5px">kiosk-001</td><td><span class="tag mut"><i class="dot" style="background:var(--mut)"></i>离线</span></td><td>0</td><td>3</td><td style="color:var(--bad)">1</td><td class="weak mono">09:12:44</td><td><button class="btn btn-ghost btn-sm">详情</button></td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12.5px">kiosk-002</td><td><span class="tag warn"><i class="dot" style="background:var(--warn)"></i>已禁用</span></td><td>0</td><td>0</td><td>0</td><td class="weak mono">10-24 18:02</td><td><button class="btn btn-ghost btn-sm">详情</button></td></tr>
+        </tbody></table></div>
+      <div class="pager"><span>共 5 个</span></div>
+    </div>
+    <div class="detail-col">
+      <div class="detail-title"><h3 style="cursor:default">store-001</h3><span class="tag ok"><i class="dot" style="background:var(--ok)"></i>在线</span><span class="sp"></span><div class="switch on"></div></div>
+      <dl class="kv">
+        <dt>活动连接</dt><dd class="num">1</dd>
+        <dt>未完成投递</dt><dd class="num">2</dd>
+        <dt>死信</dt><dd class="num" style="color:var(--bad)">1</dd>
+        <dt>注册时间</dt><dd class="mono num">2026-10-19 08:00:12</dd>
+      </dl>
+      <div class="oprow">
+        <button class="btn btn-outline btn-sm">PING</button>
+        <button class="btn btn-outline btn-sm">刷新状态</button>
+        <a style="font-size:12px;align-self:center" onclick="go('messages')">查该客户端消息 →</a>
+        <div class="opsmenu" style="margin-left:auto">
+          <button class="btn btn-outline btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'">操作 ▾</button>
+          <div class="menu" style="display:none">
+            <button>断开连接…</button>
+            <button class="danger">禁用客户端…</button>
+            <button class="danger">注销客户端…</button>
+          </div>
+        </div>
+      </div>
+      <div class="sect">发件箱（客户端设备本地队列 · 需主动拉取）</div>
+      <div class="toolbar" style="margin-bottom:8px">
+        <select class="fsel" style="flex:1"><option>全部状态</option><option>待发送</option><option>服务端已接受</option><option>发送失败</option><option>死信</option></select>
+        <button class="btn btn-primary btn-sm">拉取快照</button>
+      </div>
+      <div class="empty" style="padding:20px 0">尚未拉取 · 客户端在线时可获取其本地队列快照</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 死信 ═══ -->
+<div class="page" id="p-dead">
+  <div class="page-head headrow">
+    <div><h1>死信</h1><div class="sub">重试耗尽的投递 · 重试或跳过后同顺序键后续消息放行</div></div>
+    <span class="sp"></span>
+    <button class="btn btn-outline btn-sm">批量跳过</button>
+    <button class="btn btn-outline btn-sm">批量重试</button>
+  </div>
+  <div class="toolbar">
+    <span class="weak" style="margin-right:2px">客户端</span>
+    <select class="fsel" style="width:170px"><option>全部客户端</option><option>store-001</option><option>kiosk-001</option></select>
+    <span class="clearbtn">清除筛选</span>
+  </div>
+  <div class="split">
+    <div class="list-col">
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>消息 ID</th><th>客户端</th><th>失败原因</th><th>重试</th><th>滞留时长</th></tr></thead>
+        <tbody>
+          <tr class="sel" onclick="sel(this)"><td class="mono" style="font-size:12px">msg-2026-1024</td><td class="mono">kiosk-001</td><td class="reason">目标状态不可达 MAX_RETRY</td><td>5</td><td class="weak mono">2 小时</td></tr>
+          <tr onclick="sel(this)"><td class="mono" style="font-size:12px">msg-2026-1011</td><td class="mono">store-001</td><td class="reason">连续处理失败 5 次</td><td>5</td><td class="weak mono">38 分钟</td></tr>
+        </tbody></table></div>
+      <div class="pager"><span>共 2 条</span></div>
+    </div>
+    <div class="detail-col">
+      <div class="detail-title"><h3>msg-2026-1024</h3><span class="sp"></span><button class="icon-btn" title="复制 ID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <dl class="kv">
+        <dt>状态</dt><dd><span class="tag bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="width:10px;height:10px"><circle cx="12" cy="12" r="9"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>死信</span></dd>
+        <dt>客户端</dt><dd class="mono">kiosk-001</dd>
+        <dt>顺序键</dt><dd class="mono">kiosk-001-seq</dd>
+        <dt>失败原因</dt><dd>目标状态不可达 MAX_RETRY</dd>
+        <dt>重试次数</dt><dd class="num">5 / 5</dd>
+      </dl>
+      <div class="oprow">
+        <button class="btn btn-tint btn-sm">重试</button>
+        <button class="btn btn-danger btn-sm">跳过</button>
+      </div>
+      <div class="sect">DELIVERY RECORDS</div>
+      <div class="tl">
+        <div class="tl-item mut"><div class="t">10-25 06:12:30 · 重试 5</div><div class="n"><span class="tag mut">RETRYING</span> 达到重试上限，转入死信</div></div>
+        <div class="tl-item err"><div class="t">10-25 05:44:11 · 重试 4</div><div class="n"><span class="tag warn">FAILED</span> <span class="weak">连接超时</span></div></div>
+        <div class="tl-item err"><div class="t">10-25 05:16:02 · 重试 3</div><div class="n"><span class="tag warn">FAILED</span> <span class="weak">连接超时</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ 远程操作 ═══ -->
+<div class="page" id="p-remote">
+  <div class="page-head"><h1>远程操作</h1><div class="sub">向在线客户端下发指令并追踪异步执行结果</div></div>
+  <div class="grid-2b" style="grid-template-columns:420px 1fr;align-items:start">
+    <div class="panel">
+      <h3>提交命令</h3>
+      <div class="cmdform" style="margin-top:12px">
+        <div><label>目标客户端</label><select class="fsel" style="width:100%"><option>store-001（在线）</option><option>store-002（在线）</option><option>store-003（在线）</option><option disabled>kiosk-001（离线）</option></select></div>
+        <div><label>命令</label><select class="fsel" style="width:100%"><option>PING</option><option>QUERY_OUTBOX</option><option>RETRY_OUTBOX_DEAD_LETTER</option><option>DISCARD_OUTBOX_DEAD_LETTER</option></select></div>
+        <div class="full"><label>参数（按命令可选）</label><input class="fin mono" style="width:100%" placeholder="如 status=DEAD_LETTER&limit=50"></div>
+        <div class="full"><label>操作原因 <b style="color:var(--bad)">*</b></label><input class="fin" style="width:100%" placeholder="写入服务端日志留痕"></div>
+      </div>
+      <div class="oprow"><button class="btn btn-primary">提交命令</button><span class="weak">仅在线客户端可送达</span></div>
+    </div>
+    <div class="panel">
+      <h3>执行状态<span class="sp"></span><span class="weak mono">queryId: qry-8f3a2c</span></h3>
+      <div class="cmdstate ok" style="margin-top:12px"><span class="st">已完成</span><span class="weak">结果更新于 10:41:56 · QUERY_OUTBOX · store-001</span></div>
+      <div class="cmdstate" style="margin-top:8px"><span class="spin"></span><span class="st">等待回执</span><span class="weak">QUERY_OUTBOX · kiosk-001 · 已等待 12s（第 6/15 次轮询）</span></div>
+      <div class="cmdstate bad" style="margin-top:8px"><span class="st">超时</span><span class="weak">RETRY_OUTBOX_DEAD_LETTER · store-002 · 客户端未在时限内回传</span></div>
+      <div class="sect">QUERY_OUTBOX · store-001 · 结果</div>
+      <div class="codeblock">{
+  "rows": [
+    { "messageId": "msg-up-0912", "statusText": "服务端已接受", "retryCount": 0, "payloadSize": 42 },
+    { "messageId": "msg-up-0877", "statusText": "死信", "retryCount": 5, "payloadSize": 96 }
+  ],
+  "total": 2
+}</div>
+      <p class="weak" style="margin-top:8px">说明：queryId 返回仅代表命令已提交；只有结果接口明确返回结果时才展示结果。离线客户端的查询结果显示"暂未取得结果"，不显示空数组。</p>
+    </div>
+  </div>
+</div>
+
+<div class="mock-note">静态设计稿 · 假数据 · 交互仅演示（导航/分区切换可用）<br>确认后按此稿改正式代码（Vue 3 + 真实 API）</div>
+
+<script>
+function go(p){
+  document.querySelectorAll(".page").forEach(function(el){ el.classList.remove("on"); });
+  document.getElementById("p-" + p).classList.add("on");
+  document.querySelectorAll(".mainnav a").forEach(function(a){ a.classList.toggle("on", a.dataset.p === p); });
+  window.scrollTo(0, 0);
+}
+function sel(tr){
+  tr.parentElement.querySelectorAll("tr").forEach(function(r){ r.classList.remove("sel"); });
+  tr.classList.add("sel");
+}
+function setSeg(t){ alert("演示：切到 " + (t === "pending" ? "未完成投递" : t)); }
+</script>
+</body>
+</html>

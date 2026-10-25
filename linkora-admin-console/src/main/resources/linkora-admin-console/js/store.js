@@ -50,6 +50,19 @@ window.createStore = function(Vue){
     obPhase: "idle",
     obPulledAt: "",
 
+    /* 死信页 */
+    deadClient: "",
+    deadRows: [],
+    deadLoading: false,
+    deadError: "",
+
+    /* 远程操作页 */
+    remoteClientId: "",
+    remoteCmd: "PING",
+    remoteReason: "",
+    remoteBusy: false,
+    cmdHistory: [],
+
     /* 弹窗 */
     confirm: {on:false, title:"", desc:"", okLabel:"确认执行", extra:null, busy:false, reason:""},
     confirmExtra: {},
