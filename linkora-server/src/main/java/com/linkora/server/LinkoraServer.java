@@ -519,7 +519,7 @@ public final class LinkoraServer {
                 beginTime, endTime, (safePage - 1) * safeSize, safeSize);
         List<com.linkora.server.admin.MessageView> result = new ArrayList<>();
         for (LinkoraMessage message : messages) {
-            Object[] agg = aggregateDelivery(message.getMessageId());
+            Object[] agg = aggregateDelivery(message);
             result.add(new com.linkora.server.admin.MessageView(message,
                     deliverySummary(message.getMessageId()),
                     (String) agg[0], (String) agg[1], (Integer) agg[2],
@@ -531,11 +531,17 @@ public final class LinkoraServer {
     /**
      * 聚合一条消息的全部投递记录为最需关注的状态：
      * 死信 &gt; 重试中 &gt; 失败 &gt; 已过期 &gt; 推进中（CREATED/ACCEPTED/RECEIVED）&gt; 已完成。
+     * 无投递记录 = 上行消息（客户端发布，服务端直接接收，无投递语义），
+     * 返回合成状态 UPLINK，避免误显示为"已创建/未知"。
      *
      * @return [state 名, 中文描述, 最大重试次数, 最近错误, 最近推进时间（格式化）]
      */
-    private Object[] aggregateDelivery(String messageId) {
-        List<DeliveryRecord> records = deliveryRepository.findAllByMessageId(messageId);
+    private Object[] aggregateDelivery(LinkoraMessage message) {
+        List<DeliveryRecord> records = deliveryRepository.findAllByMessageId(message.getMessageId());
+        if (records.isEmpty()) {
+            return new Object[]{"UPLINK", "上行消息 · 服务端已接收", 0, "—",
+                    com.linkora.server.admin.AdminViews.formatTime(message.getCreatedAt())};
+        }
         MessageState worst = null;
         int worstPriority = -1;
         int retryCount = 0;

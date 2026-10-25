@@ -169,14 +169,14 @@ window.bootApp = function(){
   }
   function detailState(){
     if (s.detail && s.detail.deliveries && s.detail.deliveries.length) return s.detail.deliveries[0].state;
-    return null;
+    return "UPLINK";   /* 无投递记录 = 上行消息（客户端发布，服务端直接接收） */
   }
   function detailStateText(){
     if (s.detail && s.detail.deliveries && s.detail.deliveries.length){
       var d0 = s.detail.deliveries[0];
       return d0.stateText || d0.state || "未知";
     }
-    return "未知";
+    return "上行消息 · 服务端已接收";
   }
   function prettyPayload(){
     if (!s.detail || !s.detail.payload) return "（无）";

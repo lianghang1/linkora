@@ -26,7 +26,8 @@ window.Admin = (function(){
     FAILED:     {cls:"warn", txt:"发送失败"},
     RETRYING:   {cls:"warn", txt:"重试中"},
     EXPIRED:    {cls:"mut",  txt:"已过期/跳过"},
-    DEAD_LETTER:{cls:"bad",  txt:"死信"}
+    DEAD_LETTER:{cls:"bad",  txt:"死信"},
+    UPLINK:     {cls:"acc",  txt:"上行 · 已接收"}
   };
   var ICONS = {
     ok:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',

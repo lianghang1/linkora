@@ -229,7 +229,7 @@
                   <div class="n"><span v-html="A.stPill(d.state, d.stateText)"></span> <span class="weak" v-if="d.lastError && d.lastError!=='—'">{{ d.lastError }}</span></div>
                 </div>
               </div>
-              <div class="empty" v-else><p>后端未返回投递记录，数据不可用</p></div>
+              <div class="empty" v-else><p>上行消息：由客户端发布，服务端直接接收，无投递记录</p></div>
             </template>
           </div>
         </div>
