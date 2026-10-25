@@ -329,3 +329,22 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
   .fin{flex:1;min-width:0;width:auto}
   .fdate{flex:1;width:auto}
 }
+
+/* ═════════ 收件箱 ═════════ */
+.baseline{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:9px 14px;margin-bottom:12px;flex-wrap:wrap}
+.baseline .sp{flex:1}
+.inbox-empty{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:56px 20px;text-align:center;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.inbox-empty .okmark{width:44px;height:44px;border-radius:50%;background:var(--success-tint);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;margin-bottom:14px}
+.inbox-empty h2{font-size:17px;font-weight:650;margin-bottom:8px}
+.inbox-empty p{font-size:13px;color:var(--text-secondary)}
+.inbox-empty a{color:var(--accent)}
+.inbox-list{display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;min-height:0;padding-bottom:8px}
+.icard{background:var(--surface);border:1px solid var(--border);border-left-width:3px;border-radius:var(--radius-md);padding:13px 16px}
+.icard.dead{border-left-color:var(--danger)}
+.icard.stuck{border-left-color:var(--warning)}
+.icard-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.icard-top .sp{flex:1}
+.icard-top .isubj{font-size:13.5px;font-weight:600;word-break:break-all}
+.icard-sub{display:flex;gap:14px;flex-wrap:wrap;margin-top:7px;font-size:12px;color:var(--text-secondary)}
+.icard-sub .mono{font-size:11.5px}
+.icard-acts{display:flex;gap:8px;margin-top:10px}

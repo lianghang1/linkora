@@ -125,10 +125,15 @@ public class AdminConsoleServlet extends HttpServlet {
             writeJson(resp, 200, server.listUnfinishedDeliveries(seg[3], intParam(req, "limit", 100)));
             return;
         }
+        if ("/api/inbox".equals(path)) {
+            writeJson(resp, 200, server.getInbox());
+            return;
+        }
         if ("/api/messages".equals(path)) {
             writeJson(resp, 200, server.listMessages(
                     req.getParameter("clientId"),
                     req.getParameter("type"),
+                    req.getParameter("keyword"),
                     longParam(req, "begin"),
                     longParam(req, "end"),
                     intParam(req, "page", 1),
@@ -236,9 +241,11 @@ public class AdminConsoleServlet extends HttpServlet {
             }
             if ("/api/actions/register-client".equals(path)) {
                 String newId = requireText(body, "newClientId");
+                String displayName = body.path("displayName").asText("");
                 audit("注册客户端", newId, null, reason);
                 writeJson(resp, 200, result(server.registerClient(
-                        newId, body.path("enabled").asBoolean(true))));
+                        newId, body.path("enabled").asBoolean(true),
+                        displayName == null || displayName.trim().isEmpty() ? null : displayName.trim())));
                 return;
             }
             if ("/api/actions/remove-client".equals(path)) {

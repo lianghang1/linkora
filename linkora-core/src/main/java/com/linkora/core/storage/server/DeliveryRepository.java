@@ -111,6 +111,25 @@ public interface DeliveryRepository {
         return java.util.Collections.emptyList();
     }
 
+    /**
+     * 管理接口：全部客户端的死信记录，按更新时间倒序。
+     *
+     * @param sinceUpdated 只返回 updated_at &gt; sinceUpdated 的记录（0 = 全部），
+     *                     供告警去重增量扫描
+     */
+    default List<DeliveryRecord> findDeadLettersSince(long sinceUpdated, int limit) {
+        return java.util.Collections.emptyList();
+    }
+
+    /**
+     * 管理接口：长时间无推进的未终结投递（CREATED/ACCEPTED/RECEIVED 且
+     * updated_at &lt;= threshold），按更新时间升序（最久的排最前）。
+     * 自实现仓储不覆盖返回空列表。
+     */
+    default List<DeliveryRecord> findStuckBefore(long threshold, int limit) {
+        return java.util.Collections.emptyList();
+    }
+
     /** 统计指定客户端的死信数量。 */
     default long countDeadLetters(String clientId) {
         return 0;

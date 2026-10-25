@@ -58,6 +58,10 @@ public final class MessageJsonCodec {
         if (message.getSequenceKey() != null) {
             node.put("sequenceKey", message.getSequenceKey());
         }
+        if (message.getSubject() != null) {
+            // 老版本收到带 subject 的消息不会报错（滚动升级安全）
+            node.put("subject", message.getSubject());
+        }
         return node.toString();
     }
 
@@ -82,6 +86,10 @@ public final class MessageJsonCodec {
         JsonNode sequenceKey = node.get("sequenceKey");
         if (sequenceKey != null && !sequenceKey.isNull()) {
             builder.sequenceKey(sequenceKey.asText());
+        }
+        JsonNode subject = node.get("subject");
+        if (subject != null && !subject.isNull()) {
+            builder.subject(subject.asText());
         }
         try {
             return builder.build();

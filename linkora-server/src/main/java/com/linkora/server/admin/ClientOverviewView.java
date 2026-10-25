@@ -14,8 +14,9 @@ public final class ClientOverviewView {
     private final int unfinishedCount;
     private final long deadLetterCount;
     private final String createdAt;
+    private final String displayName;
 
-    public ClientOverviewView(String clientId, boolean enabled, int connectionCount,
+    public ClientOverviewView(String clientId, String displayName, boolean enabled, int connectionCount,
                               int unfinishedCount, long deadLetterCount, long createdAt) {
         this.clientId = clientId;
         this.enabled = enabled;
@@ -24,6 +25,7 @@ public final class ClientOverviewView {
         this.unfinishedCount = unfinishedCount;
         this.deadLetterCount = deadLetterCount;
         this.createdAt = AdminViews.formatTime(createdAt);
+        this.displayName = displayName == null || displayName.trim().isEmpty() ? null : displayName.trim();
     }
 
     public String getClientId() {
@@ -58,6 +60,11 @@ public final class ClientOverviewView {
     /** 注册时间（已格式化）。 */
     public String getCreatedAt() {
         return createdAt;
+    }
+
+    /** 可为 null（人类可读名称，显示时回退到 clientId）。 */
+    public String getDisplayName() {
+        return displayName;
     }
 
     @Override

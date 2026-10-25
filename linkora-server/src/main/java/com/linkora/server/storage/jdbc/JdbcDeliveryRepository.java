@@ -408,6 +408,51 @@ public final class JdbcDeliveryRepository implements DeliveryRepository {
     }
 
     @Override
+    public List<DeliveryRecord> findDeadLettersSince(long sinceUpdated, int limit) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT " + COLUMNS + " FROM lk_delivery "
+                             + "WHERE state = '" + MessageState.DEAD_LETTER.name() + "' "
+                             + "AND updated_at > ? ORDER BY updated_at DESC LIMIT ?")) {
+            ps.setLong(1, sinceUpdated);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DeliveryRecord> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapRecord(rs));
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "增量查询死信失败", e);
+        }
+    }
+
+    @Override
+    public List<DeliveryRecord> findStuckBefore(long threshold, int limit) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT " + COLUMNS + " FROM lk_delivery "
+                             + "WHERE state IN ('" + MessageState.CREATED.name() + "', '"
+                             + MessageState.ACCEPTED.name() + "', '" + MessageState.RECEIVED.name() + "') "
+                             + "AND updated_at <= ? ORDER BY updated_at ASC LIMIT ?")) {
+            ps.setLong(1, threshold);
+            ps.setInt(2, limit);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DeliveryRecord> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapRecord(rs));
+                }
+                return result;
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "查询长时间无推进的投递失败", e);
+        }
+    }
+
+    @Override
     public java.util.Map<String, Long> countByState() {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(

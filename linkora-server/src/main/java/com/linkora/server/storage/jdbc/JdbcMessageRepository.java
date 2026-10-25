@@ -27,7 +27,7 @@ public final class JdbcMessageRepository implements MessageRepository {
 
     private static final String COLUMNS =
             "message_id, client_id, message_type, payload_base64, created_at, expires_at, "
-                    + "schema_version, trace_id, sequence_key";
+                    + "schema_version, trace_id, sequence_key, subject";
 
     private final DataSource dataSource;
 
@@ -42,7 +42,7 @@ public final class JdbcMessageRepository implements MessageRepository {
     public boolean save(LinkoraMessage message) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
-                     "INSERT INTO lk_message (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?)")) {
+                     "INSERT INTO lk_message (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?)")) {
             ps.setString(1, message.getMessageId());
             ps.setString(2, message.getClientId());
             ps.setString(3, message.getMessageType());
@@ -52,6 +52,7 @@ public final class JdbcMessageRepository implements MessageRepository {
             ps.setInt(7, message.getSchemaVersion());
             setNullableString(ps, 8, message.getTraceId());
             setNullableString(ps, 9, message.getSequenceKey());
+            setNullableString(ps, 10, message.getSubject());
             ps.executeUpdate();
             return true;
         } catch (SQLIntegrityConstraintViolationException duplicate) {
@@ -80,6 +81,7 @@ public final class JdbcMessageRepository implements MessageRepository {
 
     @Override
     public java.util.List<LinkoraMessage> listMessages(String clientId, String messageType,
+                                                       String keyword,
                                                        Long beginTime, Long endTime,
                                                        int offset, int limit) {
         StringBuilder where = new StringBuilder();
@@ -91,6 +93,15 @@ public final class JdbcMessageRepository implements MessageRepository {
         if (messageType != null && !messageType.trim().isEmpty()) {
             where.append(where.length() > 0 ? " AND message_type = ?" : " message_type = ?");
             params.add(messageType);
+        }
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String kw = keyword.trim();
+            where.append(where.length() > 0
+                    ? " AND (subject LIKE ? OR message_type LIKE ? OR message_id = ?)"
+                    : " (subject LIKE ? OR message_type LIKE ? OR message_id = ?)");
+            params.add("%" + kw + "%");
+            params.add("%" + kw + "%");
+            params.add(kw);
         }
         if (beginTime != null) {
             where.append(where.length() > 0 ? " AND created_at >= ?" : " created_at >= ?");
@@ -164,6 +175,7 @@ public final class JdbcMessageRepository implements MessageRepository {
                 .schemaVersion(rs.getInt("schema_version"))
                 .traceId(rs.getString("trace_id"))
                 .sequenceKey(rs.getString("sequence_key"))
+                .subject(rs.getString("subject"))
                 .build();
     }
 

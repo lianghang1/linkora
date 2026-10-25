@@ -16,6 +16,12 @@ public final class ServerConfig {
     private final long messageSizeLimitBytes;
     private final long maxOutboundBytesPerConnection;
     private final int retentionDays;
+    /** 死信告警 Webhook URL（null = 不告警）。 */
+    private final String alertWebhookUrl;
+    /** 告警报文格式：raw | wecom | dingtalk | feishu。 */
+    private final String alertWebhookType;
+    /** 收件箱"卡死"判定阈值（分钟）：非终态投递超过该时长无推进即入收件箱。 */
+    private final int inboxStuckMinutes;
 
     private ServerConfig(Builder b) {
         this.pushBatchSize = b.pushBatchSize;
@@ -28,6 +34,9 @@ public final class ServerConfig {
         this.messageSizeLimitBytes = b.messageSizeLimitBytes;
         this.maxOutboundBytesPerConnection = b.maxOutboundBytesPerConnection;
         this.retentionDays = b.retentionDays;
+        this.alertWebhookUrl = b.alertWebhookUrl;
+        this.alertWebhookType = b.alertWebhookType;
+        this.inboxStuckMinutes = b.inboxStuckMinutes;
     }
 
     public static Builder builder() {
@@ -80,6 +89,21 @@ public final class ServerConfig {
         return retentionDays;
     }
 
+    /** null = 不启用死信告警。 */
+    public String getAlertWebhookUrl() {
+        return alertWebhookUrl;
+    }
+
+    /** raw | wecom | dingtalk | feishu（默认 raw）。 */
+    public String getAlertWebhookType() {
+        return alertWebhookType;
+    }
+
+    /** 收件箱"卡死"阈值（分钟），默认 30。 */
+    public int getInboxStuckMinutes() {
+        return inboxStuckMinutes;
+    }
+
     public long getMessageSizeLimitBytes() {
         return messageSizeLimitBytes;
     }
@@ -107,6 +131,9 @@ public final class ServerConfig {
         private long messageSizeLimitBytes = 1024 * 1024L;
         private long maxOutboundBytesPerConnection = 8L * 1024 * 1024;
         private int retentionDays = 0;
+        private String alertWebhookUrl;
+        private String alertWebhookType = "raw";
+        private int inboxStuckMinutes = 30;
 
         public Builder pushBatchSize(int pushBatchSize) {
             if (pushBatchSize < 1 || pushBatchSize > 10_000) {
@@ -177,6 +204,35 @@ public final class ServerConfig {
                 throw new IllegalArgumentException("retentionDays 必须 >= 0（0 = 不清理）");
             }
             this.retentionDays = retentionDays;
+            return this;
+        }
+
+        /** 死信告警 Webhook URL（null/空 = 不告警）。 */
+        public Builder alertWebhookUrl(String alertWebhookUrl) {
+            this.alertWebhookUrl = alertWebhookUrl == null || alertWebhookUrl.trim().isEmpty()
+                    ? null : alertWebhookUrl.trim();
+            return this;
+        }
+
+        /** 告警报文格式：raw | wecom | dingtalk | feishu（默认 raw）。 */
+        public Builder alertWebhookType(String alertWebhookType) {
+            if (alertWebhookType == null || alertWebhookType.trim().isEmpty()) {
+                throw new IllegalArgumentException("alertWebhookType 不能为空");
+            }
+            String t = alertWebhookType.trim().toLowerCase();
+            if (!"raw".equals(t) && !"wecom".equals(t) && !"dingtalk".equals(t) && !"feishu".equals(t)) {
+                throw new IllegalArgumentException("alertWebhookType 仅支持 raw|wecom|dingtalk|feishu");
+            }
+            this.alertWebhookType = t;
+            return this;
+        }
+
+        /** 收件箱"卡死"阈值（分钟），取值范围 [1, 10080]。 */
+        public Builder inboxStuckMinutes(int inboxStuckMinutes) {
+            if (inboxStuckMinutes < 1 || inboxStuckMinutes > 10080) {
+                throw new IllegalArgumentException("inboxStuckMinutes 取值范围 [1, 10080]（分钟）");
+            }
+            this.inboxStuckMinutes = inboxStuckMinutes;
             return this;
         }
 

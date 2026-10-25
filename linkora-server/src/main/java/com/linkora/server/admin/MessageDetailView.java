@@ -15,6 +15,7 @@ public final class MessageDetailView {
     private final String clientId;
     private final String messageType;
     private final String sequenceKey;
+    private final String subject;
     private final String createdAt;
     private final String expiresAt;
     private final String traceId;
@@ -29,6 +30,7 @@ public final class MessageDetailView {
         this.clientId = message.getClientId();
         this.messageType = message.getMessageType();
         this.sequenceKey = message.getSequenceKey() == null ? "—" : message.getSequenceKey();
+        this.subject = message.getSubject();
         this.createdAt = AdminViews.formatTime(message.getCreatedAt());
         this.expiresAt = AdminViews.formatTime(message.getExpiresAt());
         this.traceId = message.getTraceId() == null ? "—" : message.getTraceId();
@@ -54,6 +56,10 @@ public final class MessageDetailView {
 
     public String getSequenceKey() {
         return sequenceKey;
+    }
+
+    public String getSubject() {
+        return subject;
     }
 
     public String getCreatedAt() {

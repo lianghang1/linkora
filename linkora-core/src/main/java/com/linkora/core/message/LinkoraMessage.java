@@ -24,6 +24,9 @@ public final class LinkoraMessage {
     private final int schemaVersion;
     private final String traceId;
     private final String sequenceKey;
+    /** 人类可读主题（可选，供运维界面展示；不参与协议语义）。 */
+    public static final int MAX_SUBJECT_LENGTH = 255;
+    private final String subject;
 
     /** 顺序键长度上限（与库表列宽一致）。 */
     public static final int MAX_SEQUENCE_KEY_LENGTH = 128;
@@ -53,6 +56,10 @@ public final class LinkoraMessage {
             throw new IllegalArgumentException("sequenceKey 长度不得超过 " + MAX_SEQUENCE_KEY_LENGTH);
         }
         this.sequenceKey = builder.sequenceKey;
+        if (builder.subject != null && builder.subject.length() > MAX_SUBJECT_LENGTH) {
+            throw new IllegalArgumentException("subject 长度不得超过 " + MAX_SUBJECT_LENGTH);
+        }
+        this.subject = builder.subject;
     }
 
     public static Builder builder() {
@@ -116,6 +123,11 @@ public final class LinkoraMessage {
         return sequenceKey;
     }
 
+    /** 可为 null 表示未设置（显示时回退到 messageType）。 */
+    public String getSubject() {
+        return subject;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -133,7 +145,8 @@ public final class LinkoraMessage {
                 && Arrays.equals(payload, that.payload)
                 && java.util.Objects.equals(expiresAt, that.expiresAt)
                 && java.util.Objects.equals(traceId, that.traceId)
-                && java.util.Objects.equals(sequenceKey, that.sequenceKey);
+                && java.util.Objects.equals(sequenceKey, that.sequenceKey)
+                && java.util.Objects.equals(subject, that.subject);
     }
 
     @Override
@@ -147,6 +160,7 @@ public final class LinkoraMessage {
         result = 31 * result + schemaVersion;
         result = 31 * result + java.util.Objects.hashCode(traceId);
         result = 31 * result + java.util.Objects.hashCode(sequenceKey);
+        result = 31 * result + java.util.Objects.hashCode(subject);
         return result;
     }
 
@@ -236,6 +250,18 @@ public final class LinkoraMessage {
         public Builder sequenceKey(String sequenceKey) {
             this.sequenceKey = sequenceKey == null || sequenceKey.trim().isEmpty()
                     ? null : sequenceKey.trim();
+            return this;
+        }
+
+        private String subject;
+
+        /**
+         * 可选：一句话人类可读主题（如「优惠券补发 RV-2001」），供运维控制台等
+         * 界面直接展示。null / 空白归一化为 null；不参与协议语义与投递逻辑。
+         */
+        public Builder subject(String subject) {
+            this.subject = subject == null || subject.trim().isEmpty()
+                    ? null : subject.trim();
             return this;
         }
 

@@ -125,10 +125,20 @@ public final class JdbcServerSchema {
                     + "ON lk_delivery (client_id, sequence_key, seq)",
     };
 
+    /** v4：人类可读元数据——消息主题（运维界面直接展示）、客户端显示名。幂等。 */
+    private static final String[] V4_H2 = {
+            "ALTER TABLE lk_message ADD COLUMN IF NOT EXISTS subject VARCHAR(255)",
+            "ALTER TABLE lk_client ADD COLUMN IF NOT EXISTS display_name VARCHAR(255)",
+    };
+    private static final String[] V4_MYSQL = {
+            "ALTER TABLE lk_message ADD COLUMN subject VARCHAR(255)",
+            "ALTER TABLE lk_client ADD COLUMN display_name VARCHAR(255)",
+    };
+
     private static final String[][] MIGRATIONS =
-            {concat(V1_TABLES, V1_INDEXES_H2), V2_H2, V3_H2};
+            {concat(V1_TABLES, V1_INDEXES_H2), V2_H2, V3_H2, V4_H2};
     private static final String[][] MIGRATIONS_MYSQL =
-            {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL, V3_MYSQL};
+            {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL, V3_MYSQL, V4_MYSQL};
 
     private static String[] concat(String[] tables, String[] indexes) {
         String[] all = new String[tables.length + indexes.length];

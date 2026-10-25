@@ -45,6 +45,19 @@ public interface MessageRepository {
     default java.util.List<LinkoraMessage> listMessages(String clientId, String messageType,
                                                         Long beginTime, Long endTime,
                                                         int offset, int limit) {
+        return listMessages(clientId, messageType, null, beginTime, endTime, offset, limit);
+    }
+
+    /**
+     * 管理接口：带关键词的管理查询（匹配 subject / messageId / messageType）。
+     * default 忽略关键词并委托给不带关键词的版本：自实现仓储不覆盖不会破坏编译。
+     *
+     * @param keyword 关键词，null/空白不过滤
+     */
+    default java.util.List<LinkoraMessage> listMessages(String clientId, String messageType,
+                                                        String keyword,
+                                                        Long beginTime, Long endTime,
+                                                        int offset, int limit) {
         return java.util.Collections.emptyList();
     }
 

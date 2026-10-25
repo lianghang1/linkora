@@ -14,6 +14,8 @@ public final class MessageView {
     private final String clientId;
     private final String messageType;
     private final String sequenceKey;
+    /** 人类可读主题（未设置时为 null，前端回退显示类型）。 */
+    private final String subject;
     private final String createdAt;
     private final String expiresAt;
     private final String payloadPreview;
@@ -38,6 +40,7 @@ public final class MessageView {
         this.clientId = message.getClientId();
         this.messageType = message.getMessageType();
         this.sequenceKey = message.getSequenceKey() == null ? "—" : message.getSequenceKey();
+        this.subject = message.getSubject();
         this.createdAt = AdminViews.formatTime(message.getCreatedAt());
         this.expiresAt = AdminViews.formatTime(message.getExpiresAt());
         this.payloadPreview = AdminViews.payloadPreview(message.getPayload());
@@ -53,6 +56,11 @@ public final class MessageView {
 
     public String getMessageId() {
         return messageId;
+    }
+
+    /** 可为 null（未设置时前端回退显示 messageType）。 */
+    public String getSubject() {
+        return subject;
     }
 
     public String getClientId() {

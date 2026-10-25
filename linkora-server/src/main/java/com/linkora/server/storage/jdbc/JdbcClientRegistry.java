@@ -22,7 +22,7 @@ import java.util.Optional;
 public final class JdbcClientRegistry implements ClientRegistry {
 
     private static final String COLUMNS =
-            "client_id, enabled, created_at, connection_state, last_active_at";
+            "client_id, enabled, created_at, connection_state, last_active_at, display_name";
 
     private final DataSource dataSource;
 
@@ -37,11 +37,13 @@ public final class JdbcClientRegistry implements ClientRegistry {
     public void register(ClientRegistration registration) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
-                     "INSERT INTO lk_client (" + COLUMNS + ") VALUES (?,?,?,?,NULL)")) {
+                     "INSERT INTO lk_client (" + COLUMNS + ") VALUES (?,?,?,?,NULL,?)")) {
             ps.setString(1, registration.getClientId());
             ps.setBoolean(2, registration.isEnabled());
             ps.setLong(3, registration.getCreatedAt());
             ps.setString(4, ConnectionState.DISCONNECTED.name());
+            // 幂等重复注册时忽略 display_name（保留首次记录）
+            ps.setString(5, registration.getDisplayName());
             ps.executeUpdate();
         } catch (SQLIntegrityConstraintViolationException duplicate) {
             // 幂等语义：重复注册忽略
@@ -55,7 +57,7 @@ public final class JdbcClientRegistry implements ClientRegistry {
     public Optional<ClientRegistration> findByClientId(String clientId) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
-                     "SELECT client_id, enabled, created_at FROM lk_client WHERE client_id = ?")) {
+                     "SELECT client_id, enabled, created_at, display_name FROM lk_client WHERE client_id = ?")) {
             ps.setString(1, clientId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
@@ -64,7 +66,8 @@ public final class JdbcClientRegistry implements ClientRegistry {
                 return Optional.of(new ClientRegistration(
                         rs.getString("client_id"),
                         rs.getBoolean("enabled"),
-                        rs.getLong("created_at")));
+                        rs.getLong("created_at"),
+                        rs.getString("display_name")));
             }
         } catch (SQLException e) {
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
@@ -76,14 +79,15 @@ public final class JdbcClientRegistry implements ClientRegistry {
     public java.util.List<ClientRegistration> findAll() {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
-                     "SELECT client_id, enabled, created_at FROM lk_client ORDER BY client_id ASC");
+                     "SELECT client_id, enabled, created_at, display_name FROM lk_client ORDER BY client_id ASC");
              ResultSet rs = ps.executeQuery()) {
             java.util.List<ClientRegistration> result = new java.util.ArrayList<>();
             while (rs.next()) {
                 result.add(new ClientRegistration(
                         rs.getString("client_id"),
                         rs.getBoolean("enabled"),
-                        rs.getLong("created_at")));
+                        rs.getLong("created_at"),
+                        rs.getString("display_name")));
             }
             return result;
         } catch (SQLException e) {

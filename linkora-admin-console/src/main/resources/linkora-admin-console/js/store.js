@@ -7,11 +7,16 @@ window.createStore = function(Vue){
     loginErr: "", loginInput: "", loginBusy: false, showToken: false,
 
     /* 全局 */
-    view: "cockpit",
+    view: "inbox",
     tick: 10,
     backendOk: true,            /* 最近一次概览请求是否成功（顶部状态条依据） */
     clients: [],
     toasts: [],
+
+    /* 收件箱（死信 + 长时间无推进） */
+    inbox: [],
+    inboxLoading: false,
+    inboxError: "",
 
     /* 概览 */
     publishedPerDay: [],
@@ -23,7 +28,7 @@ window.createStore = function(Vue){
     msgTab: "all",              /* all | pending | dead */
     msgPage: 1,
     msgClient: "",
-    msgSearch: "",
+    msgKeyword: "",   /* 主题/类型/消息 ID 关键词 */
     msgBegin: "",               /* YYYY-MM-DD（真实 API begin/end） */
     msgEnd: "",
     messages: [],
@@ -50,18 +55,6 @@ window.createStore = function(Vue){
     obPhase: "idle",
     obPulledAt: "",
 
-    /* 死信页 */
-    deadClient: "",
-    deadRows: [],
-    deadLoading: false,
-    deadError: "",
-
-    /* 远程操作页 */
-    remoteClientId: "",
-    remoteCmd: "PING",
-    remoteReason: "",
-    remoteBusy: false,
-    cmdHistory: [],
 
     /* 弹窗 */
     confirm: {on:false, title:"", desc:"", okLabel:"确认执行", extra:null, busy:false, reason:""},
@@ -75,6 +68,6 @@ window.createStore = function(Vue){
       for (var i = 0; i < this.clients.length; i++) if (this.clients[i].clientId === id) return this.clients[i];
       return null;
     },
-    pickedClient: function(){ return (this.msgSearch || "").trim() || this.msgClient || ""; }
+    pickedClient: function(){ return this.msgClient || ""; }
   });
 };

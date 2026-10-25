@@ -83,6 +83,7 @@ public final class LinkoraServer {
     private final AtomicBoolean running = new AtomicBoolean(false);
     /** 保留期清理调度器：仅 retentionDays > 0 时创建；独立线程，避免清理 DELETE 占用编排线程。 */
     private ScheduledExecutorService retentionScheduler;
+    private com.linkora.server.pipeline.DeadLetterAlertService alertService;
     private ScheduledFuture<?> retentionTask;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private volatile ScheduledFuture<?> sweepTask;
@@ -201,6 +202,11 @@ public final class LinkoraServer {
                 }
             }, 60_000L, 24L * 60 * 60 * 1000L, TimeUnit.MILLISECONDS);
         }
+        if (config.getAlertWebhookUrl() != null) {
+            alertService = new com.linkora.server.pipeline.DeadLetterAlertService(
+                    deliveryRepository, messageRepository, config);
+            alertService.start();
+        }
         log.info("Linkora 服务端已启动（扫描周期 {} ms，数据保留 {} 天）",
                 config.getSweepIntervalMs(),
                 config.getRetentionDays() > 0 ? String.valueOf(config.getRetentionDays()) : "不限");
@@ -226,6 +232,9 @@ public final class LinkoraServer {
         }
         if (retentionScheduler != null) {
             retentionScheduler.shutdownNow();
+        }
+        if (alertService != null) {
+            alertService.stop();
         }
         log.info("Linkora 服务端已关闭");
     }
@@ -376,6 +385,7 @@ public final class LinkoraServer {
         for (ClientRegistration registration : clientRegistry.findAll()) {
             result.add(new com.linkora.server.admin.ClientOverviewView(
                     registration.getClientId(),
+                    registration.getDisplayName(),
                     registration.isEnabled(),
                     gateway.connectionCount(registration.getClientId()),
                     (int) deliveryRepository.countUnfinished(registration.getClientId()),
@@ -512,10 +522,27 @@ public final class LinkoraServer {
                                                                    String messageType,
                                                                    Long beginTime, Long endTime,
                                                                    int page, int size) {
+        return listMessages(clientId, messageType, null, beginTime, endTime, page, size);
+    }
+
+    /**
+     * 管理接口：条件检索消息（人类可读视图），支持关键词。
+     *
+     * <p>全部过滤条件可为 null；时间参数为 epoch 毫秒（含边界）；keyword 匹配
+     * subject / messageType / messageId（前两者模糊、ID 精确）。</p>
+     *
+     * @param page 页码（从 1 开始）
+     * @param size 每页条数（1~100）
+     */
+    public List<com.linkora.server.admin.MessageView> listMessages(String clientId,
+                                                                   String messageType,
+                                                                   String keyword,
+                                                                   Long beginTime, Long endTime,
+                                                                   int page, int size) {
         int safePage = Math.max(1, page);
         int safeSize = Math.max(1, Math.min(100, size));
         List<LinkoraMessage> messages = messageRepository.listMessages(
-                trimToNull(clientId), trimToNull(messageType),
+                trimToNull(clientId), trimToNull(messageType), trimToNull(keyword),
                 beginTime, endTime, (safePage - 1) * safeSize, safeSize);
         List<com.linkora.server.admin.MessageView> result = new ArrayList<>();
         for (LinkoraMessage message : messages) {
@@ -526,6 +553,49 @@ public final class LinkoraServer {
                     (String) agg[3], (String) agg[4]));
         }
         return result;
+    }
+
+    /**
+     * 管理接口：收件箱——需要人关注的事项。
+     *
+     * <p>只返回两类：死信（自动机制用尽）与长时间无推进的投递（自愈疑似失效，
+     * 阈值 {@code config.getInboxStuckMinutes()}）。正常流转与重试中的消息
+     * 不进入收件箱（自愈在工作，避免噪音）。</p>
+     */
+    public List<com.linkora.server.admin.InboxItemView> getInbox() {
+        List<com.linkora.server.admin.InboxItemView> items = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        for (DeliveryRecord record : deliveryRepository.findDeadLettersSince(0, 100)) {
+            items.add(toInboxItem("dead", record, now));
+        }
+        long stuckThreshold = now - config.getInboxStuckMinutes() * 60_000L;
+        for (DeliveryRecord record : deliveryRepository.findStuckBefore(stuckThreshold, 100)) {
+            items.add(toInboxItem("stuck", record, now));
+        }
+        items.sort((a, b) -> b.getUpdatedAt().compareTo(a.getUpdatedAt()));
+        return items;
+    }
+
+    private com.linkora.server.admin.InboxItemView toInboxItem(String type, DeliveryRecord record, long now) {
+        LinkoraMessage message = messageRepository.findByMessageId(record.getMessageId()).orElse(null);
+        String subject = message == null ? null : message.getSubject();
+        String messageType = message == null ? "—" : message.getMessageType();
+        long ageMs = Math.max(0, now - record.getUpdatedAt());
+        String age;
+        if (ageMs < 3600_000L) {
+            age = Math.max(1, ageMs / 60_000L) + " 分钟";
+        } else if (ageMs < 86_400_000L) {
+            age = (ageMs / 3600_000L) + " 小时 " + ((ageMs % 3600_000L) / 60_000L) + " 分钟";
+        } else {
+            age = (ageMs / 86_400_000L) + " 天";
+        }
+        return new com.linkora.server.admin.InboxItemView(
+                type, record.getClientId(), record.getMessageId(), subject,
+                messageType, record.getState().name(),
+                com.linkora.server.admin.AdminViews.stateText(record.getState()),
+                record.getRetryCount(),
+                record.getLastError() == null ? "—" : record.getLastError(),
+                com.linkora.server.admin.AdminViews.formatTime(record.getUpdatedAt()), age);
     }
 
     /**
@@ -659,13 +729,20 @@ public final class LinkoraServer {
 
     /** 管理接口：注册新客户端（白名单添加）。已存在时返回 false。 */
     public boolean registerClient(String clientId, boolean enabled) {
+        return registerClient(clientId, enabled, null);
+    }
+
+    /** 管理接口：注册新客户端（白名单添加）。已存在时返回 false。displayName 为可选显示名。 */
+    public boolean registerClient(String clientId, boolean enabled, String displayName) {
         requireNotBlank(clientId, "clientId");
         String id = clientId.trim();
         if (clientRegistry.findByClientId(id).isPresent()) {
             return false;
         }
-        clientRegistry.register(new ClientRegistration(id, enabled, System.currentTimeMillis()));
-        log.info("管理接口注册客户端: clientId={}, enabled={}", id, enabled);
+        clientRegistry.register(new ClientRegistration(id, enabled,
+                System.currentTimeMillis(), displayName));
+        log.info("管理接口注册客户端: clientId={}, enabled={}, displayName={}",
+                id, enabled, displayName);
         return true;
     }
 
