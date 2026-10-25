@@ -40,7 +40,7 @@
       <span class="sp"></span>
       <div class="gsearch">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
-        <input v-model="s.msgSearch" placeholder="搜主题 / 类型 / 消息 ID…" @keydown.enter="go('messages'); s.msgClient=''; setMsgTab('all')">
+        <input v-model="s.msgKeyword" placeholder="搜主题 / 类型 / 消息 ID…" @keydown.enter="go('messages')">
       </div>
       <div class="syschip" :class="{err: !s.backendOk}" :title="s.backendOk ? '基于最近一次概览数据' : '最近一次数据获取失败'">
         <i></i><span>{{ s.backendOk ? s.tick + "s" : "后端不可用" }}</span>
