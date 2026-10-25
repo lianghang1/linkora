@@ -107,6 +107,8 @@ table.tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
 .tbl tr:last-child td{border-bottom:none}
 .tbl tbody tr{cursor:pointer;transition:background .12s}
 .tbl tbody tr:hover{background:var(--surface-hover)}
+/* 行内成对操作按钮统一间距（重试/跳过、重发/放弃等），防止相邻按钮贴死 */
+.tbl td .btn + .btn{margin-left:6px}
 .tbl tbody tr.sel{background:var(--accent-tint)}
 
 /* ═════════ 状态标签（颜色+文字+图标） ═════════ */
