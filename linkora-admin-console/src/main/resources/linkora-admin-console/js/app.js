@@ -11,6 +11,11 @@ window.bootApp = function(){
   function api(path, opts){ return A.api(s, path, opts); }
 
   /* ── 会话 ── */
+  var VIEWS = ["inbox", "messages", "clients"];
+  function hashView(){
+    var h = (location.hash || "").replace(/^#\/?/, "");
+    return VIEWS.indexOf(h) >= 0 ? h : null;
+  }
   function doLogin(){
     var v = (s.loginInput || "").trim();
     if (!v){ s.loginErr = "请输入访问令牌"; return; }
@@ -28,23 +33,29 @@ window.bootApp = function(){
   function logout(){
     sessionStorage.removeItem("linkora-admin-token");
     s.token = ""; s.loggedIn = false; s.cdId = ""; s.obData = null; s.obPhase = "idle";
+    if (location.hash) history.replaceState(null, "", location.pathname + location.search);
     charts.destroyAll();
   }
   function boot(){
     s.loggedIn = true;
     loadClients(function(){
-      go("inbox");
+      go(hashView() || "inbox");
     });
   }
 
-  /* ── 导航与刷新（页面切换取消在途请求） ── */
+  /* ── 导航与刷新（页面切换取消在途请求；hash 路由：刷新/后退/直达均保持页面） ── */
   function go(v){
     if (s.view !== v) A.cancelAll();
     s.view = v;
     stopObPolling();
     refreshCurrent();
-    window.scrollTo(0, 0);
+    if (("#/" + v) !== location.hash) location.hash = "#/" + v;
   }
+  window.addEventListener("hashchange", function(){
+    if (!s.loggedIn) return;
+    var v = hashView();
+    if (v && v !== s.view) go(v);
+  });
   function refreshCurrent(){
     if (s.view === "inbox") loadInbox();
     else if (s.view === "messages") loadMessages();
@@ -477,4 +488,18 @@ window.bootApp = function(){
       };
     }
   }).mount("#app");
+
+  /* ── 会话恢复：sessionStorage 有令牌则静默验证，刷新后直达原页面不掉线 ── */
+  if (s.token){
+    A.api(s, "api/overview", {tag: "restore"}).then(function(){
+      boot();
+    }).catch(function(e){
+      if (!A.isSilent(e)){
+        s.token = "";
+        sessionStorage.removeItem("linkora-admin-token");
+        /* 令牌失效：停留登录页（loginErr 由模板展示提示） */
+        s.loginErr = "上次会话已失效，请重新输入令牌";
+      }
+    });
+  }
 };
