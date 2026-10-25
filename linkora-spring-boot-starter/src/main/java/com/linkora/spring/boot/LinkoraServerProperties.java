@@ -49,6 +49,14 @@ public class LinkoraServerProperties {
     private Long messageSizeLimitBytes;
     private Integer retentionDays;
 
+    // ---- 死信告警（0.4.2 起，null/空 = 关闭告警） ----
+    /** 死信/卡死告警 Webhook 地址（企业微信/钉钉/飞书/自定义机器人），不配置即关闭。 */
+    private String alertWebhookUrl;
+    /** 告警消息格式：raw | wecom | dingtalk | feishu，默认 raw。 */
+    private String alertWebhookType;
+    /** 收件箱"卡死"判定阈值（分钟），投递未终结且停留超过该时长视为异常，默认 30。 */
+    private Integer inboxStuckMinutes;
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -191,5 +199,29 @@ public class LinkoraServerProperties {
 
     public void setRetentionDays(Integer retentionDays) {
         this.retentionDays = retentionDays;
+    }
+
+    public String getAlertWebhookUrl() {
+        return alertWebhookUrl;
+    }
+
+    public void setAlertWebhookUrl(String alertWebhookUrl) {
+        this.alertWebhookUrl = alertWebhookUrl;
+    }
+
+    public String getAlertWebhookType() {
+        return alertWebhookType;
+    }
+
+    public void setAlertWebhookType(String alertWebhookType) {
+        this.alertWebhookType = alertWebhookType;
+    }
+
+    public Integer getInboxStuckMinutes() {
+        return inboxStuckMinutes;
+    }
+
+    public void setInboxStuckMinutes(Integer inboxStuckMinutes) {
+        this.inboxStuckMinutes = inboxStuckMinutes;
     }
 }

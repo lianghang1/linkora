@@ -145,6 +145,15 @@ public class LinkoraServerAutoConfiguration {
         if (p.getRetentionDays() != null) {
             builder.retentionDays(p.getRetentionDays());
         }
+        if (p.getAlertWebhookUrl() != null && !p.getAlertWebhookUrl().trim().isEmpty()) {
+            builder.alertWebhookUrl(p.getAlertWebhookUrl());
+            if (p.getAlertWebhookType() != null && !p.getAlertWebhookType().trim().isEmpty()) {
+                builder.alertWebhookType(p.getAlertWebhookType());
+            }
+        }
+        if (p.getInboxStuckMinutes() != null) {
+            builder.inboxStuckMinutes(p.getInboxStuckMinutes());
+        }
         return builder.build();
     }
 
