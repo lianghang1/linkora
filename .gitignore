@@ -19,3 +19,7 @@ Thumbs.db
 
 # 示例运行时数据（内嵌 H2 文件库等）
 data/
+
+# 运行时 SQLite 库目录（示例/控制台运行残留）
+examples/**/linkora/
+linkora/
