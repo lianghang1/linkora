@@ -6,7 +6,7 @@
 
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-parent</artifactId>
-    <version>0.4.2</version>
+    <version>0.5.0</version>
     <packaging>pom</packaging>
 
     <name>Linkora</name>
