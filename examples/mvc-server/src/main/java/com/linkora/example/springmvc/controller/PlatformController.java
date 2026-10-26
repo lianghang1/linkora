@@ -73,6 +73,38 @@ public class PlatformController {
         return body;
     }
 
+    /**
+     * 同库同事务演示（datasource/mysql 模式）：fail=true 时 publish 之后整体回滚，
+     * 业务行与消息一起消失；sqlite 模式下业务表建在内嵌库中，语义一致。
+     */
+    @PostMapping("/api/demo/atomic-order")
+    public java.util.Map<String, Object> placeOrderAtomically(
+            @RequestParam String clientId,
+            @RequestParam String orderNo,
+            @RequestParam String item,
+            @RequestParam(defaultValue = "false") boolean fail) {
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<String, Object>();
+        try {
+            com.linkora.server.PublishResult result =
+                    orderService.placeOrderAtomically(clientId, orderNo, item, fail);
+            body.put("messageId", result.getMessageId());
+            body.put("committed", true);
+        } catch (IllegalStateException e) {
+            body.put("committed", false);
+            body.put("note", "业务已回滚：业务行与消息一起消失");
+        }
+        return body;
+    }
+
+    /** 查证回滚效果：订单是否真实落库。 */
+    @GetMapping("/api/demo/order-exists")
+    public java.util.Map<String, Object> orderExists(@RequestParam String orderNo) {
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<String, Object>();
+        body.put("orderNo", orderNo);
+        body.put("exists", orderService.orderExists(orderNo));
+        return body;
+    }
+
     /** 查看线下回传的订单状态（OrderStatusHandler 处理结果）。 */
     @GetMapping("/api/uplink/order-status-updates")
     public List<OrderStatusHandler.OrderStatusUpdate> orderStatusUpdates() {

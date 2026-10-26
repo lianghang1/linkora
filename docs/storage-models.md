@@ -35,6 +35,9 @@ linkora:
 
 注意事项：
 
+- **纯 Spring MVC 宿主必须显式 `@EnableTransactionManagement`**（Boot 有自动配置，
+  纯 Spring 没有——缺失时 `@Transactional` **静默失效**：无代理、无回滚、无报错，
+  实测于 MySQL 真库发现，见 examples/mvc-server 的 AppConfig）
 - 双 DataSource 宿主（业务库 + 自动配置的嵌入式库并存）时，
   Boot 的 `DataSourceTransactionManagerAutoConfiguration` 因多候选不生效，
   需显式声明 `PlatformTransactionManager` 并绑定 linkora 存储数据源

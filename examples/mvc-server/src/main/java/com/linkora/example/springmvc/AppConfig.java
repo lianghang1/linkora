@@ -38,6 +38,9 @@ import javax.sql.DataSource;
  */
 @Configuration
 @EnableWebMvc
+// 纯 Spring MVC 宿主没有 Boot 的自动配置：注解事务必须显式开启，
+// 否则 @Transactional 静默失效（无代理、无回滚）
+@org.springframework.transaction.annotation.EnableTransactionManagement
 @ComponentScan("com.linkora.example.springmvc")
 @Import(LinkoraServerConfiguration.class)
 public class AppConfig implements WebMvcConfigurer {
@@ -74,12 +77,20 @@ public class AppConfig implements WebMvcConfigurer {
             }
             // 启动前完成 schema 迁移（幂等，崩溃续跑）
             JdbcServerSchema.migrate(ds);
-            return ds;
+            // 事务感知包装：宿主 @Transactional 内的 publish 随业务原子提交
+            return com.linkora.spring.TxAwareDataSources.wrap(ds);
         }
         // sqlite（默认）：内嵌文件库，零配置起步；迁移同样幂等
         DataSource ds = embeddedDb.dataSource();
         JdbcServerSchema.migrate(ds);
-        return ds;
+        return com.linkora.spring.TxAwareDataSources.wrap(ds);
+    }
+
+    /** 事务管理器：绑定存储数据源，@Transactional（同库同事务演示）依赖它。 */
+    @Bean
+    public org.springframework.transaction.PlatformTransactionManager linkoraTransactionManager(
+            DataSource linkoraDataSource) {
+        return new org.springframework.jdbc.datasource.DataSourceTransactionManager(linkoraDataSource);
     }
 
     @Bean
