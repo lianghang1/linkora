@@ -5,5 +5,7 @@
 # 与 lk_client_outbox 同库，OrderStatusService.updateStatusAtomically 的事务演示
 # 完整）；生产替换为业务库连接。
 linkora:
+  # 传输加密（0.6.0 默认开启，与认证无关；两端 key 必须一致）
+  payload-cipher-key: "Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M="
   client:
     store: datasource

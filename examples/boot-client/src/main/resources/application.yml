@@ -6,16 +6,19 @@ spring:
     name: linkora-boot-client
 
 linkora:
-  # 本示例为客户端角色：显式关闭服务端装配
-  # （0.5.0 起服务端默认 store=sqlite、不再依赖宿主 DataSource，client-only 宿主必须显式关闭）
-  server:
-    enabled: false
+  # 传输加密（0.6.0 默认开启，与认证无关；两端 key 必须一致）
+  payload-cipher-key: "Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M="
+  # 0.6.0 拆包后：客户端宿主只引 client starter，服务端类不在 classpath，无需再显式关闭
   client:
-    # starter 自动装配开关：组装 LinkoraClient（启动/优雅关闭全部托管）
+    # 0.6.0 引包即用（enabled 默认 true，属性保留作显式关闭逃生口）
     enabled: true
     # 对端 boot-server（默认端口 8082）
     server-url: http://127.0.0.1:8082
     client-id: demo-client
+    # 认证（0.6.0）：token 模式——宿主登录体系下发的 token（静态演示；
+    # 生产实现 TokenProvider Bean 动态获取，每次请求自动携带最新 token）
+    auth-mode: token
+    auth-token: grp-demo-client-2026
     # 存储模式（0.5.0，与服务端对等）：
     #   sqlite（默认）——本地 SQLite 文件，离线缓冲优先；
     #   datasource   ——复用宿主 DataSource（业务消息同库同事务，transactional

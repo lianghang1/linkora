@@ -385,6 +385,58 @@ public final class JdbcClientStore implements ClientStore {
         }
     }
 
+    @Override
+    public java.util.Map<String, String> loadSyncSnapshot(String syncKey) {
+        return exec("loadSyncSnapshot", () -> {
+            java.util.Map<String, String> out = new java.util.LinkedHashMap<String, String>();
+            try (Connection conn = connection();
+                    PreparedStatement ps = conn.prepareStatement(
+                    "SELECT row_key, row_hash FROM lk_client_snapshot WHERE sync_key = ?")) {
+                ps.setString(1, syncKey);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.put(rs.getString(1), rs.getString(2));
+                    }
+                }
+                return out;
+            }
+        });
+    }
+
+    @Override
+    public void saveSyncSnapshot(String syncKey, java.util.Map<String, String> rowHashes) {
+        exec("saveSyncSnapshot", () -> {
+            try (Connection conn = connection()) {
+                boolean autoCommit = conn.getAutoCommit();
+                conn.setAutoCommit(false);
+                try {
+                    try (PreparedStatement del = conn.prepareStatement(
+                            "DELETE FROM lk_client_snapshot WHERE sync_key = ?")) {
+                        del.setString(1, syncKey);
+                        del.executeUpdate();
+                    }
+                    try (PreparedStatement ins = conn.prepareStatement(
+                            "INSERT INTO lk_client_snapshot (sync_key, row_key, row_hash) VALUES (?, ?, ?)")) {
+                        for (java.util.Map.Entry<String, String> e : rowHashes.entrySet()) {
+                            ins.setString(1, syncKey);
+                            ins.setString(2, e.getKey());
+                            ins.setString(3, e.getValue());
+                            ins.addBatch();
+                        }
+                        ins.executeBatch();
+                    }
+                    conn.commit();
+                } catch (SQLException e) {
+                    conn.rollback();
+                    throw e;
+                } finally {
+                    conn.setAutoCommit(autoCommit);
+                }
+                return null;
+            }
+        });
+    }
+
     private Connection connection() throws SQLException {
         return dataSource.getConnection();
     }

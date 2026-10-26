@@ -24,6 +24,8 @@ public final class ClientConfig {
     private final long retryBackoffMaxMs;
     private final long outboxRetentionMs;
     private final long inboxRetentionMs;
+    /** payload 传输加密密钥（Base64, 32 字节）；null = 不加密（内核默认，宿主装配默认开）。 */
+    private final String payloadCipherKey;
 
     private ClientConfig(Builder b) {
         this.eventsPath = b.eventsPath;
@@ -43,6 +45,7 @@ public final class ClientConfig {
         this.retryBackoffMaxMs = b.retryBackoffMaxMs;
         this.outboxRetentionMs = b.outboxRetentionMs;
         this.inboxRetentionMs = b.inboxRetentionMs;
+        this.payloadCipherKey = b.payloadCipherKey;
     }
 
     public static Builder builder() {
@@ -121,6 +124,11 @@ public final class ClientConfig {
     }
 
     /** 已完成 inbox 记录保留时长（毫秒）。 */
+    /** payload 传输加密密钥（可能为 null = 不加密）。 */
+    public String getPayloadCipherKey() {
+        return payloadCipherKey;
+    }
+
     public long getInboxRetentionMs() {
         return inboxRetentionMs;
     }
@@ -272,6 +280,17 @@ public final class ClientConfig {
                 throw new IllegalArgumentException("inboxRetentionMs 不得小于 1 秒");
             }
             this.inboxRetentionMs = inboxRetentionMs;
+            return this;
+        }
+
+        private String payloadCipherKey;
+
+        /** payload 传输加密密钥（Base64, 32 字节，openssl rand -base64 32）；不配置 = 不加密。 */
+        public Builder payloadCipherKey(String base64Key) {
+            if (base64Key != null) {
+                com.linkora.core.crypto.PayloadCipher.decodeKey(base64Key); // fail-fast 校验
+            }
+            this.payloadCipherKey = base64Key;
             return this;
         }
 

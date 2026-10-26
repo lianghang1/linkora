@@ -62,6 +62,10 @@ public final class MessageJsonCodec {
             // 老版本收到带 subject 的消息不会报错（滚动升级安全）
             node.put("subject", message.getSubject());
         }
+        // enc 线路标记：只在有值时输出（0.6.0 传输加密；解码端按字段名读，滚动升级安全）
+        if (message.getEnc() != null) {
+            node.put("enc", message.getEnc());
+        }
         return node.toString();
     }
 
@@ -90,6 +94,10 @@ public final class MessageJsonCodec {
         JsonNode subject = node.get("subject");
         if (subject != null && !subject.isNull()) {
             builder.subject(subject.asText());
+        }
+        JsonNode enc = node.get("enc");
+        if (enc != null && !enc.isNull()) {
+            builder.enc(enc.asText());
         }
         try {
             return builder.build();

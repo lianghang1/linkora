@@ -5,7 +5,6 @@ import com.linkora.core.storage.server.ClientCursorRepository;
 import com.linkora.core.storage.server.ClientRegistry;
 import com.linkora.core.storage.server.DeliveryRepository;
 import com.linkora.core.storage.server.MessageRepository;
-import com.linkora.server.auth.AllowAllClientAuthenticator;
 import com.linkora.server.auth.ClientAuthenticator;
 import com.linkora.server.storage.jdbc.JdbcClientCursorRepository;
 import com.linkora.server.storage.jdbc.JdbcClientRegistry;
@@ -91,10 +90,20 @@ public class AppConfig implements WebMvcConfigurer {
         return new org.springframework.jdbc.datasource.DataSourceTransactionManager(linkoraDataSource);
     }
 
+    /**
+     * 认证（0.6.0 token 模式演示）：委托宿主账号体系校验 Bearer Token
+     * （演示约定 grp-&lt;clientId&gt;-&lt;日期&gt;；生产替换为宿主登录体系的校验实现，
+     * 或换 HmacClientAuthenticator，见 docs/security.md）。
+     */
     @Bean
     public ClientAuthenticator linkoraClientAuthenticator() {
-        // 演示用放行认证器；生产环境替换为 HmacClientAuthenticator（docs/security.md）
-        return new AllowAllClientAuthenticator();
+        return new com.linkora.server.auth.TokenClientAuthenticator(
+                new com.linkora.server.auth.TokenValidator() {
+                    @Override
+                    public boolean validate(String clientId, String token) {
+                        return token != null && token.startsWith("grp-" + clientId + "-");
+                    }
+                });
     }
 
     @Bean

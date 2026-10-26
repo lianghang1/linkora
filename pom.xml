@@ -6,7 +6,7 @@
 
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-parent</artifactId>
-    <version>0.5.0</version>
+    <version>0.6.0</version>
     <packaging>pom</packaging>
 
     <name>Linkora</name>
@@ -38,9 +38,12 @@
         <module>linkora-core</module>
         <module>linkora-server</module>
         <module>linkora-client</module>
-        <module>linkora-spring</module>
+        <module>linkora-spring-common</module>
+        <module>linkora-client-spring</module>
+        <module>linkora-server-spring</module>
         <module>linkora-admin-console</module>
-        <module>linkora-spring-boot-starter</module>
+        <module>linkora-client-spring-boot-starter</module>
+        <module>linkora-server-spring-boot-starter</module>
         <module>linkora-testkit</module>
         <module>examples</module>
     </modules>

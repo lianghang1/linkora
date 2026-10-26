@@ -16,8 +16,11 @@
 
 | 你的宿主 | 服务端引 | 客户端引 |
 |---|---|---|
-| Spring Boot 应用 | `linkora-spring-boot-starter` | `linkora-spring-boot-starter`（同一包） |
-| Spring MVC 应用（无 Boot） | `linkora-spring` | `linkora-spring`（同一包） |
+| Spring Boot 应用 | `linkora-server-spring-boot-starter` | `linkora-client-spring-boot-starter` |
+| Spring MVC 应用（无 Boot） | `linkora-server-spring` | `linkora-client-spring` |
+
+> 0.6.0 起按角色拆包（官方 starter 命名规范），0.5.0 及以前的统一包已废弃，
+> 迁移对照见 [docs/migration-0.6.0.md](docs/migration-0.6.0.md)。
 
 ```xml
 <dependency>
@@ -59,6 +62,17 @@ uplinkPublisher.publish("order-status-updated", payload);
 ```
 
 完整分步说明（含 MVC 宿主、全部配置项）见 [docs/getting-started.md](docs/getting-started.md)。
+
+## 传输加密与认证（0.6.0）
+
+- **传输加密默认开启**：payload 自动 AES-256-GCM（两端配置相同密钥
+  `linkora.payload-cipher-key`，缺失启动即失败；与认证无关，匿名部署可用）；
+  大 payload 自动 gzip
+- **三种认证模式**：HMAC 签名（默认）、Bearer Token（服务端回调宿主账号体系
+  校验——已有登录系统零改造接入）、匿名；客户端 token 支持静态配置或
+  TokenProvider SPI 动态获取。详见 docs/security.md 与 docs/migration-0.6.0.md
+- **数据同步工具**：`com.linkora.client.sync.DataSync`——业务系统不改造时，
+  旁挂客户端只读源库、快照 diff、只发增量
 
 ## 核心能力
 

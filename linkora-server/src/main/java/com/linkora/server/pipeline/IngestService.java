@@ -71,12 +71,28 @@ public final class IngestService {
                 : Collections.unmodifiableList(new ArrayList<IngestListener>(ingestListeners));
     }
 
-    public IngestResult ingest(AuthRequest request) {
+    public IngestResult ingest(AuthRequest requestParam) {
+        AuthRequest request = requestParam;
         AuthResult auth = authenticator.authenticate(request);
         if (!auth.isAuthenticated()) {
             return IngestResult.rejected(
                     auth.getErrorCode() == null ? LinkoraErrorCode.AUTH_FAILED : auth.getErrorCode(),
                     auth.getMessage());
+        }
+        // gzip：验签（覆盖压缩后字节）通过后解压，大小上限按解压后内容计
+        if ("gzip".equalsIgnoreCase(
+                String.valueOf(request.getHeaders().get("X-Linkora-Content-Encoding")))) {
+            byte[] decompressed;
+            try {
+                decompressed = com.linkora.core.util.Gzip.decompress(request.getBody());
+            } catch (java.io.IOException e) {
+                return IngestResult.rejected(LinkoraErrorCode.INVALID_MESSAGE, "gzip 解压失败");
+            }
+            java.util.Map<String, String> hs =
+                    new java.util.LinkedHashMap<String, String>(request.getHeaders());
+            hs.remove("X-Linkora-Content-Encoding");
+            request = new com.linkora.server.auth.AuthRequest(
+                    request.getClientId(), request.getMethod(), hs, decompressed);
         }
         String protocolError = checkProtocol(request);
         if (protocolError != null) {
@@ -89,6 +105,15 @@ public final class IngestService {
         LinkoraMessage message;
         try {
             message = codec.decodeMessage(new String(request.getBody(), StandardCharsets.UTF_8));
+            if (message.getEnc() != null) {
+                if (config.getPayloadCipherKey() == null) {
+                    return IngestResult.rejected(LinkoraErrorCode.INVALID_MESSAGE,
+                            "收到加密消息但服务端未配置 payload-cipher-key");
+                }
+                message = com.linkora.core.crypto.EncryptedMessages.decrypt(
+                        com.linkora.core.crypto.PayloadCipher.decodeKey(
+                                config.getPayloadCipherKey()), message);
+            }
         } catch (LinkoraException e) {
             return IngestResult.rejected(LinkoraErrorCode.INVALID_MESSAGE, e.getMessage());
         }

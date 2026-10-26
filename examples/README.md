@@ -1,50 +1,37 @@
-# Linkora 全套示例（0.5.0 存储模型）
+# Linkora 示例（0.6.0 殡葬集团业务场景）
 
-四个示例应用，覆盖 Spring Boot 与 Spring MVC（均为 Tomcat）、
-两种存储模式（sqlite 内嵌 / datasource 宿主库同事务）：
+四个全功能示例应用（均为 Tomcat），模拟真实接入形态：**集团总部线上服务 +
+门店/墓园线下终端，业务系统已存在，接入 linkora 实现双向可靠通信**。
 
-| 应用 | 角色 | 依赖版本 |
-|---|---|---|
-| `boot-server` | 服务端 + 运维控制台（内嵌 Tomcat） | 仓库源码 |
-| `boot-client` | 客户端嵌入业务服务（内嵌 Tomcat） | 仓库源码 |
-| `mvc-server`  | 服务端 + 运维控制台（Tomcat war/内嵌 Tomcat） | Maven Central 正式包 |
-| `mvc-client`  | 客户端（Tomcat） | Maven Central 正式包 |
+| 应用 | 角色 | 宿主 | 演示内容 |
+|---|---|---|---|
+| `boot-server` | 总部服务端 | Spring Boot（内嵌 Tomcat） | 订单下发（顺序键）、墓位数据同步接收、token 认证（回调宿主校验）、控制台、传输加密 |
+| `boot-client` | 墓园终端 | Spring Boot（内嵌 Tomcat） | 订单接收处理、状态回传（上行+ACK）、墓位数据同步（只读业务库+快照 diff+增量上报）、token 携带、离线补发 |
+| `mvc-server` | 总部服务端 | Spring MVC（Tomcat） | 同 boot-server（手动装配形态） |
+| `mvc-client` | 门店终端 | Spring MVC（Tomcat） | 同 boot-client（手动装配形态） |
 
-## 存储模式（两端对等）
+每个示例均为两种存储模式（`store=sqlite` 内嵌默认 / `store=datasource` 宿主库同事务）。
 
-| 模式 | 语义 | 适用 |
-|---|---|---|
-| `sqlite`（默认） | 内嵌 SQLite 文件，零配置起步；boot 系默认 `./data/*.db` | 开发 / 演示 / 小规模部署 |
-| `datasource` | 复用宿主 DataSource，业务与消息**同库同事务**（transactional outbox） | 生产推荐 |
+## 认证演示（token 模式）
 
-## 启动与验证（以 boot-server 为例）
+- 服务端 `HostTokenValidator`：回调宿主账号体系校验（演示约定 `grp-<clientId>-<日期>`）
+- 客户端静态 token（`linkora.client.auth-token`）；生产实现
+  `TokenProvider` Bean 动态获取（每次请求自动携带最新 token）
+- 错误 token → 服务端 401 拒绝（可自行 curl 验证）
 
-```bash
-# sqlite 模式（默认，无需数据库）
-mvn spring-boot:run
-# datasource 模式（演示用 H2 内存库；生产替换 spring.datasource 为业务库）
-mvn spring-boot:run -Dspring-boot.run.profiles=datasource
-```
+## 传输加密
 
-事务演示（datasource 模式下语义完整）：
+两端配置相同 `linkora.payload-cipher-key`（默认开启）；线路上的 payload 为
+AES-256-GCM 密文，服务端解密后进业务逻辑。抓包可见内容均为密文。
+
+## 数据同步（墓位场景）
 
 ```bash
-# 业务行与消息同事务提交
-curl -X POST "http://127.0.0.1:8092/api/demo/atomic-order?clientId=demo-client&orderNo=A-1&item=x"
-# fail=true：publish 之后整体回滚——业务行与消息一起消失
-curl -X POST "http://127.0.0.1:8092/api/demo/atomic-order?clientId=demo-client&orderNo=A-2&item=x&fail=true"
-curl "http://127.0.0.1:8092/api/demo/order-exists?orderNo=A-2"   # → {"exists":false}
+# 1. 启动 boot-server（8082）与 boot-client（8083）
+# 2. 模拟业务系统写入墓位（业务系统不改造，数据进"它自己的库"）
+curl -X POST "http://127.0.0.1:8083/api/business/tomb" -d "code=A-001&name=测试墓位"
+# 3. 等 30s 定时同步：客户端日志显示"全量读取 N 行，增量 M"——只上报变更
+# 4. 服务端 TombSyncHandler 按业务主键 upsert；再改一行 → 下轮只报 1 条 UPDATE
 ```
 
-boot-client 同理：`/api/ship`（普通上行）、`/api/demo/atomic-ship?fail=true`（同事务回滚，
-server 侧 `/api/uplink/order-status-updates` 可验证"回滚的消息从未到达"）。
-
-## 各示例专属说明
-
-- **boot-server / boot-client**：`application.yml`（sqlite 默认）+ `application-datasource.yml`
-  （datasource profile）；boot-client 为 client-only 宿主，已显式 `linkora.server.enabled=false`
-- **mvc-server**：`-Dlinkora.store=sqlite|mysql` 切换（默认 sqlite）；
-  控制台令牌 `-Dlinkora.admin.console.token=...`；启动
-  `java -Dlinkora.store=sqlite -Dlinkora.admin.console.token=t -cp "target/classes:$(cat target/cp.txt)" com.linkora.example.springmvc.SpringMvcServerMain 8081`
-- **mvc-client**：`linkora-client.properties` 配置；`-Dlinkora.client.store=datasource`
-  切换（需宿主 DataSource Bean）
+各应用启动方式见各自 README；迁移与依赖对照见 docs/migration-0.6.0.md。

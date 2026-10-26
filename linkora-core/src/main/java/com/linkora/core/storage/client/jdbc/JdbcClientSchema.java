@@ -20,7 +20,7 @@ import javax.sql.DataSource;
 public final class JdbcClientSchema {
 
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    public static final int LATEST_VERSION = 2;
+    public static final int LATEST_VERSION = 3;
 
     private static final String VERSION_TABLE = "lk_client_schema_version";
 
@@ -67,7 +67,16 @@ public final class JdbcClientSchema {
                     + "ON lk_client_outbox (sequence_key)",
     };
 
-    private static final String[][] MIGRATIONS = {V1, V2};
+    /** v3：数据同步快照表（0.6.0 sync 工具）。 */
+    private static final String[] V3 = {
+            "CREATE TABLE IF NOT EXISTS lk_client_snapshot ("
+                    + " sync_key  VARCHAR(128) NOT NULL,"
+                    + " row_key   VARCHAR(255) NOT NULL,"
+                    + " row_hash  VARCHAR(64)  NOT NULL,"
+                    + " PRIMARY KEY (sync_key, row_key))",
+    };
+
+    private static final String[][] MIGRATIONS = {V1, V2, V3};
 
     private JdbcClientSchema() {
     }

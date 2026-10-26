@@ -73,6 +73,19 @@ public interface ClientStore {
      * <p>默认返回 false（不阻塞）：自实现存储不覆盖该方法即退化为"不保证上行顺序"，
      * 不会破坏既有实现。</p>
      */
+    /**
+     * 加载数据同步快照（0.6.0，sync 工具用）：syncKey → {rowKey: rowHash}。
+     * 自定义实现未支持时抛 UnsupportedOperationException（0.6.0 内置两实现均已支持）。
+     */
+    default java.util.Map<String, String> loadSyncSnapshot(String syncKey) {
+        throw new UnsupportedOperationException("当前 ClientStore 不支持数据同步快照");
+    }
+
+    /** 保存数据同步快照（整表覆盖写：先删该 syncKey 旧行再批量插入）。 */
+    default void saveSyncSnapshot(String syncKey, java.util.Map<String, String> rowHashes) {
+        throw new UnsupportedOperationException("当前 ClientStore 不支持数据同步快照");
+    }
+
     default boolean hasEarlierActiveInKey(String sequenceKey, String messageId) {
         return false;
     }

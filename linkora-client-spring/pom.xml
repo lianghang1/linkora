@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.lianghang1</groupId>
+        <artifactId>linkora-parent</artifactId>
+        <version>0.6.0</version>
+    </parent>
+
+    <artifactId>linkora-client-spring</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Linkora Spring Client</name>
+    <description>Spring MVC 宿主的 Linkora 客户端装配（@Import 一行接入）。</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.lianghang1</groupId>
+            <version>${project.version}</version>
+            <artifactId>linkora-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.lianghang1</groupId>
+            <version>${project.version}</version>
+            <artifactId>linkora-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.lianghang1</groupId>
+            <version>${project.version}</version>
+            <artifactId>linkora-spring-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+        </dependency>
+    </dependencies>
+</project>

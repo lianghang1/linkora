@@ -8,7 +8,7 @@
          可脱离本仓库单独构建（mvn -f 本文件），用于验证发布产物的可用性 -->
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-example-spring-boot-client-app</artifactId>
-    <version>0.5.0</version>
+    <version>0.6.0</version>
     <packaging>jar</packaging>
 
     <name>Linkora Example: Spring Boot Client App</name>
@@ -21,7 +21,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <maven.compiler.release>8</maven.compiler.release>
         <!-- 固定引用已发布的正式版；升级示例依赖时仅需改此属性（联调 SNAPSHOT 先 mvn install） -->
-        <linkora.version>0.5.0</linkora.version>
+        <linkora.version>0.6.0</linkora.version>
         <!-- 独立 pom 不继承 examples 聚合的该属性：maven-deploy-plugin 识别它，
              防止 deploy 时把示例推往 settings.xml altDeploymentRepository 指向的公司 nexus -->
         <maven.deploy.skip>true</maven.deploy.skip>
@@ -46,16 +46,14 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- 仅需 spring-jdbc（JdbcTemplate）；不可用 spring-boot-starter-jdbc——
-             它携带 HikariCP 会强制激活 Boot 的 DataSource 自动配置，sqlite 内嵌存储
-             模式（默认，零外部依赖）下无驱动无 url 直接启动失败 -->
+        <!-- datasource 模式需要：宿主 DataSource（HikariCP）与 JdbcTemplate -->
         <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-jdbc</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.lianghang1</groupId>
-            <artifactId>linkora-spring-boot-starter</artifactId>
+            <artifactId>linkora-client-spring-boot-starter</artifactId>
             <version>${linkora.version}</version>
         </dependency>
     </dependencies>

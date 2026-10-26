@@ -383,6 +383,62 @@ public final class SqliteClientStore implements ClientStore, Closeable {
     }
 
     @Override
+    public java.util.Map<String, String> loadSyncSnapshot(String syncKey) {
+        synchronized (lock) {
+            java.util.Map<String, String> out = new java.util.LinkedHashMap<String, String>();
+            try (java.sql.PreparedStatement ps = connection.prepareStatement(
+                    "SELECT row_key, row_hash FROM lk_client_snapshot WHERE sync_key = ?")) {
+                ps.setString(1, syncKey);
+                try (java.sql.ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        out.put(rs.getString(1), rs.getString(2));
+                    }
+                }
+                return out;
+            } catch (SQLException e) {
+                throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                        "加载同步快照失败: " + syncKey, e);
+            }
+        }
+    }
+
+    @Override
+    public void saveSyncSnapshot(String syncKey, java.util.Map<String, String> rowHashes) {
+        synchronized (lock) {
+            try {
+                boolean autoCommit = connection.getAutoCommit();
+                connection.setAutoCommit(false);
+                try {
+                    try (java.sql.PreparedStatement del = connection.prepareStatement(
+                            "DELETE FROM lk_client_snapshot WHERE sync_key = ?")) {
+                        del.setString(1, syncKey);
+                        del.executeUpdate();
+                    }
+                    try (java.sql.PreparedStatement ins = connection.prepareStatement(
+                            "INSERT INTO lk_client_snapshot (sync_key, row_key, row_hash) VALUES (?, ?, ?)")) {
+                        for (java.util.Map.Entry<String, String> e : rowHashes.entrySet()) {
+                            ins.setString(1, syncKey);
+                            ins.setString(2, e.getKey());
+                            ins.setString(3, e.getValue());
+                            ins.addBatch();
+                        }
+                        ins.executeBatch();
+                    }
+                    connection.commit();
+                } catch (SQLException e) {
+                    connection.rollback();
+                    throw e;
+                } finally {
+                    connection.setAutoCommit(autoCommit);
+                }
+            } catch (SQLException e) {
+                throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                        "保存同步快照失败: " + syncKey, e);
+            }
+        }
+    }
+
+    @Override
     public void close() {
         synchronized (lock) {
             if (closed) {

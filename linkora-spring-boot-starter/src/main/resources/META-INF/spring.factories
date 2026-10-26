@@ -1,4 +1,0 @@
-org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.linkora.spring.boot.LinkoraServerAutoConfiguration,\
-com.linkora.spring.boot.LinkoraClientAutoConfiguration,\
-com.linkora.spring.boot.LinkoraAdminConsoleAutoConfiguration

@@ -411,6 +411,7 @@ public final class LinkoraClient implements AutoCloseable {
         LinkoraMessage message;
         try {
             message = codec.decodeMessage(json);
+            message = decryptInbound(message);
         } catch (LinkoraException e) {
             // 解不开也必须给服务端一个明确答复：否则它会按 pacing（最长 60s 一次）
             // 无限重推。messageId 是 JSON 的第一个字段，坏消息通常仍能抠出来。
@@ -833,11 +834,12 @@ public final class LinkoraClient implements AutoCloseable {
                     .messageId(entry.getMessageId())
                     .clientId(clientId)
                     .messageType(entry.getMessageType())
-                    .payload(entry.getPayload())
+                    .payload(uplinkPayload(entry.getPayload()))
                     .createdAt(entry.getCreatedAt())
                     .expiresAt(entry.getExpiresAt())
                     .schemaVersion(Protocol.PROTOCOL_VERSION)
                     .sequenceKey(entry.getSequenceKey())
+                    .enc(uplinkEncMark())
                     .build();
         } catch (IllegalArgumentException e) {
             transitionOutbox(entry.with(OutboxStatus.DEAD_LETTER, entry.getRetryCount(),
@@ -846,8 +848,12 @@ public final class LinkoraClient implements AutoCloseable {
             return;
         }
         byte[] body = codec.encodeMessage(message).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        body = com.linkora.core.util.Gzip.maybeCompress(body);
         Map<String, String> headers = baseHeaders();
         headers.put("Content-Type", "application/json");
+        if (com.linkora.core.util.Gzip.isGzipped(body)) {
+            headers.put("X-Linkora-Content-Encoding", "gzip");
+        }
         headers.putAll(credentialProvider.authHeaders(
                 new CredentialProvider.RequestMaterial("POST", body)));
         TransportRequest request = TransportRequest.newBuilder(ingestUrl)
@@ -939,6 +945,35 @@ public final class LinkoraClient implements AutoCloseable {
         } catch (RuntimeException e) {
             log.warn("恢复扫描失败（下轮继续）", e);
         }
+    }
+
+    /** 上行 payload 加密（未配置密钥时原样返回）。 */
+    private byte[] uplinkPayload(byte[] payload) {
+        if (config.getPayloadCipherKey() == null) {
+            return payload;
+        }
+        byte[] key = com.linkora.core.crypto.PayloadCipher.decodeKey(config.getPayloadCipherKey());
+        return com.linkora.core.crypto.PayloadCipher
+                .encryptToBase64(payload, key).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** 上行 enc 标记（未配置密钥时 null）。 */
+    private String uplinkEncMark() {
+        return config.getPayloadCipherKey() == null ? null
+                : com.linkora.core.crypto.PayloadCipher.ENC_MARK;
+    }
+
+    /** 下行接收解密：按 enc 标记执行；密钥未配置而收到密文 → 抛错转重试（不静默丢）。 */
+    private LinkoraMessage decryptInbound(LinkoraMessage message) {
+        if (message.getEnc() == null) {
+            return message;
+        }
+        if (config.getPayloadCipherKey() == null) {
+            throw new IllegalStateException(
+                    "收到加密消息但本端未配置 payload-cipher-key: " + message.getMessageId());
+        }
+        byte[] key = com.linkora.core.crypto.PayloadCipher.decodeKey(config.getPayloadCipherKey());
+        return com.linkora.core.crypto.EncryptedMessages.decrypt(key, message);
     }
 
     // ---------------- ACK 发送 ----------------

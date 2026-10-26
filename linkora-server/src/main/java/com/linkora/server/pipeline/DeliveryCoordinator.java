@@ -253,6 +253,11 @@ public final class DeliveryCoordinator implements SseSubscribeHandler {
                 return; // RETRYING 由重试退避调度，不受重推节奏约束
             }
 
+            if (config.getPayloadCipherKey() != null) {
+                message = com.linkora.core.crypto.EncryptedMessages.encrypt(
+                        com.linkora.core.crypto.PayloadCipher.decodeKey(
+                                config.getPayloadCipherKey()), message);
+            }
             String data = codec.encodeMessage(message);
             int delivered = gateway.push(clientId, String.valueOf(record.getSeq()),
                     MESSAGE_EVENT_TYPE, data);

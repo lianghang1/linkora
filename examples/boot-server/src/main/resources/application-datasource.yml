@@ -5,6 +5,8 @@
 # 同库，事务演示完整）；生产替换为业务库连接（MySQL 等 JDBC 数据源）。
 # 注意：内嵌 SQLite 请确保 sqlite-jdbc 3.46+（见 docs/storage-models.md 驱动版本说明）。
 linkora:
+  # 传输加密（0.6.0 默认开启，与认证无关；两端 key 必须一致）
+  payload-cipher-key: "Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M="
   server:
     store: datasource
     auto-migrate: true

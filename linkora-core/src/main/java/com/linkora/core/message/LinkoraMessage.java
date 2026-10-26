@@ -28,6 +28,9 @@ public final class LinkoraMessage {
     public static final int MAX_SUBJECT_LENGTH = 255;
     private final String subject;
 
+    /** 线路标记：payload 是否加密（A256GCM:keyId）；仅传输语义，不参与 equals/持久化。 */
+    private final String enc;
+
     /** 顺序键长度上限（与库表列宽一致）。 */
     public static final int MAX_SEQUENCE_KEY_LENGTH = 128;
 
@@ -60,6 +63,7 @@ public final class LinkoraMessage {
             throw new IllegalArgumentException("subject 长度不得超过 " + MAX_SUBJECT_LENGTH);
         }
         this.subject = builder.subject;
+        this.enc = builder.enc;
     }
 
     public static Builder builder() {
@@ -126,6 +130,11 @@ public final class LinkoraMessage {
     /** 可为 null 表示未设置（显示时回退到 messageType）。 */
     public String getSubject() {
         return subject;
+    }
+
+    /** enc 线路标记（可能为 null）。 */
+    public String getEnc() {
+        return enc;
     }
 
     @Override
@@ -255,6 +264,8 @@ public final class LinkoraMessage {
 
         private String subject;
 
+        private String enc;
+
         /**
          * 可选：一句话人类可读主题（如「优惠券补发 RV-2001」），供运维控制台等
          * 界面直接展示。null / 空白归一化为 null；不参与协议语义与投递逻辑。
@@ -262,6 +273,12 @@ public final class LinkoraMessage {
         public Builder subject(String subject) {
             this.subject = subject == null || subject.trim().isEmpty()
                     ? null : subject.trim();
+            return this;
+        }
+
+        /** enc 线路标记（A256GCM:keyId）；由加密切换点设置，业务方无需关心。 */
+        public Builder enc(String enc) {
+            this.enc = enc;
             return this;
         }
 

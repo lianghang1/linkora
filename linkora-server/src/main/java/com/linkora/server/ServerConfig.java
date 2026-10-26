@@ -18,6 +18,9 @@ public final class ServerConfig {
     private final int retentionDays;
     /** 死信告警 Webhook URL（null = 不告警）。 */
     private final String alertWebhookUrl;
+
+    /** payload 传输加密密钥（Base64, 32 字节）；null = 不加密。 */
+    private final String payloadCipherKey;
     /** 告警报文格式：raw | wecom | dingtalk | feishu。 */
     private final String alertWebhookType;
     /** 收件箱"卡死"判定阈值（分钟）：非终态投递超过该时长无推进即入收件箱。 */
@@ -35,6 +38,7 @@ public final class ServerConfig {
         this.maxOutboundBytesPerConnection = b.maxOutboundBytesPerConnection;
         this.retentionDays = b.retentionDays;
         this.alertWebhookUrl = b.alertWebhookUrl;
+        this.payloadCipherKey = b.payloadCipherKey;
         this.alertWebhookType = b.alertWebhookType;
         this.inboxStuckMinutes = b.inboxStuckMinutes;
     }
@@ -94,6 +98,11 @@ public final class ServerConfig {
         return alertWebhookUrl;
     }
 
+    /** payload 传输加密密钥（可能为 null = 不加密）。 */
+    public String getPayloadCipherKey() {
+        return payloadCipherKey;
+    }
+
     /** raw | wecom | dingtalk | feishu（默认 raw）。 */
     public String getAlertWebhookType() {
         return alertWebhookType;
@@ -132,6 +141,8 @@ public final class ServerConfig {
         private long maxOutboundBytesPerConnection = 8L * 1024 * 1024;
         private int retentionDays = 0;
         private String alertWebhookUrl;
+
+        private String payloadCipherKey;
         private String alertWebhookType = "raw";
         private int inboxStuckMinutes = 30;
 
@@ -211,6 +222,15 @@ public final class ServerConfig {
         public Builder alertWebhookUrl(String alertWebhookUrl) {
             this.alertWebhookUrl = alertWebhookUrl == null || alertWebhookUrl.trim().isEmpty()
                     ? null : alertWebhookUrl.trim();
+            return this;
+        }
+
+        /** payload 传输加密密钥（Base64, 32 字节，openssl rand -base64 32）；不配置 = 不加密。 */
+        public Builder payloadCipherKey(String base64Key) {
+            if (base64Key != null) {
+                com.linkora.core.crypto.PayloadCipher.decodeKey(base64Key); // fail-fast 校验
+            }
+            this.payloadCipherKey = base64Key;
             return this;
         }
 
