@@ -45,6 +45,9 @@ import javax.sql.DataSource;
 @Import(LinkoraServerConfiguration.class)
 public class AppConfig implements WebMvcConfigurer {
 
+    private static final org.slf4j.Logger log =
+            org.slf4j.LoggerFactory.getLogger(AppConfig.class);
+
     private static final String DEFAULT_URL =
             "jdbc:mysql://115.159.41.195:3306/linkora?useSSL=false"
                     + "&allowPublicKeyRetrieval=true&characterEncoding=UTF-8"
@@ -61,6 +64,8 @@ public class AppConfig implements WebMvcConfigurer {
     @Bean
     public DataSource linkoraDataSource(EmbeddedSqliteDatabase embeddedDb) {
         String store = System.getProperty("linkora.store", "sqlite");
+        log.info("Linkora 服务端存储模式: {}（{}）", store,
+                "mysql".equalsIgnoreCase(store) ? "宿主 MySQL，同库同事务" : "内嵌 SQLite，零配置起步");
         if ("mysql".equalsIgnoreCase(store)) {
             String url = System.getProperty("linkora.datasource.url", DEFAULT_URL);
             com.mysql.cj.jdbc.MysqlDataSource mysql = new com.mysql.cj.jdbc.MysqlDataSource();

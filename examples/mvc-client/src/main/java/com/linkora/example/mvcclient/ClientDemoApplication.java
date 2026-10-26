@@ -120,6 +120,9 @@ public class ClientDemoApplication {
             System.out.println("Linkora 演示客户端已启动（Spring 宿主，引 linkora-spring 单包）");
             System.out.println("  服务端: " + SERVER_BASE);
             System.out.println("  客户端: " + CLIENT_ID);
+            System.out.println("  存储模式: " + ("datasource".equalsIgnoreCase(
+                    System.getProperty("linkora.client.store", "sqlite"))
+                    ? "datasource（与宿主业务同库同事务）" : "sqlite（内嵌，零配置起步）"));
             System.out.println("  [就绪] 已注册 2 个下行处理器（order-created / review-created），SSE 在线");
             System.out.println("========================================");
 
