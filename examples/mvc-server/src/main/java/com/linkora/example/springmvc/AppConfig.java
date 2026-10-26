@@ -31,7 +31,7 @@ import javax.sql.DataSource;
  *   <li>{@code sqlite}（默认）：内嵌 SQLite 文件（{@code ./linkora/linkora-mvc-server.db}），
  *       零配置起步；</li>
  *   <li>{@code mysql}：远程 MySQL（datasource 模式，业务消息同库同事务），
- *       测试可用 {@code linkora.datasource.url} 指向 H2 内存库覆盖。</li>
+ *       测试可用 {@code linkora.datasource.url} 指向任意 JDBC URL 覆盖。</li>
  * </ul>
  *
  * @author lianghang

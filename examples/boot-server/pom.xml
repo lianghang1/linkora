@@ -45,9 +45,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- 仅需 spring-jdbc（JdbcTemplate/事务管理器）；不可用 spring-boot-starter-jdbc——
+             它携带 HikariCP 会强制激活 Boot 的 DataSource 自动配置，sqlite 内嵌存储模式
+             （默认，零外部依赖）下无驱动无 url 直接启动失败 -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-jdbc</artifactId>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.lianghang1</groupId>

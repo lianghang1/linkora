@@ -1,16 +1,9 @@
 # datasource 模式：客户端本地队列落在宿主 DataSource，与业务表同库同事务
 # 启动方式：--spring.profiles.active=datasource
 #
-# 演示用 SQLite 文件作为"宿主业务库"（business_shipment 与 lk_client_outbox
-# 同库，OrderStatusService.updateStatusAtomically 的事务演示完整）；
-# 生产替换为业务库连接。
-spring:
-  datasource:
-    url: jdbc:sqlite:./linkora/business-client.db
-    driver-class-name: org.sqlite.JDBC
-    hikari:
-      connection-init-sql: "PRAGMA busy_timeout=5000"
-
+# 宿主数据源由 DatasourceStoreConfig 提供（演示用 SQLite 文件库，business_shipment
+# 与 lk_client_outbox 同库，OrderStatusService.updateStatusAtomically 的事务演示
+# 完整）；生产替换为业务库连接。
 linkora:
   client:
     store: datasource

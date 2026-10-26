@@ -1,16 +1,9 @@
 # datasource 模式：复用宿主 DataSource，业务消息同库同事务（transactional outbox）
 # 启动方式：--spring.profiles.active=datasource
 #
-# 演示用 SQLite 文件作为"宿主业务库"（业务表与 lk_* 表同库，事务演示完整）；
-# 生产替换为业务库连接（MySQL 等 JDBC 数据源）。
+# 宿主数据源由 DatasourceStoreConfig 提供（演示用 SQLite 文件库，业务表与 lk_* 表
+# 同库，事务演示完整）；生产替换为业务库连接（MySQL 等 JDBC 数据源）。
 # 注意：内嵌 SQLite 请确保 sqlite-jdbc 3.46+（见 docs/storage-models.md 驱动版本说明）。
-spring:
-  datasource:
-    url: jdbc:sqlite:./linkora/business.db
-    driver-class-name: org.sqlite.JDBC
-    hikari:
-      connection-init-sql: "PRAGMA busy_timeout=5000"
-
 linkora:
   server:
     store: datasource
