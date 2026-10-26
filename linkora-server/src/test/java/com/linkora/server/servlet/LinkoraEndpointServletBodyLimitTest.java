@@ -12,7 +12,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.h2.jdbcx.JdbcDataSource;
+import org.sqlite.SQLiteDataSource;
 import org.junit.Test;
 
 import java.io.OutputStream;
@@ -30,6 +30,19 @@ import static org.junit.Assert.assertNotEquals;
  * @author lianghang
  */
 public class LinkoraEndpointServletBodyLimitTest {
+
+    /** SQLite 文件库等价实现（替代 H2 内存库：按名称隔离的 temp 目录，JVM 退出自动清理）。 */
+    private static String sqliteUrl(String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("linkora-test-" + name);
+            java.io.File f = dir.resolve("db.sqlite").toFile();
+            f.deleteOnExit();
+            dir.toFile().deleteOnExit();
+            return "jdbc:sqlite:" + f.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("创建测试库目录失败: " + name, e);
+        }
+    }
 
     @Test
     public void bodyOverConfiguredLimitIsRejected() throws Exception {
@@ -50,8 +63,8 @@ public class LinkoraEndpointServletBodyLimitTest {
     }
 
     private static int postWithLimit(long limit, int bodySize) throws Exception {
-        JdbcDataSource ds = new JdbcDataSource();
-        ds.setURL("jdbc:h2:mem:body_limit_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+        SQLiteDataSource ds = new SQLiteDataSource();
+        ds.setUrl(sqliteUrl("body_limit_" + System.nanoTime()));
         JdbcServerSchema.migrate(ds);
         LinkoraServer peer = LinkoraServer.builder()
                 .clientAuthenticator(new AllowAllClientAuthenticator())

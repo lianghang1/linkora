@@ -12,7 +12,7 @@ import com.linkora.server.pipeline.SsePushGateway;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.h2.jdbcx.JdbcDataSource;
+import org.sqlite.SQLiteDataSource;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -38,6 +38,19 @@ import static org.junit.Assert.assertTrue;
  * @author lianghang
  */
 public class AdminConsoleEndToEndTest {
+
+    /** SQLite 文件库等价实现（替代 H2 内存库：按名称隔离的 temp 目录，JVM 退出自动清理）。 */
+    private static String sqliteUrl(String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("linkora-test-" + name);
+            java.io.File f = dir.resolve("db.sqlite").toFile();
+            f.deleteOnExit();
+            dir.toFile().deleteOnExit();
+            return "jdbc:sqlite:" + f.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("创建测试库目录失败: " + name, e);
+        }
+    }
 
     private static final String CLIENT = "store-001";
     private static final String TOKEN = "it-console-token";
@@ -80,8 +93,8 @@ public class AdminConsoleEndToEndTest {
      * 用于验证控制台全链路在 MySQL 存储上的行为。
      */
     private static javax.sql.DataSource newDataSource() throws Exception {
-        JdbcDataSource h2 = new JdbcDataSource();
-        h2.setURL("jdbc:h2:mem:linkora_admin_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+        SQLiteDataSource h2 = new SQLiteDataSource();
+        h2.setUrl(sqliteUrl("linkora_admin_" + System.nanoTime()));
         if (!Boolean.getBoolean("linkora.it.mysql")) {
             return h2;
         }

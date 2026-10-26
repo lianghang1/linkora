@@ -60,11 +60,6 @@
             <artifactId>linkora-admin-console</artifactId>
             <version>${linkora.version}</version>
         </dependency>
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>runtime</scope>
-        </dependency>
         <!-- 显式锁定 SQLite 驱动版本：Boot BOM 锁的是 3.36，会压制 linkora 传递的
              3.46（内嵌 SQLite 模式需要；事务内并发写场景两版行为有差异） -->
         <dependency>

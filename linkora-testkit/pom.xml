@@ -33,11 +33,6 @@
             <artifactId>jetty-servlet</artifactId>
             <scope>compile</scope>
         </dependency>
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>compile</scope>
-        </dependency>
 
         <!-- 自测与监听器 API 依赖：RecordingMessageListener 面向 linkora-client 公共接口 -->
         <dependency>

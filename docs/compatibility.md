@@ -28,7 +28,6 @@
 | spring-boot (autoconfigure) | 2.7.18 | 仅 `linkora-spring-boot-starter` 使用。兼容 Boot 2.x 全系（2.7.18 为测试基线；自动配置注册使用 spring.factories，Boot 2.0–2.7 全系支持）；**上限 Spring 6 / Boot 3.x（javax→jakarta）不支持**，宿主升级到该代需 SDK 提供 jakarta 适配 |
 | sqlite-jdbc | 3.46.1.3 | **宿主 classpath 必须保证版本唯一**：多版本共存会导致 native 库重复加载冲突（`NoClassDefFoundError: Could not initialize class org.sqlite.NativeDB` 类报错） |
 | slf4j-api | 1.7.36 | 仅门面；日志实现完全由宿主提供（缺实现时退化为 NOP，不报错） |
-| h2 | 2.2.224 | 服务端**测试**依赖；生产用业务库，不会进入宿主 classpath |
 | jetty 9.4.x | 9.4.56 | 仅 testkit 与 examples 使用，生产服务端走 Servlet 适配器 |
 | junit 4.13.2 | test | 不进入主依赖 |
 
@@ -38,7 +37,7 @@
 
 | 数据库 | 状态 | 说明 |
 |---|---|---|
-| H2 2.2.x | **已验证**（全部自动化测试 + testkit + datasource 模式示例） | SQL 为方言中立 ANSI |
+| SQLite 3.46（测试基座与内嵌默认，0.5.0 起两端统一） | **已验证**（全部自动化测试 454 项 + 真机四应用矩阵） | 测试基座与内嵌模式同引擎，测试即生产行为；datasource 模式亦可用 H2/MySQL（H2 已从依赖中移除，如宿主业务库为 H2 请自行引入驱动） |
 | SQLite 3.46（内嵌，0.5.0 起两端默认） | **已验证**（schema 迁移幂等 + 四仓储读写 + 服务端全量测试 + 示例运行验证） | 内嵌模式统一 PRAGMA：WAL + busy_timeout=5000 + synchronous=NORMAL；注意宿主 Boot BOM 可能压制驱动版本至 3.36（事务内并发写有 BUSY 差异），请显式声明 3.46+ |
 | MySQL 8.0 | **已验证**（MySQL 8.0.46 真库 IT：schema 迁移幂等、二进制 payload 往返、CAS 竞争、并发投递序号分配、事务接管发件箱） | 迁移语句经真库回归；并发序号分配含 InnoDB 死锁重试处理 |
 | PostgreSQL | 代码就绪，**待真实库回归** | 接入前在测试库执行 `JdbcServerSchema.migrate` 验证方言差异 |

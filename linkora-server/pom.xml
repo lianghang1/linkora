@@ -37,11 +37,6 @@
             <artifactId>javax.servlet-api</artifactId>
             <scope>provided</scope>
         </dependency>
-        <!-- 测试依赖：H2 + Jetty 用于端到端验证；MySQL 真实库回归见 JdbcServerStorageMySqlIT（生产由宿主提供数据库与容器） -->
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-        </dependency>
         <dependency>
             <groupId>org.eclipse.jetty</groupId>
             <artifactId>jetty-server</artifactId>

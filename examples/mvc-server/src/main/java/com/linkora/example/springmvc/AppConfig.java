@@ -63,18 +63,11 @@ public class AppConfig implements WebMvcConfigurer {
         String store = System.getProperty("linkora.store", "sqlite");
         if ("mysql".equalsIgnoreCase(store)) {
             String url = System.getProperty("linkora.datasource.url", DEFAULT_URL);
-            DataSource ds;
-            if (url.startsWith("jdbc:h2:")) {
-                org.h2.jdbcx.JdbcDataSource h2 = new org.h2.jdbcx.JdbcDataSource();
-                h2.setURL(url);
-                ds = h2;
-            } else {
-                com.mysql.cj.jdbc.MysqlDataSource mysql = new com.mysql.cj.jdbc.MysqlDataSource();
-                mysql.setURL(url);
-                mysql.setUser(System.getProperty("linkora.datasource.user", DEFAULT_USER));
-                mysql.setPassword(System.getProperty("linkora.datasource.password", DEFAULT_PASSWORD));
-                ds = mysql;
-            }
+            com.mysql.cj.jdbc.MysqlDataSource mysql = new com.mysql.cj.jdbc.MysqlDataSource();
+            mysql.setURL(url);
+            mysql.setUser(System.getProperty("linkora.datasource.user", DEFAULT_USER));
+            mysql.setPassword(System.getProperty("linkora.datasource.password", DEFAULT_PASSWORD));
+            DataSource ds = mysql;
             // 启动前完成 schema 迁移（幂等，崩溃续跑）
             JdbcServerSchema.migrate(ds);
             // 事务感知包装：宿主 @Transactional 内的 publish 随业务原子提交

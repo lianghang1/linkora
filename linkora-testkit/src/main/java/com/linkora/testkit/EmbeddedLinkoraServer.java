@@ -17,7 +17,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.h2.jdbcx.JdbcDataSource;
+import org.sqlite.SQLiteDataSource;
 
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
@@ -56,11 +56,24 @@ import java.util.List;
  */
 public final class EmbeddedLinkoraServer implements AutoCloseable {
 
+    /** SQLite 文件库（测试基座：temp 目录，close 时清理）。 */
+    private static String sqliteUrl(String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("linkora-test-" + name);
+            java.io.File f = dir.resolve("db.sqlite").toFile();
+            f.deleteOnExit();
+            dir.toFile().deleteOnExit();
+            return "jdbc:sqlite:" + f.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("创建测试库目录失败: " + name, e);
+        }
+    }
+
     private final ClientAuthenticator authenticator;
     private final ServerConfig config;
     private final List<ClientRegistration> pendingRegistrations;
 
-    private JdbcDataSource dataSource;
+    private SQLiteDataSource dataSource;
     private LinkoraServer server;
     private Server jetty;
     private int port = -1;
@@ -84,8 +97,8 @@ public final class EmbeddedLinkoraServer implements AutoCloseable {
         if (started) {
             return;
         }
-        dataSource = new JdbcDataSource();
-        dataSource.setURL("jdbc:h2:mem:linkora_testkit_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+        dataSource = new SQLiteDataSource();
+        dataSource.setUrl(sqliteUrl("linkora_testkit_" + System.nanoTime()));
         JdbcServerSchema.migrate(dataSource);
 
         JdbcClientRegistry registry = new JdbcClientRegistry(dataSource);

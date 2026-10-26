@@ -14,7 +14,7 @@ import com.linkora.server.storage.jdbc.JdbcMessageRepository;
 import com.linkora.server.storage.jdbc.JdbcServerSchema;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.h2.jdbcx.JdbcDataSource;
+import org.sqlite.SQLiteDataSource;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -36,6 +36,19 @@ import static org.junit.Assert.assertTrue;
  * @author lianghang
  */
 public class LinkoraSpringAssemblyTest {
+
+    /** SQLite 文件库等价实现（替代 H2 内存库：按名称隔离的 temp 目录，JVM 退出自动清理）。 */
+    private static String sqliteUrl(String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("linkora-test-" + name);
+            java.io.File f = dir.resolve("db.sqlite").toFile();
+            f.deleteOnExit();
+            dir.toFile().deleteOnExit();
+            return "jdbc:sqlite:" + f.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("创建测试库目录失败: " + name, e);
+        }
+    }
 
     private AnnotationConfigApplicationContext context;
 
@@ -101,10 +114,9 @@ public class LinkoraSpringAssemblyTest {
     static class TestStorageConfig {
 
         @Bean
-        public JdbcDataSource linkoraDataSource() {
-            JdbcDataSource ds = new JdbcDataSource();
-            ds.setURL("jdbc:h2:mem:linkora_spring_test_" + System.nanoTime()
-                    + ";DB_CLOSE_DELAY=-1");
+        public SQLiteDataSource linkoraDataSource() {
+            SQLiteDataSource ds = new SQLiteDataSource();
+            ds.setUrl(sqliteUrl("linkora_spring_test_" + System.nanoTime()));
             JdbcServerSchema.migrate(ds);
             return ds;
         }
@@ -115,22 +127,22 @@ public class LinkoraSpringAssemblyTest {
         }
 
         @Bean
-        public ClientRegistry linkoraClientRegistry(JdbcDataSource linkoraDataSource) {
+        public ClientRegistry linkoraClientRegistry(SQLiteDataSource linkoraDataSource) {
             return new JdbcClientRegistry(linkoraDataSource);
         }
 
         @Bean
-        public MessageRepository linkoraMessageRepository(JdbcDataSource linkoraDataSource) {
+        public MessageRepository linkoraMessageRepository(SQLiteDataSource linkoraDataSource) {
             return new JdbcMessageRepository(linkoraDataSource);
         }
 
         @Bean
-        public DeliveryRepository linkoraDeliveryRepository(JdbcDataSource linkoraDataSource) {
+        public DeliveryRepository linkoraDeliveryRepository(SQLiteDataSource linkoraDataSource) {
             return new JdbcDeliveryRepository(linkoraDataSource);
         }
 
         @Bean
-        public ClientCursorRepository linkoraCursorRepository(JdbcDataSource linkoraDataSource) {
+        public ClientCursorRepository linkoraCursorRepository(SQLiteDataSource linkoraDataSource) {
             return new JdbcClientCursorRepository(linkoraDataSource);
         }
     }

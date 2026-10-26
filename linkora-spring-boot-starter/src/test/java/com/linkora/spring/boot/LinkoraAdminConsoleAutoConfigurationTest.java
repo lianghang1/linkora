@@ -1,6 +1,6 @@
 package com.linkora.spring.boot;
 
-import org.h2.jdbcx.JdbcDataSource;
+import org.sqlite.SQLiteDataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -22,12 +22,25 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class LinkoraAdminConsoleAutoConfigurationTest {
 
+    /** SQLite 文件库等价实现（temp 目录，按名称隔离，JVM 退出自动清理）。 */
+    private static String sqliteUrl(String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("linkora-test-" + name);
+            java.io.File f = dir.resolve("db.sqlite").toFile();
+            f.deleteOnExit();
+            dir.toFile().deleteOnExit();
+            return "jdbc:sqlite:" + f.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     @Configuration
     static class DataSourceConfig {
         @Bean
         DataSource dataSource() {
-            JdbcDataSource ds = new JdbcDataSource();
-            ds.setURL("jdbc:h2:mem:linkora_admin_console_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+            SQLiteDataSource ds = new SQLiteDataSource();
+            ds.setUrl(sqliteUrl("linkora_admin_console_" + System.nanoTime()));
             return ds;
         }
     }

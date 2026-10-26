@@ -1,16 +1,15 @@
 # datasource 模式：客户端本地队列落在宿主 DataSource，与业务表同库同事务
 # 启动方式：--spring.profiles.active=datasource
 #
-# 演示用 H2 内存库；OrderStatusService.updateStatusAtomically 的 @Transactional
-# 同时包住 business_shipment 业务行与 lk_client_outbox 队列写入。
+# 演示用 SQLite 文件作为"宿主业务库"（business_shipment 与 lk_client_outbox
+# 同库，OrderStatusService.updateStatusAtomically 的事务演示完整）；
+# 生产替换为业务库连接。
 spring:
   datasource:
-    url: jdbc:h2:mem:linkora-boot-client;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
-    username: sa
-    password: ""
+    url: jdbc:sqlite:./linkora/business-client.db
+    driver-class-name: org.sqlite.JDBC
     hikari:
-      leak-detection-threshold: 5000
+      connection-init-sql: "PRAGMA busy_timeout=5000"
 
 linkora:
   client:

@@ -118,8 +118,8 @@ class LinkoraClientAutoConfigurationTest {
     static class HostDataSourceConfig {
         @Bean
         javax.sql.DataSource dataSource() {
-            org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
-            ds.setURL("jdbc:h2:mem:client-ds-mode;DB_CLOSE_DELAY=-1");
+            org.sqlite.SQLiteDataSource ds = new org.sqlite.SQLiteDataSource();
+            ds.setUrl("jdbc:sqlite:target/client-ds-mode.db");
             return ds;
         }
     }

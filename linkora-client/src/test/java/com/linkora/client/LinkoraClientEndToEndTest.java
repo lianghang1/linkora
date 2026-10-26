@@ -22,7 +22,7 @@ import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
-import org.h2.jdbcx.JdbcDataSource;
+import org.sqlite.SQLiteDataSource;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -46,11 +46,24 @@ import static org.junit.Assert.assertTrue;
  */
 public class LinkoraClientEndToEndTest {
 
+    /** SQLite 文件库等价实现（替代 H2 内存库：按名称隔离的 temp 目录，JVM 退出自动清理）。 */
+    private static String sqliteUrl(String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("linkora-test-" + name);
+            java.io.File f = dir.resolve("db.sqlite").toFile();
+            f.deleteOnExit();
+            dir.toFile().deleteOnExit();
+            return "jdbc:sqlite:" + f.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("创建测试库目录失败: " + name, e);
+        }
+    }
+
     private static final String CLIENT_ID = "store-e2e";
 
     private Server jetty;
     private LinkoraServer server;
-    private JdbcDataSource dataSource;
+    private SQLiteDataSource dataSource;
     private SqliteClientStore clientStore;
     private LinkoraClient client;
     private final List<String> processedIds = new CopyOnWriteArrayList<String>();
@@ -60,8 +73,8 @@ public class LinkoraClientEndToEndTest {
     @Before
     public void setUp() throws Exception {
         // 服务端栈
-        dataSource = new JdbcDataSource();
-        dataSource.setURL("jdbc:h2:mem:linkora_e2e_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1");
+        dataSource = new SQLiteDataSource();
+        dataSource.setUrl(sqliteUrl("linkora_e2e_" + System.nanoTime()));
         JdbcServerSchema.migrate(dataSource);
         JdbcClientRegistry registry = new JdbcClientRegistry(dataSource);
         registry.register(new ClientRegistration(CLIENT_ID, true, System.currentTimeMillis()));

@@ -92,9 +92,9 @@ public class ClientDemoApplication {
      */
     @Bean
     public javax.sql.DataSource linkoraDataSource() {
-        org.h2.jdbcx.JdbcDataSource ds = new org.h2.jdbcx.JdbcDataSource();
-        ds.setURL(System.getProperty("linkora.datasource.url",
-                "jdbc:h2:mem:mvc-client;DB_CLOSE_DELAY=-1"));
+        org.sqlite.SQLiteDataSource ds = new org.sqlite.SQLiteDataSource();
+        ds.setUrl(System.getProperty("linkora.datasource.url",
+                "jdbc:sqlite:./linkora/business-client.db"));
         return ds;
     }
 

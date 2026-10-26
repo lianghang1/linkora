@@ -5,7 +5,7 @@ import com.linkora.core.storage.server.MessageRepository;
 import com.linkora.server.LinkoraServer;
 import com.linkora.server.storage.jdbc.JdbcClientRegistry;
 import com.linkora.server.storage.jdbc.JdbcMessageRepository;
-import org.h2.jdbcx.JdbcDataSource;
+import org.sqlite.SQLiteDataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
@@ -29,6 +29,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class LinkoraServerAutoConfigurationTest {
 
+    /** SQLite 文件库等价实现（temp 目录，按名称隔离，JVM 退出自动清理）。 */
+    private static String sqliteUrl(String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("linkora-test-" + name);
+            java.io.File f = dir.resolve("db.sqlite").toFile();
+            f.deleteOnExit();
+            dir.toFile().deleteOnExit();
+            return "jdbc:sqlite:" + f.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     @Configuration
     @Import(App.DataSourceConfig.class)
     @org.springframework.boot.autoconfigure.EnableAutoConfiguration
@@ -38,9 +51,8 @@ class LinkoraServerAutoConfigurationTest {
         static class DataSourceConfig {
             @Bean
             DataSource linkoraDataSource() {
-                JdbcDataSource ds = new JdbcDataSource();
-                ds.setURL("jdbc:h2:mem:linkora_boot_server_" + System.nanoTime()
-                        + ";DB_CLOSE_DELAY=-1");
+                SQLiteDataSource ds = new SQLiteDataSource();
+                ds.setUrl(sqliteUrl("linkora_boot_server_" + System.nanoTime()));
                 return ds;
             }
         }
@@ -50,9 +62,8 @@ class LinkoraServerAutoConfigurationTest {
     static class HostOverrideConfig {
         @Bean
         MessageRepository customMessageRepository() {
-            JdbcDataSource ds = new JdbcDataSource();
-            ds.setURL("jdbc:h2:mem:linkora_boot_override_" + System.nanoTime()
-                    + ";DB_CLOSE_DELAY=-1");
+            SQLiteDataSource ds = new SQLiteDataSource();
+            ds.setUrl(sqliteUrl("linkora_boot_override_" + System.nanoTime()));
             return new JdbcMessageRepository(ds);
         }
     }

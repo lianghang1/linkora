@@ -12,7 +12,7 @@ import com.linkora.server.auth.AllowAllClientAuthenticator;
 import com.linkora.server.pipeline.SsePushGateway;
 import com.linkora.server.servlet.LinkoraHttpRequest;
 import com.linkora.server.servlet.LinkoraHttpResult;
-import org.h2.jdbcx.JdbcDataSource;
+import org.sqlite.SQLiteDataSource;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -42,7 +42,20 @@ import static org.junit.Assert.fail;
  */
 public class LinkoraServerTest {
 
-    private JdbcDataSource dataSource;
+    /** SQLite 文件库等价实现（替代 H2 内存库：按名称隔离的 temp 目录，JVM 退出自动清理）。 */
+    private static String sqliteUrl(String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("linkora-test-" + name);
+            java.io.File f = dir.resolve("db.sqlite").toFile();
+            f.deleteOnExit();
+            dir.toFile().deleteOnExit();
+            return "jdbc:sqlite:" + f.getAbsolutePath();
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("创建测试库目录失败: " + name, e);
+        }
+    }
+
+    private SQLiteDataSource dataSource;
     private LinkoraServer server;
     private RecordingGateway gateway;
 
@@ -50,9 +63,8 @@ public class LinkoraServerTest {
 
     @Before
     public void setUp() {
-        dataSource = new JdbcDataSource();
-        dataSource.setURL("jdbc:h2:mem:linkora_server_" + System.nanoTime()
-                + ";DB_CLOSE_DELAY=-1");
+        dataSource = new SQLiteDataSource();
+        dataSource.setUrl(sqliteUrl("linkora_server_" + System.nanoTime()));
         com.linkora.server.storage.jdbc.JdbcServerSchema.migrate(dataSource);
         ClientRegistry registry = new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource);
         registry.register(new ClientRegistration(CLIENT, true, System.currentTimeMillis()));
