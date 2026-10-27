@@ -58,14 +58,18 @@ class BootHostSmokeIT {
         int port = ((WebServerApplicationContext) context).getWebServer().getPort();
         LinkoraServer linkoraServer = context.getBean(LinkoraServer.class);
 
-        // 2. 真实客户端（同款装配语义 + 临时 SQLite）
+        // 2. 真实客户端（同款装配语义 + 临时 SQLite）；token 认证（0.6.0），
+        //    与宿主 HostTokenValidator 演示约定一致：grp-<clientId>-<日期>
         Path db = Files.createTempDirectory("linkora-smoke").resolve("client.db");
         store = new SqliteClientStore(db);
         client = LinkoraClient.builder()
                 .serverUrl("http://127.0.0.1:" + port)
                 .clientId(CLIENT_ID)
                 .clientStore(store)
-                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300).build())
+                .credentialProvider(com.linkora.client.auth.TokenCredentialProvider
+                        .forStaticToken("grp-" + CLIENT_ID + "-2026"))
+                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300)
+        .payloadCipherKey("Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M=").build())
                 .build();
         RecordingMessageListener listener = new RecordingMessageListener();
         client.addListener("smoke-msg", listener);
@@ -130,7 +134,10 @@ class BootHostSmokeIT {
                 .serverUrl("http://127.0.0.1:" + port)
                 .clientId(CLIENT_ID)
                 .clientStore(store)
-                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300).build())
+                .credentialProvider(com.linkora.client.auth.TokenCredentialProvider
+                        .forStaticToken("grp-" + CLIENT_ID + "-2026"))
+                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300)
+        .payloadCipherKey("Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M=").build())
                 .build();
         client.start();
         assertTrue(awaitOnline(linkoraServer, 20_000), "客户端应经真实 SSE 上线");

@@ -30,6 +30,8 @@ import static org.junit.Assert.assertTrue;
 public class MvcHostSmokeIT {
 
     private static final String CLIENT_ID = "demo-client";
+    /** 传输加密 key（0.6.0 默认开启）：烟测固定值，两端一致即可。 */
+    private static final String CIPHER_KEY = "Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M=";
 
     private Tomcat tomcat;
     private int port;
@@ -44,6 +46,8 @@ public class MvcHostSmokeIT {
         // IT 数据走 sqlite 模式内嵌库（AppConfig 默认），不触碰远程 MySQL；
         // 如需 MySQL 回归：去掉 linkora.store 覆盖并用 linkora.datasource.url 指向测试库
         System.setProperty("linkora.store", "sqlite");
+        // 传输加密（0.6.0 默认开启）：服务端侧 key
+        System.setProperty("linkora.payload-cipher-key", CIPHER_KEY);
         tomcat = SpringMvcServerMain.startServer(port);
     }
 
@@ -56,6 +60,7 @@ public class MvcHostSmokeIT {
             store.close();
         }
         System.clearProperty("linkora.datasource.url");
+        System.clearProperty("linkora.payload-cipher-key");
         if (tomcat != null) {
             tomcat.stop();
         }
@@ -63,14 +68,18 @@ public class MvcHostSmokeIT {
 
     @Test(timeout = 120_000)
     public void fullRoundTripOnRealHost() throws Exception {
-        // 1. 真实客户端（Spring 装配同款路径 + 临时 SQLite）
+        // 1. 真实客户端（Spring 装配同款路径 + 临时 SQLite）；
+        //    token 认证（0.6.0，与 AppConfig 演示约定 grp-<clientId>-<日期>）+ 传输加密
         Path db = Files.createTempDirectory("linkora-smoke").resolve("client.db");
         store = new SqliteClientStore(db);
         client = LinkoraClient.builder()
                 .serverUrl("http://127.0.0.1:" + port)
                 .clientId(CLIENT_ID)
                 .clientStore(store)
-                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300).build())
+                .credentialProvider(com.linkora.client.auth.TokenCredentialProvider
+                        .forStaticToken("grp-" + CLIENT_ID + "-2026"))
+                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300)
+                        .payloadCipherKey(CIPHER_KEY).build())
                 .build();
         RecordingMessageListener listener = new RecordingMessageListener();
         client.addListener("order-created", listener);

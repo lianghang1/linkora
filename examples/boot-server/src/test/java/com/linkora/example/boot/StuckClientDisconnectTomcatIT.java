@@ -73,7 +73,10 @@ class StuckClientDisconnectTomcatIT {
                 .serverUrl("http://127.0.0.1:" + port)
                 .clientId("normal-store")
                 .clientStore(normalStore)
-                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300).build())
+                .credentialProvider(com.linkora.client.auth.TokenCredentialProvider
+                        .forStaticToken("grp-normal-store-2026"))
+                .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300)
+        .payloadCipherKey("Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M=").build())
                 .build();
         RecordingMessageListener listener = new RecordingMessageListener();
         normalClient.addListener("greeting", listener);
@@ -86,6 +89,7 @@ class StuckClientDisconnectTomcatIT {
         stuckSocket.setReceiveBufferSize(8 * 1024);
         OutputStream out = stuckSocket.getOutputStream();
         out.write(("GET /events?clientId=stuck-store HTTP/1.1\r\nHost: localhost\r\n"
+                + "Authorization: Bearer grp-stuck-store-2026\r\n"
                 + "Accept: text/event-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8));
         out.flush();
         InputStream in = stuckSocket.getInputStream();
@@ -123,7 +127,10 @@ class StuckClientDisconnectTomcatIT {
                     .serverUrl("http://127.0.0.1:" + port)
                     .clientId("stuck-store")
                     .clientStore(stuckStore)
-                    .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300).build())
+                    .credentialProvider(com.linkora.client.auth.TokenCredentialProvider
+                            .forStaticToken("grp-stuck-store-2026"))
+                    .config(ClientConfig.builder().senderIntervalMs(100).recoveryIntervalMs(300)
+        .payloadCipherKey("Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M=").build())
                     .build();
             RecordingMessageListener stuckListener = new RecordingMessageListener();
             stuckClient.addListener("greeting", stuckListener);
