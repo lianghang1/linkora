@@ -1,5 +1,7 @@
 # 兼容性说明
 
+> 适用版本：0.6.0。宿主形态与存储矩阵随版本更新，见下。
+
 ## JDK
 
 - **最低要求 JDK 8**；全程使用真实 JDK 1.8.0_341 构建与测试通过（非仅
@@ -11,7 +13,7 @@
 
 | 环境 | 要求 | 状态 |
 |---|---|---|
-| **宿主形态（0.5.0 定位）** | **仅支持 Spring MVC（Tomcat）与 Spring Boot（内嵌 Tomcat）宿主**；纯 Java Builder / 非 Spring Servlet 容器不再作为产品保障范围 | 已验证（4 个示例应用） |
+| **宿主形态（0.6.0 定位）** | **仅支持 Spring MVC（Tomcat）与 Spring Boot（内嵌 Tomcat）宿主**；纯 Java Builder / 非 Spring Servlet 容器不再作为产品保障范围 | 已验证（4 个示例应用） |
 | 客户端运行时 | JDK 8+，Spring 宿主 | 已验证 |
 | 服务端容器 | Tomcat 8+/9+（Boot 内嵌或 MVC war） | Tomcat 9（Boot/MVC 示例）验收通过 |
 | `javax.servlet-api` | 3.1.0，宿主容器 provided | 3.1 API 面（无 Servlet 4.0 常量依赖） |

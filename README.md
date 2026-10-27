@@ -61,7 +61,8 @@ linkora.publish(clientId, "order-created", payload);
 uplinkPublisher.publish("order-status-updated", payload);
 ```
 
-完整分步说明（含 MVC 宿主、全部配置项）见 [docs/getting-started.md](docs/getting-started.md)。
+完整分步说明见 [docs/getting-started.md](docs/getting-started.md)；
+**全部配置项**见 [docs/configuration.md](docs/configuration.md)。
 
 ## 传输加密与认证（0.6.0）
 

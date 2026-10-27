@@ -4,7 +4,7 @@
 直接服务页面与端点。零新增部署物、零新增中间件、零前端构建、完全离线可用
 （前端资源与 Vue 3 / Chart.js 库全部内嵌在 jar 内，无任何 CDN / 在线字体 / 在线图标请求）。
 
-> 适用版本：0.4.2 及以上。控制台随 SDK 版本一起发布，前端资源与后端端点
+> 适用版本：0.6.0 及以上。控制台随 SDK 版本一起发布，前端资源与后端端点
 > 必须来自**同一个版本**的 jar（混装新旧版本会出现"界面新、数据旧"的错乱）。
 
 ---
@@ -38,14 +38,14 @@
 ```xml
 <dependency>
     <groupId>io.github.lianghang1</groupId>
-    <artifactId>linkora-spring-boot-starter</artifactId>
-    <version>0.4.2</version>
+    <artifactId>linkora-server-spring-boot-starter</artifactId>
+    <version>0.6.0</version>
 </dependency>
 <!-- 控制台（starter 中为 optional 传递，需显式声明） -->
 <dependency>
     <groupId>io.github.lianghang1</groupId>
     <artifactId>linkora-admin-console</artifactId>
-    <version>0.4.2</version>
+    <version>0.6.0</version>
 </dependency>
 ```
 
@@ -55,7 +55,7 @@
 linkora:
   server:
     # ... 你已有的服务端配置（数据库、认证等）
-    # 死信主动告警（可选，0.4.2 起；不配置即关闭）
+    # 死信主动告警（可选，0.6.0 起；不配置即关闭）
     alert-webhook-url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
     alert-webhook-type: wecom        # raw | wecom | dingtalk | feishu，默认 raw
     inbox-stuck-minutes: 30          # 收件箱"卡死"判定阈值（分钟），默认 30
@@ -155,7 +155,7 @@ tomcatCtx.addServletMappingDecoded("/linkora-admin/*", "linkoraAdminConsoleServl
 
 - 浏览器打开 `http://服务端地址:端口/linkora-admin/`，输入 Token 进入
   （Token 存 sessionStorage，关闭标签页即失效，无"记住我"）
-- **hash 路由**（0.4.2 起）：页面地址形如 `#/inbox`、`#/messages`、`#/clients`，
+- **hash 路由**（0.6.0 起）：页面地址形如 `#/inbox`、`#/messages`、`#/clients`，
   刷新 / 前进后退 / 直接深链均保持在当前页且不掉登录（Token 静默续验）
 - 所有 API 经 `Authorization: Bearer <token>` 校验（**恒定时间比较**），
   未携带/错误一律 401；页面本身放行（浏览器首跳无法带自定义头）
@@ -168,7 +168,7 @@ tomcatCtx.addServletMappingDecoded("/linkora-admin/*", "linkoraAdminConsoleServl
 
 ## 6. 页面说明（三页）
 
-0.4.2 按运维定位收敛为三页：**异常收件箱（发现）→ 查询（追溯）→ 客户端（处置）**。
+0.6.0 按运维定位收敛为三页：**异常收件箱（发现）→ 查询（追溯）→ 客户端（处置）**。
 正常数据"能查到就行"，异常数据主动送到眼前。
 
 | 页面 | 内容 |
@@ -177,7 +177,7 @@ tomcatCtx.addServletMappingDecoded("/linkora-admin/*", "linkoraAdminConsoleServl
 | **查询** `#/messages` | 全量消息追溯：两行筛选（客户端 / 关键词 / 时间范围 / 清除），关键词同时匹配消息主题（subject）与消息 ID，全部真实生效；左右布局，详情含基本信息 / Payload（可复制）/ 投递记录时间线 |
 | **客户端** `#/clients` | 左窄导航列（显示名称 + ID + 状态点 + 死信徽标）+ 右详情面板：信息、启停开关、PING（送达即完成）、操作菜单（断开/注销/注册）、发件箱快照拉取与上行死信重发/放弃 |
 
-**消息定性**（0.4.2 修复）：列表状态为服务端按投递记录真实聚合的结果——
+**消息定性**（0.6.0 修复）：列表状态为服务端按投递记录真实聚合的结果——
 下行消息按死信 > 重试 > 失败 > 已过期 > 推进中 > 完成取最严重态；
 **无任何投递记录的消息定性为"上行 · 已接收"**（设备上报），不再误显示"已创建/未知"。
 
@@ -197,11 +197,11 @@ tomcatCtx.addServletMappingDecoded("/linkora-admin/*", "linkoraAdminConsoleServl
 
 | 端点 | 方法 | 说明 |
 |---|---|---|
-| `/api/inbox` | GET | 异常收件箱（死信 + 停留超 `inboxStuckMinutes` 的未终结投递），0.4.2 起 |
+| `/api/inbox` | GET | 异常收件箱（死信 + 停留超 `inboxStuckMinutes` 的未终结投递），0.6.0 起 |
 | `/api/overview` | GET | 客户端概览 + 近 7 日统计 |
 | `/api/clients` | GET | 全部客户端概览（状态/连接/未完成/死信计数） |
 | `/api/clients/{id}/unfinished` | GET | 指定客户端未完成投递 |
-| `/api/messages` | GET | 消息列表（clientId/keyword/begin/end/page/size），返回真实聚合投递状态；keyword 匹配主题与消息 ID，0.4.2 起 |
+| `/api/messages` | GET | 消息列表（clientId/keyword/begin/end/page/size），返回真实聚合投递状态；keyword 匹配主题与消息 ID，0.6.0 起 |
 | `/api/messages/{id}` | GET | 消息详情（完整 payload + 投递记录） |
 | `/api/dead-letters?clientId=` | GET | 指定客户端死信列表 |
 | `/api/stats?days=7` | GET | 每日发布量 + 投递状态分布 |
@@ -222,7 +222,7 @@ tomcatCtx.addServletMappingDecoded("/linkora-admin/*", "linkoraAdminConsoleServl
 
 ---
 
-## 8. 死信主动告警（0.4.2 起）
+## 8. 死信主动告警（0.6.0 起）
 
 设计原则：**发现靠推送，不靠打开**。配置 Webhook 后无需盯着控制台，
 死信产生即送达群聊。
@@ -279,7 +279,7 @@ tomcatCtx.addServletMappingDecoded("/linkora-admin/*", "linkoraAdminConsoleServl
 | 收不到死信告警 | 确认 `alert-webhook-url` 已配置且 URL 有效；告警只推本次运行期间新产生的死信，重启不补发历史 |
 | 写操作 400 | 状态机拒绝（如非法转移），错误信息含当前/目标状态 |
 | 状态字段显示不全 / 分页异常 | 前后端 jar 版本不一致（见 §10），对齐两个 jar 后强刷 |
-| 刷新后回到登录页 | 0.4.1 及以前无 hash 路由；升级到 0.4.2+ 后刷新/深链均保持在当前页 |
+| 刷新后回到登录页 | 0.4.1 及以前无 hash 路由；升级到 0.6.0+ 后刷新/深链均保持在当前页 |
 | 指令送达 0 / 下发失败 | 客户端离线，指令通道不重试，客户端上线后重新下发 |
 | QUERY_OUTBOX 显示"暂未取得结果" | 客户端可能未执行或中途离线；点"重新查询"或再次拉取 |
 | 内嵌 Tomcat 注册失败 | Spring 刷新后不能用标准 Servlet API 动态注册，改用 Tomcat 原生 API（见 §4.2） |

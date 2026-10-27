@@ -116,3 +116,30 @@ FROM lk_message ORDER BY created_at DESC LIMIT 20;
   `outboxRetentionMs/inboxRetentionMs`（默认 7 天）自动清理；
 - 服务端：`lk_message/lk_delivery` 由宿主按业务保留策略归档清理
   （先归档再删除，勿跳过备份）。
+
+## 0.6.0 新增排查
+
+### 启动失败：必须配置 linkora.payload-cipher-key
+
+传输加密默认开启，两端必须配置相同的 32 字节密钥（`openssl rand -base64 32`）。
+如确不需要传输加密：`linkora.payload-cipher: false`。
+
+### 消息一直收不到且服务端日志出现 401
+
+token 认证模式下客户端 token 与宿主校验不符：检查 `linkora.client.auth-token`
+（或 TokenProvider 返回值）是否为宿主登录体系当前有效 token。
+
+### 控制台里 payload 显示为乱码/密文
+
+0.6.0 传输加密默认开启：消息在线路上是密文，服务端解密后落库为明文。
+若控制台看到密文，说明该消息在**入库前未解密**——确认服务端配置了
+`payload-cipher-key` 且与客户端一致。
+
+### 启动失败：linkora.payload-cipher 默认开启，必须配置……
+
+见上；或显式 `linkora.payload-cipher: false` 关闭传输加密。
+
+### 升级到 0.6.0 后依赖找不到（NoClassDefFoundError: com.linkora.server.*）
+
+0.6.0 按角色拆包：客户端宿主请改引 `linkora-client-spring-boot-starter`，
+服务端宿主改引 `linkora-server-spring-boot-starter`（对照表见 history.md）。

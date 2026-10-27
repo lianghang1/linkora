@@ -69,3 +69,12 @@ data: <管理指令 JSON（{"cmd":...,"params":{...}}，不落库不补发）>
 - 所有接口要求 Header 认证（凭据禁止出现在 URL）。
 - 高熵随机 token（≥32 字节）；写请求附加 HMAC 签名（时间戳 + nonce + 共享密钥）。
 - 详见 `security.md`。
+
+## 传输扩展字段（0.6.0）
+
+| 字段/头 | 方向 | 说明 |
+|---|---|---|
+| `"enc": "A256GCM:k1"` | 双向消息信封 | payload 已加密：`Base64(IV[12] + AES-256-GCM 密文 + Tag[16])`；密钥带外分发（两端配置一致）；无此字段 = 明文（滚动升级安全） |
+| `X-Linkora-Content-Encoding: gzip` | 上行请求头 | 报文体超 64KB 自动 gzip；HMAC 签名覆盖压缩后字节，服务端验签后解压再解码 |
+
+密钥管理与安全边界见 [security.md](security.md)。

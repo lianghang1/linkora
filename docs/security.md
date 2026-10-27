@@ -1,35 +1,69 @@
-# 安全设计
+# 安全设计（Security）
 
-## 原则：纯应用层，不依赖 PKI/证书
+> 0.6.0：认证扩展为三种模式（HMAC / Bearer Token / 匿名），新增传输级
+> payload 加密（默认开启）。原则不变：纯应用层，不依赖 PKI/证书。
 
-真实生产环境可能无法满足证书管理要求，安全能力全部在 SDK 功能层实现：
+## 一、三种认证模式（`linkora.server.auth-mode` / `linkora.client.auth-mode`）
 
-- **不要求任何证书申请或 mTLS 配置**。
-- HTTPS 为建议项：客户端保持 JDK 标准证书校验（禁止默认关闭），不要求用户申请证书。
-- 内网 HTTP 环境可运行，风险由接入方评估（文档标注）。
-- IP 级封禁、WAF、fail2ban 交给宿主已有反向代理层，SDK 提供配合配置说明。
+| 模式 | 适用 | 服务端 | 客户端 |
+|---|---|---|---|
+| **hmac**（默认） | 高安全：签名+防重放+防爆破 | `HmacClientAuthenticator`（默认，需凭证） | `HmacCredentialProvider` |
+| **token** | 宿主已有账号密码登录体系 | `TokenClientAuthenticator` + 宿主 `TokenValidator` Bean | 静态 `auth-token` 或 `TokenProvider` Bean |
+| **anonymous** | 仅开发/演示 | `AllowAllClientAuthenticator` | 无凭据 |
 
-## 缺省即拒绝（fail-fast）
+选型建议：**宿主已有登录系统 → token（零改造对接）；纯设备间高安全 → hmac；
+本地开发 → anonymous（生产禁用）**。
 
-缺少 `ClientAuthenticator` 时，装配层（`LinkoraServerAssembler`）**直接抛异常终止启动**，
-而不是回退成"放行全部请求"。理由：SSE 端点通常直接暴露在网络上，一个配置漏项
-就等于任何人都能订阅任意 clientId 的下行数据，而"启动成功"会让人误以为一切正常。
+## 二、token 模式：对接已有账号体系
 
-本地开发/演示需要匿名访问时显式打开：
+### 服务端：实现 TokenValidator，回调宿主账号体系
+
+```java
+@Service
+public class HostTokenValidator implements TokenValidator {
+    @Override
+    public boolean validate(String clientId, String token) {
+        // 查会话表 / 调认证服务 /token/introspect / 校验 JWT——任选，都是宿主已有能力
+        return sessionService.isValid(clientId, token);
+    }
+}
+```
 
 ```yaml
 linkora:
   server:
-    allow-anonymous: true   # 仅限本地；启动日志会打印醒目的 WARN
+    auth-mode: token
 ```
 
-Spring MVC 宿主同样读取 `linkora.server.allow-anonymous`（默认 false）。
+- 三个入口（`/events` `/messages` `/acks`）共用同一校验；失败统一 401 `AUTH_FAILED`
+- 宿主校验器抛异常按认证失败处理（不放大为 500）
+- 失败锁定策略由宿主账号体系承担（登录接口本身的防爆破兜底）
 
-## 认证机制：HMAC 请求签名
+### 客户端：token 从哪来
+
+```yaml
+linkora:
+  client:
+    auth-mode: token
+    auth-token: "宿主登录体系下发的 token"    # 方式一：静态（过期需换配置）
+```
+
+```java
+// 方式二（推荐）：动态 TokenProvider——每次出站请求自动取最新 token，
+// 宿主在内部完成续期/刷新，SDK 与 at-least-once 重试语义完全无感
+@Bean
+public TokenProvider tokenProvider() {
+    return () -> hostSessionService.currentToken(clientId);
+}
+```
+
+- 客户端自动附加 `Authorization: Bearer <token>`（兼容 `X-Linkora-Token` 头）
+- token 过期 → 服务端 401 → 消息随 at-least-once 自动重试，续期后补投成功，零丢失
+- token **禁止放入 URL**（避免进入反代/访问日志）
+
+## 三、hmac 模式（默认）
 
 ### 请求签名算法
-
-客户端与服务端共享唯一权威实现 [HmacSha256](../linkora-core/src/main/java/com/linkora/core/security/HmacSha256.java)：
 
 ```text
 bodyHash   = SHA-256(body).hexLower          （body 为空时对空字节数组求哈希）
@@ -37,89 +71,75 @@ canonical  = clientId + "\n" + HTTP方法 + "\n" + timestampMillis + "\n" + nonc
 signature  = HMAC-SHA256(secretBytes, canonical).hexLower
 ```
 
-设计说明：
-
-- 签名**不包含 URL 路径**，避免 Servlet 容器对 contextPath/servletPath 的映射差异导致
-  校验失败；跨端点重放由 timestamp + nonce 缓存拦截。
-- 所有比较使用恒定时间比较（`MessageDigest.isEqual`），防时序侧信道。
-- 纯 JDK crypto（`javax.crypto.Mac`），无新增依赖，JDK 8 兼容。
-
-### 请求头
+- 签名不包含 URL 路径（规避容器映射差异）；跨端点重放由 timestamp + nonce 拦截
+- 全部恒定时间比较；纯 JDK crypto，无新增依赖
 
 | 头名 | 说明 |
 |---|---|
-| `X-Linkora-Access-Token` | 服务端发放的高熵访问令牌（`HmacSha256.generateToken()` 生成 256 bit Base64URL） |
-| `X-Linkora-Timestamp` | 请求发起时间（epoch 毫秒），服务端校验 ±5 分钟窗口（可配） |
-| `X-Linkora-Nonce` | 一次性随机数（128 bit hex），服务端缓存窗口内 nonce 拒绝重放 |
+| `X-Linkora-Access-Token` | 服务端发放的高熵令牌（256 bit） |
+| `X-Linkora-Timestamp` | epoch 毫秒，±5 分钟窗口 |
+| `X-Linkora-Nonce` | 128 bit 一次性随机数 |
 | `X-Linkora-Signature` | HMAC-SHA256 签名（hex 小写） |
 
-**令牌禁止放入 URL**（避免进入反代/访问日志），一律走请求头。
+### 防爆破与防重放
 
-### 客户端接入
+1. 256 bit 高熵令牌使在线爆破不可行
+2. 失败指数锁定：同 clientId 连续失败 5 次 → 2^n 指数锁定（封顶 15 分钟）
+3. 防枚举：未知 clientId 与错误凭据统一返回 `AUTH_FAILED`
+4. 防重放：时间戳窗口 + nonce 缓存（10 万条有界）
+5. 凭据存储为可插拔 SPI（`CredentialStore`）；双凭据并存实现平滑轮换；
+   泄露应急 = 轮换 secret + 清锁定计数
 
-```java
-LinkoraClient client = LinkoraClient.builder()
-    .serverUrl("https://server.example.com/linkora")
-    .clientId("store-001")
-    .clientStore(store)
-    .credentialProvider(new HmacCredentialProvider("store-001", accessToken, secretBytes))
-    .build();
+## 四、传输加密（0.6.0 默认开启，与认证无关）
+
+### 是什么
+
+payload 线路上自动 AES-256-GCM 加密：客户端加密 → 服务端解密后进业务逻辑；
+信封带 `"enc": "A256GCM:k1"` 标记。**业务代码零改动**，落库为明文（只管传输）。
+
+```yaml
+linkora:
+  payload-cipher-key: "Qr1J5BCqFYkIlxfELSx6xYoZZ5YxYEZyWHZrBOJT83M="   # 两端一致
+  # payload-cipher: false   # 如确不需要（纯内网已自评估），显式关闭
 ```
 
-`HmacCredentialProvider` 线程安全；每个请求自动生成新 nonce 与签名；
-`destroySecret()` 支持停用时清零内存密钥。
+### 密钥管理（两条铁律）
 
-### 服务端接入
+1. **带外分发**：密钥与 server-url 一样走部署配置/配置中心（Nacos 等），
+   **绝不在明文线路上在线下发**——在线下发 key 等于把房卡寄出去
+2. **与认证解耦**：独立配置项，匿名部署也能加密；换认证方式不受影响
 
-```java
-CredentialStore store = ...; // 宿主实现：按 clientId 查找已发放的 token + secret
-LinkoraServer server = LinkoraServer.builder()
-    .clientAuthenticator(new HmacClientAuthenticator(store))
-    // 可选：自定义时钟窗口 / 锁定策略 / nonce 缓存
-    // new HmacClientAuthenticator(store, 300_000L, new FailureLockout(5, 2000, 900_000), new NonceCache(...))
-    ...
-    .build();
-```
+### 格式与开销
 
-服务端三入口（SSE 订阅 `/events`、消息上报 `/messages`、ACK `/acks`）共用同一认证器；
-认证失败统一回 401 + `AUTH_FAILED`，不区分"令牌错/签名错"，防枚举。
+- 线格式自描述：`Base64(IV[12] + 密文 + Tag[16])`，固定开销 +28 字节
+- 每次加密随机 IV（相同明文两次加密结果不同）；篡改任一字节解密即失败
+  （失败走 ACK FAILED 进重试/死信，不会解出错误数据跑业务）
+- 密文超过 64KB 的上行报文先 gzip 再加密（加密前压缩）
 
-### 校验顺序
+### 轮换与泄露应急
 
-1. clientId 存在且未被锁定（锁定直接 429 + `RATE_LIMITED`）；
-2. 凭据记录存在、令牌恒定时间匹配；
-3. 时间戳在允许窗口内；
-4. nonce 未出现过（防重放）；
-5. HMAC 签名恒定时间匹配。
+- 信封 keyId 位已预留；本期轮换 = 生成新 key + 两端配置更新重启
+  （低峰执行，窗口内消息由 at-least-once 自动补投）
+- 泄露应急 = 换 key 重启，泄露窗口止于换钥时刻
+- 未来"单客户端泄露不波及其他"：演进为 per-client key（协议位已留）
 
-任一步失败计入失败锁定；全部通过即清零失败计数。
+### 边界（如实说明）
 
-## 防爆破（SSE 接口暴露于互联网）
+- 保护**传输与信封**：落库为明文（业务库自身的加密属业务系统安全范畴）
+- 元数据（messageId/类型/时间/keyId）明文可见——要连元数据都藏需 HTTPS，
+  与本机制不冲突也不重叠
 
-1. **高熵 token 使在线爆破在算力上不可行**（第一道防线，256 bit）。
-2. **失败指数锁定**（[FailureLockout](../linkora-server/src/main/java/com/linkora/server/auth/FailureLockout.java)）：
-   同一 clientId 连续失败 N 次（默认 5）后按 2^n 指数锁定（默认 2s 起步、封顶 15 分钟）。
-   锁定期间直接拒绝、不校验凭据（拖慢爆破 + 节省服务端算力）。
-   纯内存实现：重启即清零是可接受的降级（锁定的目的是拖慢爆破而非精确审计）。
-3. **防枚举**：未知 clientId 与错误凭据返回统一错误码 `AUTH_FAILED`（401）。
-4. **防重放**：时间戳窗口 + nonce 缓存（[NonceCache](../linkora-server/src/main/java/com/linkora/server/auth/NonceCache.java)，
-   有界 10 万条，超限惰性驱逐，重启清零可接受——攻击者重启服务端无法获益）。
-5. 认证失败计数建议接入宿主监控告警；连接数限制交给宿主容器配置。
+## 五、缺省即拒绝（fail-fast）
 
-## 凭据管理约定
+| 场景 | 行为 |
+|---|---|
+| `auth-mode=token` 但无 TokenValidator Bean | 服务端启动失败 |
+| `payload-cipher=true`（默认）但无 key | 两端启动失败 |
+| 控制台 `enabled=true` 但无 token | 启动失败 |
+| 无认证器且未显式 `allow-anonymous` / `auth-mode=anonymous` | 告警放行（仅 hmac 回退语义），生产应显式配置 |
 
-- 凭据存储为可插拔 SPI（[CredentialStore](../linkora-server/src/main/java/com/linkora/server/auth/CredentialStore.java)），
-  宿主自行决定落库/加密方式；SDK 不持久化明文凭据。
-- 客户端 secret 以字节数组在内存持有；SDK 本地 SQLite 不保存凭据。
-- 双凭据并存窗口（平滑轮换）：宿主在 `CredentialStore` 实现中同时接受新旧
-  token/secret 即可，SDK 侧无需变更。
-- 凭据泄露应急：轮换 secret（旧签名即刻失效）+ 清除锁定计数。
+## 六、输入与输出防护
 
-## 输入与输出防护
-
-- 请求体大小限制（服务端默认 1MB，可配；端点 Servlet 硬上限 2MB）、字段校验、协议版本校验。
-- SSE 字段正确编码，业务负载以 JSON 信封传输，不直接拼接进事件流。
-- 日志：关联 messageId/clientId/traceId，不记录完整凭据与未脱敏负载。
-- 错误响应不泄露凭据、内部堆栈、敏感数据。
-- 内网明文 HTTP 的风险由接入方评估：HMAC 签名保证完整性与身份真实性，
-  但不提供机密性（负载可被嗅探）。
+- 请求体上限（默认 1MB，可配）、协议版本校验、SSE 字段编码
+- 日志记录 messageId/clientId/traceId，不记录完整凭据与未脱敏负载
+- 错误响应不泄露凭据、内部堆栈、敏感数据
