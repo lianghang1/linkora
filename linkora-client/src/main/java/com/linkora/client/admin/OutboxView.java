@@ -29,7 +29,7 @@ public final class OutboxView {
         this.payloadPreview = preview(entry.getPayload());
         this.payloadSize = entry.getPayload().length;
         this.retryCount = entry.getRetryCount();
-        this.lastError = entry.getLastError() == null ? "—" : entry.getLastError();
+        this.lastError = previewError(entry.getLastError());
         this.createdAt = formatTime(entry.getCreatedAt());
         this.updatedAt = formatTime(entry.getUpdatedAt());
     }
@@ -100,6 +100,17 @@ public final class OutboxView {
         return java.time.Instant.ofEpochMilli(epochMillis)
                 .atZone(java.time.ZoneId.systemDefault())
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+    }
+
+    /** 错误信息预览：超长截断，防止单条异常错误撑爆列表响应。 */
+    static String previewError(String error) {
+        if (error == null) {
+            return "—";
+        }
+        if (error.length() > PREVIEW_MAX_CHARS) {
+            return error.substring(0, PREVIEW_MAX_CHARS) + "…（共 " + error.length() + " 字符）";
+        }
+        return error;
     }
 
     static String preview(byte[] payload) {

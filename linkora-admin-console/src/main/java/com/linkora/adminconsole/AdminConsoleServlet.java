@@ -275,6 +275,14 @@ public class AdminConsoleServlet extends HttpServlet {
                         paramsNode.fields().forEachRemaining(
                                 e -> params.put(e.getKey(), e.getValue().asText()));
                     }
+                    // 兼容前端把指令参数放在 body 顶层的写法（重发/放弃死信等）：
+                    // params 缺失时从顶层回填，避免客户端拿到空 messageId
+                    mergeTopLevelParam(body, params, "messageId", "status", "reason");
+                    JsonNode limitNode = body.get("limit");
+                    if (limitNode != null && !limitNode.isNull()
+                            && !params.containsKey("limit")) {
+                        params.put("limit", limitNode.asInt(50));
+                    }
                     out.put("delivered", server.sendClientCommand(clientId, command, params));
                 }
                 writeJson(resp, 200, out);
@@ -326,6 +334,17 @@ public class AdminConsoleServlet extends HttpServlet {
     private static String text(JsonNode body, String field) {
         JsonNode node = body.get(field);
         return node == null || node.isNull() ? null : node.asText();
+    }
+
+    /** 顶层字符串参数兜底并入 params（params 优先，顶层为兼容写法）。 */
+    private static void mergeTopLevelParam(JsonNode body, Map<String, Object> params,
+                                           String... fields) {
+        for (String field : fields) {
+            String value = text(body, field);
+            if (value != null && !params.containsKey(field)) {
+                params.put(field, value);
+            }
+        }
     }
 
     private static String requireText(JsonNode body, String field) {

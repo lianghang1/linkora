@@ -37,7 +37,7 @@ public final class DeliveryView {
         this.stateText = AdminViews.stateText(state);
         this.retryCount = retryCount;
         this.nextRetryAt = AdminViews.formatTime(nextRetryAt);
-        this.lastError = lastError == null ? "—" : lastError;
+        this.lastError = AdminViews.errorPreview(lastError);
         this.payloadPreview = AdminViews.payloadPreview(payload);
         this.payloadSize = payload == null ? 0 : payload.length;
         this.createdAt = AdminViews.formatTime(createdAt);

@@ -24,6 +24,17 @@ public final class AdminViews {
                 .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
+    /** 错误信息预览：超长截断，防止单条异常错误撑爆列表响应。 */
+    public static String errorPreview(String error) {
+        if (error == null) {
+            return "—";
+        }
+        if (error.length() > PREVIEW_MAX_CHARS) {
+            return error.substring(0, PREVIEW_MAX_CHARS) + "…（共 " + error.length() + " 字符）";
+        }
+        return error;
+    }
+
     /**
      * payload 的人类可读预览：UTF-8 解码后截断；
      * 含不可打印字节（非文本内容）时只标注字节数，不输出乱码。

@@ -79,18 +79,25 @@ public final class IngestService {
                     auth.getErrorCode() == null ? LinkoraErrorCode.AUTH_FAILED : auth.getErrorCode(),
                     auth.getMessage());
         }
-        // gzip：验签（覆盖压缩后字节）通过后解压，大小上限按解压后内容计
-        if ("gzip".equalsIgnoreCase(
-                String.valueOf(request.getHeaders().get("X-Linkora-Content-Encoding")))) {
+        // gzip：验签（覆盖压缩后字节）通过后解压，大小上限按解压后内容计；
+        // header 用大小写不敏感读取（getHeaders() 是普通 Map，精确匹配会漏），
+        // 并以 gzip 魔数兜底：中间层（网关/代理）可能改写或丢弃 Content-Encoding 头
+        if ("gzip".equalsIgnoreCase(request.header("X-Linkora-Content-Encoding"))
+                || com.linkora.core.util.Gzip.isGzipped(request.getBody())) {
             byte[] decompressed;
             try {
                 decompressed = com.linkora.core.util.Gzip.decompress(request.getBody());
             } catch (java.io.IOException e) {
                 return IngestResult.rejected(LinkoraErrorCode.INVALID_MESSAGE, "gzip 解压失败");
             }
+            // 重建请求头：大小写不敏感地剔除传输编码头（header 名可能被中间层规范化）
             java.util.Map<String, String> hs =
-                    new java.util.LinkedHashMap<String, String>(request.getHeaders());
-            hs.remove("X-Linkora-Content-Encoding");
+                    new java.util.LinkedHashMap<String, String>();
+            for (java.util.Map.Entry<String, String> e : request.getHeaders().entrySet()) {
+                if (!"X-Linkora-Content-Encoding".equalsIgnoreCase(e.getKey())) {
+                    hs.put(e.getKey(), e.getValue());
+                }
+            }
             request = new com.linkora.server.auth.AuthRequest(
                     request.getClientId(), request.getMethod(), hs, decompressed);
         }
