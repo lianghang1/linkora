@@ -43,7 +43,8 @@ public final class JdbcMessageRepository implements MessageRepository {
     public boolean save(LinkoraMessage message) {
         try (Connection connection = dataSource.getConnection();
              PreparedStatement ps = connection.prepareStatement(
-                     "INSERT INTO lk_message (" + COLUMNS + ") VALUES (?,?,?,?,?,?,?,?,?,?)")) {
+                     "INSERT INTO lk_message (" + COLUMNS
+                             + ", state) VALUES (?,?,?,?,?,?,?,?,?,?,'ACCEPTED')")) {
             ps.setString(1, message.getMessageId());
             ps.setString(2, message.getClientId());
             ps.setString(3, message.getMessageType());
@@ -79,6 +80,35 @@ public final class JdbcMessageRepository implements MessageRepository {
         } catch (SQLException e) {
             throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
                     "查询消息失败: " + messageId, e, messageId);
+        }
+    }
+
+    @Override
+    public String processStateOf(String messageId) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT state FROM lk_message WHERE message_id = ?")) {
+            ps.setString(1, messageId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString(1) : null;
+            }
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "查询消息处理状态失败: " + messageId, e, messageId);
+        }
+    }
+
+    @Override
+    public boolean updateProcessState(String messageId, String state) {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "UPDATE lk_message SET state = ? WHERE message_id = ?")) {
+            ps.setString(1, state);
+            ps.setString(2, messageId);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            throw new LinkoraException(LinkoraErrorCode.STORAGE_ERROR,
+                    "更新消息处理状态失败: " + messageId, e, messageId);
         }
     }
 

@@ -23,7 +23,7 @@ import java.sql.SQLException;
 public final class JdbcServerSchema {
 
     /** 当前最新 schema 版本，等于 MIGRATIONS 数组长度。 */
-    public static final int LATEST_VERSION = 4;
+    public static final int LATEST_VERSION = 5;
 
     private static final String VERSION_TABLE = "lk_schema_version";
 
@@ -130,12 +130,30 @@ public final class JdbcServerSchema {
             "ALTER TABLE lk_client ADD COLUMN display_name VARCHAR(255)",
     };
 
+    /**
+     * v5：上行处理状态。ACCEPTED（已入库待处理）→ PROCESSED（handler 成功）/
+     * FAILED（handler 失败，可重放）。存量数据（迁移前已入库的历史消息）
+     * 经 DEFAULT 直接视为 PROCESSED——历史消息不再触发重放。幂等。
+     */
+    private static final String[] V5_H2 = {
+            "ALTER TABLE lk_message ADD COLUMN IF NOT EXISTS "
+                    + "state VARCHAR(16) NOT NULL DEFAULT 'PROCESSED'",
+    };
+    private static final String[] V5_MYSQL = {
+            "ALTER TABLE lk_message ADD COLUMN "
+                    + "state VARCHAR(16) NOT NULL DEFAULT 'PROCESSED'",
+    };
+    private static final String[] V5_SQLITE = {
+            "ALTER TABLE lk_message ADD COLUMN "
+                    + "state VARCHAR(16) NOT NULL DEFAULT 'PROCESSED'",
+    };
+
     private static final String[][] MIGRATIONS =
-            {concat(V1_TABLES, V1_INDEXES_ANSI), V2_H2, V3_H2, V4_H2};
+            {concat(V1_TABLES, V1_INDEXES_ANSI), V2_H2, V3_H2, V4_H2, V5_H2};
     private static final String[][] MIGRATIONS_MYSQL =
-            {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL, V3_MYSQL, V4_MYSQL};
+            {concat(V1_TABLES, V1_INDEXES_MYSQL), V2_MYSQL, V3_MYSQL, V4_MYSQL, V5_MYSQL};
     private static final String[][] MIGRATIONS_SQLITE =
-            {concat(V1_TABLES, V1_INDEXES_ANSI), V2_SQLITE, V3_SQLITE, V4_SQLITE};
+            {concat(V1_TABLES, V1_INDEXES_ANSI), V2_SQLITE, V3_SQLITE, V4_SQLITE, V5_SQLITE};
 
     private static String[] concat(String[] tables, String[] indexes) {
         String[] all = new String[tables.length + indexes.length];

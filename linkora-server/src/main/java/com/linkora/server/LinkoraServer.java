@@ -1007,7 +1007,10 @@ public final class LinkoraServer {
             @Override
             public LinkoraHttpResult handle(LinkoraHttpRequest request) {
                 IngestResult result = ingestService.ingest(toAuthRequest(request));
-                if (result.getStatus() == IngestResult.Status.REJECTED) {
+                if (result.getStatus() == IngestResult.Status.REJECTED
+                        || result.getStatus() == IngestResult.Status.PROCESSING_FAILED) {
+                    // REJECTED → 400/401/413 等；PROCESSING_FAILED → 422（消息已入库 state=FAILED，
+                    // 客户端按不可重试语义进本地死信，修复后经死信重放恢复）
                     return jsonResult(result.httpStatus(),
                             codec.encodeErrorResponse(result.getErrorCode(), result.getErrorMessage()));
                 }

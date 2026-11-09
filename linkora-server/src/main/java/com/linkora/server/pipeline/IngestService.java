@@ -71,6 +71,11 @@ public final class IngestService {
                 : Collections.unmodifiableList(new ArrayList<IngestListener>(ingestListeners));
     }
 
+    /** lk_message.state 处理状态取值（与 v5 迁移列语义一致）。 */
+    static final String STATE_ACCEPTED = "ACCEPTED";
+    static final String STATE_PROCESSED = "PROCESSED";
+    static final String STATE_FAILED = "FAILED";
+
     public IngestResult ingest(AuthRequest requestParam) {
         AuthRequest request = requestParam;
         AuthResult auth = authenticator.authenticate(request);
@@ -129,10 +134,25 @@ public final class IngestService {
             return IngestResult.rejected(LinkoraErrorCode.FORBIDDEN,
                     "消息 clientId 与认证身份不一致");
         }
+        // 内部管理消息（linkora.admin.* 回传结果等）：一次性语义，不落库、不幂等检查，
+        // 仅旁路回调（管理结果暂存收集器监听后读取）
+        if (com.linkora.core.admin.ClientCommands.isInternalMessage(message.getMessageType())) {
+            notifyListeners(message);
+            return IngestResult.accepted(message.getMessageId());
+        }
         Optional<LinkoraMessage> existing = messageRepository.findByMessageId(message.getMessageId());
         if (existing.isPresent()) {
-            log.debug("消息重复上报（幂等命中）: messageId={}, clientId={}",
-                    message.getMessageId(), request.getClientId());
+            String state = messageRepository.processStateOf(message.getMessageId());
+            // FAILED：此前业务处理失败，放行重新执行监听（显式重放/客户端死信重发触发）；
+            // PROCESSED/ACCEPTED 及自实现仓储查不到状态（null）一律按重复响应，
+            // 防止已成功消息被重放、处理中消息被并发双跑
+            if (STATE_FAILED.equals(state)) {
+                log.info("处理失败消息重放: messageId={}, clientId={}",
+                        message.getMessageId(), request.getClientId());
+                return replayListeners(message);
+            }
+            log.debug("消息重复上报（幂等命中）: messageId={}, clientId={}, state={}",
+                    message.getMessageId(), request.getClientId(), state);
             return IngestResult.duplicate(message.getMessageId());
         }
         boolean inserted = messageRepository.save(message);
@@ -145,20 +165,46 @@ public final class IngestService {
         }
         log.debug("消息已持久化接受: messageId={}, clientId={}, type={}",
                 message.getMessageId(), message.getClientId(), message.getMessageType());
-        notifyListeners(message);
+        String listenerError = notifyListeners(message);
+        if (listenerError != null) {
+            messageRepository.updateProcessState(message.getMessageId(), STATE_FAILED);
+            log.warn("上行消息业务处理失败: messageId={}, clientId={}, 错误: {}",
+                    message.getMessageId(), message.getClientId(), listenerError);
+            return IngestResult.processingFailed(message.getMessageId(), listenerError);
+        }
+        messageRepository.updateProcessState(message.getMessageId(), STATE_PROCESSED);
         return IngestResult.accepted(message.getMessageId());
     }
 
-    /** 业务侧监听回调（按注册顺序逐个调用）：异常只记告警，不影响上行结果。 */
-    private void notifyListeners(LinkoraMessage message) {
+    /** 失败消息重放（消息已入库，无需再 save）：结果与首次处理一致地回写状态。 */
+    private IngestResult replayListeners(LinkoraMessage message) {
+        String listenerError = notifyListeners(message);
+        if (listenerError != null) {
+            messageRepository.updateProcessState(message.getMessageId(), STATE_FAILED);
+            return IngestResult.processingFailed(message.getMessageId(), listenerError);
+        }
+        messageRepository.updateProcessState(message.getMessageId(), STATE_PROCESSED);
+        return IngestResult.accepted(message.getMessageId());
+    }
+
+    /**
+     * 业务侧监听回调（按注册顺序逐个调用）：异常记录告警并收集首个错误信息
+     * （驱动 state=FAILED 与 422 响应）；全部成功返回 null。
+     * 内部管理消息的旁路回调异常不影响上行结果（调用方忽略返回值）。
+     */
+    private String notifyListeners(LinkoraMessage message) {
+        String firstError = null;
         for (IngestListener listener : ingestListeners) {
             try {
                 listener.onIngested(message);
             } catch (RuntimeException e) {
-                log.warn("IngestListener 回调异常（不影响上行结果）: messageId={}",
-                        message.getMessageId(), e);
+                log.warn("IngestListener 回调异常: messageId={}", message.getMessageId(), e);
+                if (firstError == null) {
+                    firstError = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                }
             }
         }
+        return firstError;
     }
 
     /** 协议版本头校验；返回 null 表示通过。 */

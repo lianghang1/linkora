@@ -38,6 +38,14 @@ public final class ClientCommands {
     /** 指令执行结果回传使用的上行消息类型（服务端据此识别并暂存结果）。 */
     public static final String RESULT_MESSAGE_TYPE = "linkora.admin.result";
 
+    /** 内部管理消息类型前缀：匹配的上行消息不落 lk_message、不进客户端 outbox（一次性语义）。 */
+    public static final String ADMIN_MESSAGE_PREFIX = "linkora.admin.";
+
+    /** 是否内部管理消息（回传结果等）：免库免状态，仅旁路暂存。 */
+    public static boolean isInternalMessage(String messageType) {
+        return messageType != null && messageType.startsWith(ADMIN_MESSAGE_PREFIX);
+    }
+
     private static final Set<String> WHITELIST = Collections.unmodifiableSet(
             new HashSet<>(Arrays.asList(
                     RETRY_OUTBOX_DEAD_LETTER, DISCARD_OUTBOX_DEAD_LETTER,

@@ -334,6 +334,66 @@ public final class LinkoraClient implements AutoCloseable {
         return messageId;
     }
 
+    /**
+     * 直发内部管理消息（{@code linkora.admin.*} 结果回传）：不写入 lk_outbox，
+     * 发送失败仅记日志丢弃——一次性语义，结果丢失由管理端重新查询恢复。
+     * 构造链路与 outbox 上报完全一致（加密、gzip、token 认证头）。
+     */
+    private void publishEphemeral(String messageType, byte[] payload) {
+        if (state == ClientState.CLOSED) {
+            throw new LinkoraException(LinkoraErrorCode.INTERNAL_ERROR, "客户端已关闭");
+        }
+        long now = System.currentTimeMillis();
+        String messageId = UUID.randomUUID().toString();
+        LinkoraMessage message;
+        try {
+            message = LinkoraMessage.builder()
+                    .messageId(messageId)
+                    .clientId(clientId)
+                    .messageType(messageType)
+                    .payload(uplinkPayload(payload))
+                    .createdAt(now)
+                    .schemaVersion(Protocol.PROTOCOL_VERSION)
+                    .enc(uplinkEncMark())
+                    .build();
+        } catch (IllegalArgumentException e) {
+            log.warn("管理结果直发失败（消息非法，丢弃）: {}", e.getMessage());
+            return;
+        }
+        byte[] body = codec.encodeMessage(message).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        body = com.linkora.core.util.Gzip.maybeCompress(body);
+        Map<String, String> headers = baseHeaders();
+        headers.put("Content-Type", "application/json");
+        if (com.linkora.core.util.Gzip.isGzipped(body)) {
+            headers.put("X-Linkora-Content-Encoding", "gzip");
+        }
+        try {
+            headers.putAll(credentialProvider.authHeaders(
+                    new CredentialProvider.RequestMaterial("POST", body)));
+        } catch (RuntimeException e) {
+            log.warn("管理结果直发失败（认证不可用，丢弃）: {}", e.getMessage());
+            return;
+        }
+        TransportRequest request = TransportRequest.newBuilder(ingestUrl)
+                .method("POST")
+                .headers(headers)
+                .body(body)
+                .connectTimeoutMs(config.getConnectTimeoutMs())
+                .readTimeoutMs(config.getRequestTimeoutMs())
+                .build();
+        try {
+            TransportResponse response = transport.execute(request);
+            if (!response.isSuccessful()) {
+                log.warn("管理结果直发失败（丢弃）: messageId={}, HTTP {}",
+                        messageId, response.getCode());
+            } else {
+                log.debug("管理结果已直发: messageId={}", messageId);
+            }
+        } catch (RuntimeException e) {
+            log.warn("管理结果直发失败（丢弃）: messageId={}, 原因: {}", messageId, e.getMessage());
+        }
+    }
+
     // ---------------- SSE 内部监听 ----------------
 
     private final SseListener internalSseListener = new SseListener() {
@@ -750,7 +810,8 @@ public final class LinkoraClient implements AutoCloseable {
                     rowsJson.append(']');
                     String resultPayload = "{\"queryId\":\"" + queryId + "\",\"clientId\":\""
                             + clientId + "\",\"rows\":" + rowsJson + "}";
-                    publish(com.linkora.core.admin.ClientCommands.RESULT_MESSAGE_TYPE,
+                    // 内部消息一次性语义：直发不入 outbox，丢失由管理端重新查询恢复
+                    publishEphemeral(com.linkora.core.admin.ClientCommands.RESULT_MESSAGE_TYPE,
                             resultPayload.getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     log.info("管理指令远程查询完成: queryId={}, 返回 {} 行", queryId, rows.size());
                     break;
@@ -854,8 +915,21 @@ public final class LinkoraClient implements AutoCloseable {
         if (com.linkora.core.util.Gzip.isGzipped(body)) {
             headers.put("X-Linkora-Content-Encoding", "gzip");
         }
-        headers.putAll(credentialProvider.authHeaders(
-                new CredentialProvider.RequestMaterial("POST", body)));
+        // 认证暂不可用（token 未就绪/服务不可达）：消息留在本地，不计失败次数，
+        // 退避后自动重推，token 恢复后无需人工介入
+        Map<String, String> authHeaders;
+        try {
+            authHeaders = credentialProvider.authHeaders(
+                    new CredentialProvider.RequestMaterial("POST", body));
+        } catch (RuntimeException e) {
+            long retryAt = System.currentTimeMillis()
+                    + Math.min(config.backoffDelayMs(entry.getRetryCount() + 1), 60_000L);
+            transitionOutbox(entry.with(OutboxStatus.FAILED, entry.getRetryCount(), retryAt,
+                    "认证暂不可用: " + e.getMessage(), System.currentTimeMillis()),
+                    OutboxStatus.SENDING);
+            return;
+        }
+        headers.putAll(authHeaders);
         TransportRequest request = TransportRequest.newBuilder(ingestUrl)
                 .method("POST")
                 .headers(headers)
@@ -984,8 +1058,15 @@ public final class LinkoraClient implements AutoCloseable {
                 .getBytes(java.nio.charset.StandardCharsets.UTF_8);
         Map<String, String> headers = baseHeaders();
         headers.put("Content-Type", "application/json");
-        headers.putAll(credentialProvider.authHeaders(
-                new CredentialProvider.RequestMaterial("POST", body)));
+        // 认证暂不可用：ACK 幂等可补，仅记日志由恢复扫描补发
+        try {
+            headers.putAll(credentialProvider.authHeaders(
+                    new CredentialProvider.RequestMaterial("POST", body)));
+        } catch (RuntimeException e) {
+            log.warn("ACK 认证暂不可用（将按幂等补发）: messageId={}, ackType={}, 原因: {}",
+                    messageId, ackType, e.getMessage());
+            return false;
+        }
         TransportRequest request = TransportRequest.newBuilder(ackUrl)
                 .method("POST")
                 .headers(headers)

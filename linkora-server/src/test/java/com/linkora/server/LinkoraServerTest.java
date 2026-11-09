@@ -855,7 +855,7 @@ public class LinkoraServerTest {
     }
 
     @Test
-    public void ingestListenerFailureDoesNotBreakIngest() {
+    public void ingestListenerFailureReturns422AndMarksFailed() {
         LinkoraServer listenerServer = LinkoraServer.builder()
                 .clientAuthenticator(new AllowAllClientAuthenticator())
                 .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
@@ -880,9 +880,47 @@ public class LinkoraServerTest {
             LinkoraHttpResult result = listenerServer.ingestHttpHandler().handle(
                     new LinkoraHttpRequest(CLIENT, "POST", protocolHeaders(),
                             codec.encodeMessage(message).getBytes(StandardCharsets.UTF_8)));
-            assertEquals(200, result.getStatus());
-            assertTrue(new String(result.getBody(), StandardCharsets.UTF_8)
-                    .contains("ACCEPTED"));
+            // 处理失败语义：422 + PROCESSING_FAILED，消息入库 state=FAILED 可重放
+            assertEquals(422, result.getStatus());
+            String body = new String(result.getBody(), StandardCharsets.UTF_8);
+            assertTrue(body.contains("PROCESSING_FAILED"));
+            com.linkora.server.storage.jdbc.JdbcMessageRepository repo =
+                    new com.linkora.server.storage.jdbc.JdbcMessageRepository(dataSource);
+            assertEquals("FAILED",
+                    repo.processStateOf("up-listener-2"));
+
+            // 重放路径：同 messageId 再上报 → FAILED 放行 → 仍失败 → 再次 422
+            LinkoraHttpResult retry = listenerServer.ingestHttpHandler().handle(
+                    new LinkoraHttpRequest(CLIENT, "POST", protocolHeaders(),
+                            codec.encodeMessage(message).getBytes(StandardCharsets.UTF_8)));
+            assertEquals(422, retry.getStatus());
+
+            // 修复后重放：listener 正常 → PROCESSED → 200
+            LinkoraServer fixedServer = LinkoraServer.builder()
+                    .clientAuthenticator(new AllowAllClientAuthenticator())
+                    .clientRegistry(new com.linkora.server.storage.jdbc.JdbcClientRegistry(dataSource))
+                    .messageRepository(repo)
+                    .deliveryRepository(new com.linkora.server.storage.jdbc.JdbcDeliveryRepository(dataSource))
+                    .cursorRepository(new com.linkora.server.storage.jdbc.JdbcClientCursorRepository(dataSource))
+                    .pushGateway(gateway)
+                    .ingestListener(new com.linkora.server.pipeline.IngestListener() {
+                        @Override
+                        public void onIngested(LinkoraMessage message) {
+                            // 正常处理
+                        }
+                    })
+                    .build();
+            fixedServer.start();
+            try {
+                LinkoraHttpResult replay = fixedServer.ingestHttpHandler().handle(
+                        new LinkoraHttpRequest(CLIENT, "POST", protocolHeaders(),
+                                codec.encodeMessage(message).getBytes(StandardCharsets.UTF_8)));
+                assertEquals(200, replay.getStatus());
+                assertEquals("PROCESSED",
+                        repo.processStateOf("up-listener-2"));
+            } finally {
+                fixedServer.close();
+            }
         } finally {
             listenerServer.close();
         }

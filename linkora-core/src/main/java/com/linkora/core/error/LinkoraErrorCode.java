@@ -40,6 +40,9 @@ public enum LinkoraErrorCode {
     /** 协议版本不受支持。 */
     UNSUPPORTED_PROTOCOL("UNSUPPORTED_PROTOCOL"),
 
+    /** 服务端业务处理失败（上行消息已收到但 handler 执行异常，客户端应重试）。 */
+    PROCESSING_FAILED("PROCESSING_FAILED"),
+
     /** 未分类的内部错误。 */
     INTERNAL_ERROR("INTERNAL_ERROR");
 

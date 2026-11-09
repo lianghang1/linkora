@@ -8,7 +8,7 @@ import com.linkora.core.error.LinkoraErrorCode;
  */
 public final class IngestResult {
 
-    public enum Status { ACCEPTED, DUPLICATE, REJECTED }
+    public enum Status { ACCEPTED, DUPLICATE, REJECTED, PROCESSING_FAILED }
 
     private final Status status;
     private final String messageId;
@@ -31,6 +31,15 @@ public final class IngestResult {
         return new IngestResult(Status.DUPLICATE, messageId, null, null);
     }
 
+    /**
+     * 业务处理失败：消息已入库（state=FAILED），客户端收到 422 后
+     * 按不可重试语义进入本地死信，由运维修复后经死信重放恢复。
+     */
+    public static IngestResult processingFailed(String messageId, String errorMessage) {
+        return new IngestResult(Status.PROCESSING_FAILED, messageId,
+                LinkoraErrorCode.PROCESSING_FAILED, errorMessage);
+    }
+
     public static IngestResult rejected(LinkoraErrorCode errorCode, String errorMessage) {
         return new IngestResult(Status.REJECTED, null, errorCode, errorMessage);
     }
@@ -51,12 +60,14 @@ public final class IngestResult {
         return errorMessage;
     }
 
-    /** 映射 HTTP 状态码：拒绝类按错误码区分，接受类一律 200。 */
+    /** 映射 HTTP 状态码：拒绝类按错误码区分，接受类一律 200，处理失败 422。 */
     public int httpStatus() {
         switch (status) {
             case ACCEPTED:
             case DUPLICATE:
                 return 200;
+            case PROCESSING_FAILED:
+                return 422;
             default:
                 if (errorCode == null) {
                     return 400;

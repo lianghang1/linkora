@@ -26,6 +26,28 @@ public interface MessageRepository {
 
     Optional<LinkoraMessage> findByMessageId(String messageId);
 
+    /**
+     * 查询消息处理状态。仅 JDBC/内置仓储支持；自实现仓储 default 返回 null，
+     * 上行处理失败时服务端将退化为"不区分状态、一律按重复消息响应"。
+     *
+     * <p>取值为 {@code ACCEPTED}（已入库待处理）、{@code PROCESSED}（处理成功）、
+     * {@code FAILED}（处理失败，可重放）；消息不存在返回 null。</p>
+     */
+    default String processStateOf(String messageId) {
+        return null;
+    }
+
+    /**
+     * 更新消息处理状态（handler 执行成功置 PROCESSED、失败置 FAILED）。
+     * default 忽略并返回 false：自实现仓储不覆盖不会破坏编译，
+     * 此时上行处理失败仍按失败响应返回，但消息保持原状态、重放由调用方自行处理。
+     *
+     * @return true 表示更新成功；false 表示仓储不支持或消息不存在
+     */
+    default boolean updateProcessState(String messageId, String state) {
+        return false;
+    }
+
     // ---------------- 管理/观测查询（可选能力） ----------------
 
     /**
